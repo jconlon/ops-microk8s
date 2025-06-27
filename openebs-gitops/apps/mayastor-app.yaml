@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: <YOUR_GIT_REPO_URL>
+    repoURL: https://github.com/jconlon/ops-microk8s
     path: openebs-gitops/apps/diskpools
     targetRevision: HEAD
   destination:

@@ -36,6 +36,11 @@ kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 
 ## OpenEBS
 
+```bash
+kubectl create namespace mayastor
+
+```
+
 ```text
 openebs-gitops/
 ├── apps/
