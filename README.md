@@ -70,3 +70,9 @@ echo 'vm.nr_hugepages=1024' | sudo tee -a /etc/sysctl.conf
 sudo modprobe nvme_tcp
 echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 ```
+
+### Bootstrap Argo CD:
+
+```bash
+kubectl apply -n argocd -f openebs-gitops/root-app-of-apps.yaml
+```
