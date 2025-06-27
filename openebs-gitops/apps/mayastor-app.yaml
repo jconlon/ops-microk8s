@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mayastor-diskpools
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: <YOUR_GIT_REPO_URL>
+    path: openebs-gitops/apps/diskpools
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mayastor

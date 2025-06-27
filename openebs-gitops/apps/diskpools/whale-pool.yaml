@@ -1,0 +1,8 @@
+apiVersion: openebs.io/v1beta1
+kind: DiskPool
+metadata:
+  name: pool-whale
+  namespace: mayastor
+spec:
+  node: whale
+  disks: ["/dev/disk/by-id/ata-WDC_WD40EZAZ-00SF3B0_WD-WX42D5122V9Y"]
