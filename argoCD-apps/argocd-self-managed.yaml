@@ -15,6 +15,12 @@ spec:
         global:
           domain: argocd.verticon.com
 
+        configs:
+          params:
+            # This is the key setting for gRPC-Web default behavior
+            server.grpc.web: true
+            server.insecure: true
+
         server:
           insecure: true
           ingress:
@@ -22,7 +28,7 @@ spec:
           service:
             type: LoadBalancer
           extraArgs:
-            - --insecure
+            - --grpc-web
 
         notifications:
           enabled: false
