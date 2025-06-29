@@ -1,0 +1,8 @@
+apiVersion: openebs.io/v1alpha1
+kind: DiskPool
+metadata:
+  name: pool-shamu
+  namespace: mayastor
+spec:
+  node: shamu
+  disks: ["/dev/disk/by-id/scsi-SASMT_ASM1156-PM_00000000000000000000"]
