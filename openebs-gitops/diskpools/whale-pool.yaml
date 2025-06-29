@@ -1,4 +1,5 @@
-apiVersion: openebs.io/v1beta1
+# File: openebs-gitops/diskpools/whale-pool.yaml
+apiVersion: openebs.io/v1alpha1
 kind: DiskPool
 metadata:
   name: pool-whale

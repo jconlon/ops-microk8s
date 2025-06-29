@@ -1,4 +1,5 @@
-apiVersion: openebs.io/v1beta1
+# #This file defines a disk pool for Mayastor on the mullet node.
+apiVersion: openebs.io/v1alpha1
 kind: DiskPool
 metadata:
   name: pool-mullet
