@@ -1,0 +1,8 @@
+apiVersion: openebs.io/v1alpha1
+kind: DiskPool
+metadata:
+  name: pool-trout
+  namespace: mayastor
+spec:
+  node: trout
+  disks: ["/dev/disk/by-id/ata-WDC_WD40EZAZ-00SF3B0_WD-WX42D5122EVU"]
