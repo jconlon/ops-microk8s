@@ -1,8 +1,8 @@
-apiVersion: openebs.io/v1beta2
+apiVersion: "openebs.io/v1beta3"
 kind: DiskPool
 metadata:
   name: pool-tuna
-  namespace: mayastor
+  namespace: openebs
 spec:
   node: tuna
-  disks: ["/dev/disk/by-id/scsi-SASMT_ASM1156-PM_00000000000000000000"]
+  disks: ["/dev/disk/by-id/scsi-35000000000000001"]

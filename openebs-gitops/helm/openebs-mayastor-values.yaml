@@ -1,0 +1,236 @@
+# OpenEBS Mayastor Helm Values File
+# This configuration enables Mayastor while disabling other OpenEBS engines
+
+# Global OpenEBS settings
+global:
+  # Set to true to enable debug logging
+  debug: false
+  # Image registry settings
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Mayastor configuration
+mayastor:
+  # Enable Mayastor engine
+  enabled: true
+  io_engine:
+    # IO Engine configuration - Fix for IOVA mode
+    # Pass additional arguments to the Environment Abstraction Layer
+    envcontext: "iova-mode=pa"
+
+  # Mayastor Control Plane
+  controlPlane:
+    replicaCount: 1
+
+    # Resource limits for control plane
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+    # Node selector for control plane
+    nodeSelector: {}
+
+    # Tolerations for control plane
+    tolerations: []
+
+    # Affinity for control plane
+    affinity: {}
+
+  # Mayastor Data Plane
+  dataPlane:
+    # Resource limits for data plane
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+        hugepages-2Mi: 2Gi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+        hugepages-2Mi: 2Gi
+
+    # Node selector for data plane (only nodes with Mayastor label)
+    nodeSelector:
+      openebs.io/engine: mayastor
+
+    # Tolerations for data plane
+    tolerations: []
+
+    # Affinity for data plane
+    affinity: {}
+
+  # CSI Controller
+  csiController:
+    replicaCount: 1
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+  # CSI Node
+  csiNode:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+  # Image settings - remove to use chart defaults
+  # image:
+  #   registry: docker.io
+  #   repository: openebs/mayastor
+  #   tag: ""  # Leave empty to use chart default
+  #   pullPolicy: IfNotPresent
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 10124
+
+  # Storage class configuration
+  storageClass:
+    enabled: true
+    name: mayastor
+    isDefaultClass: false
+    reclaimPolicy: Delete
+    allowVolumeExpansion: true
+    volumeBindingMode: Immediate
+    parameters:
+      repl: "1" # Number of replicas
+      protocol: "nvmf" # Protocol to use (nvmf or iscsi)
+      fsType: "ext4" # Filesystem type
+    allowedTopologies: []
+
+  # Monitoring and observability
+  monitoring:
+    enabled: true
+    # Prometheus metrics endpoint
+    prometheus:
+      enabled: true
+      port: 9090
+      path: /metrics
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 2000
+
+# Disable other OpenEBS engines to focus on Mayastor
+# Local PV HostPath
+localpv-hostpath:
+  enabled: false
+
+# Local PV Device
+localpv-device:
+  enabled: false
+
+# Local PV LVM
+localpv-lvm:
+  enabled: false
+
+# Local PV ZFS
+localpv-zfs:
+  enabled: false
+
+# Dynamic Local PV
+dynamic-localpv:
+  enabled: false
+
+# Jiva
+jiva:
+  enabled: false
+
+# cStor
+cstor:
+  enabled: false
+
+# OpenEBS NDM (Node Device Manager)
+# Keep enabled as Mayastor may use it for device discovery
+ndm:
+  enabled: true
+
+  # NDM configuration
+  filters:
+    enableOsDiskExcludeFilter: true
+    enableVendorFilter: true
+    enablePartitionFilter: true
+    excludeVendors: "CLOUDBYT,OpenEBS"
+    excludePaths: "loop,fd0,sr0,/dev/ram,/dev/dm-,/dev/md,/dev/rbd,/dev/zd"
+
+  # Probe configuration
+  probes:
+    enableSeachest: false
+    enableUdevProbe: true
+    enableSmartProbe: true
+
+  # Node selector for NDM
+  nodeSelector: {}
+
+  # Tolerations for NDM
+  tolerations: []
+
+  # Resources for NDM
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# NDM Operator
+ndmOperator:
+  enabled: true
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# OpenEBS API Server (optional)
+apiserver:
+  enabled: false
+
+# OpenEBS Admission Server (optional)
+admission-server:
+  enabled: false
+
+# Snapshot Controller (optional but recommended)
+snapshot-controller:
+  enabled: true
+
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# CRD configuration
+crds:
+  csi:
+    volumeSnapshots:
+      enabled: true
