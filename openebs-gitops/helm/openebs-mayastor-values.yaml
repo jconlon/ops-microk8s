@@ -144,21 +144,25 @@ mayastor:
     # runAsUser: 1000     # Commented out for CSI compatibility
     # fsGroup: 2000       # Commented out for CSI compatibility
 
-# Disable other OpenEBS engines to focus on Mayastor
+# OpenEBS Engine Configuration - Focus on Mayastor only
+# Use the correct engines.* structure to control chart dependencies
+engines:
+  local:
+    lvm:
+      enabled: false    # Disable LVM LocalPV
+    zfs:
+      enabled: false    # Disable ZFS LocalPV
+  replicated:
+    mayastor:
+      enabled: true     # Enable Mayastor for replicated storage
+
+# Legacy component disables (kept for compatibility)
 # Local PV HostPath
 localpv-hostpath:
   enabled: false
 
-# Local PV Device
+# Local PV Device  
 localpv-device:
-  enabled: false
-
-# Local PV LVM
-localpv-lvm:
-  enabled: false
-
-# Local PV ZFS
-localpv-zfs:
   enabled: false
 
 # Dynamic Local PV
@@ -245,30 +249,25 @@ crds:
     volumeSnapshots:
       enabled: true
 
-# EXPLICITLY DISABLE NATS COMPONENTS
-# Add these sections to disable NATS messaging components
-nats:
-  enabled: false
+# NATS is REQUIRED for Mayastor operation
+# NATS handles critical volume events, cluster coordination, and HA
+# Do not disable NATS when using Mayastor - it will break storage operations
 
-# If using older OpenEBS chart versions, also disable these
+# Disable optional messaging components (but keep NATS)
 messaging:
   enabled: false
-  nats:
-    enabled: false
 
-# Event exporter that might depend on NATS
+# Event exporter - optional component  
 eventExporter:
   enabled: false
 
-# Webhook configurations that might use NATS
+# Webhook configurations - optional
 webhooks:
   enabled: false
 
-# OpenEBS specific messaging components
+# OpenEBS specific optional messaging components
 openebs:
   messaging:
-    enabled: false
-  nats:
     enabled: false
   eventExporter:
     enabled: false
@@ -280,11 +279,19 @@ minio:
 # Configure Loki to use your existing MinIO
 loki:
   enabled: true
+  # Disable Loki's MinIO subchart dependency
+  minio:
+    enabled: false
   loki:
-    storage_config:
-      aws:
+    storage:
+      type: s3
+      bucketNames:
+        chunks: "openebs-logs"
+        ruler: "openebs-logs"
+        admin: "openebs-logs"
+      s3:
         endpoint: "http://trout:9000"
-        access_key_id: "jackcondor"
-        secret_access_key: "xidejc88wiix3"
-        s3forcepathstyle: true
-        bucketnames: "openebs-logs"
+        accessKeyId: "jackcondor"
+        secretAccessKey: "xidejc88wiix3"
+        s3ForcePathStyle: true
+        insecure: true

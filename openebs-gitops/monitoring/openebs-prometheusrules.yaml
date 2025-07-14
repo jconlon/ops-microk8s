@@ -10,23 +10,23 @@ spec:
   groups:
     - name: openebs.rules
       rules:
-        - alert: OpenEBSVolumeHigh
-          expr: (openebs_volume_usage_bytes / openebs_volume_capacity_bytes) * 100 > 80
+        - alert: MayastorDiskpoolHigh
+          expr: (diskpool_used_size_bytes / diskpool_total_size_bytes) * 100 > 80
           for: 5m
           labels:
             severity: warning
           annotations:
-            summary: "OpenEBS volume usage is high"
-            description: "Volume {{ $labels.volume }} usage is above 80%"
+            summary: "Mayastor diskpool usage is high"
+            description: "Diskpool {{ $labels.name }} on node {{ $labels.node }} usage is above 80%"
 
-        - alert: OpenEBSPoolHigh
-          expr: (openebs_pool_usage_bytes / openebs_pool_capacity_bytes) * 100 > 85
+        - alert: MayastorDiskpoolCritical
+          expr: (diskpool_used_size_bytes / diskpool_total_size_bytes) * 100 > 85
           for: 5m
           labels:
             severity: critical
           annotations:
-            summary: "OpenEBS pool usage is critically high"
-            description: "Pool {{ $labels.pool }} usage is above 85%"
+            summary: "Mayastor diskpool usage is critically high"
+            description: "Diskpool {{ $labels.name }} on node {{ $labels.node }} usage is above 85%"
 
         - alert: OpenEBSComponentDown
           expr: up{job=~"openebs-.*"} == 0

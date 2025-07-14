@@ -101,19 +101,19 @@ data:
           },
           "targets": [
             {
-              "expr": "openebs_volume_capacity_bytes",
+              "expr": "diskpool_total_size_bytes",
               "interval": "",
-              "legendFormat": "Volume: {{volume}} - Capacity",
+              "legendFormat": "Pool: {{name}} - Total",
               "refId": "A"
             },
             {
-              "expr": "openebs_volume_usage_bytes",
+              "expr": "diskpool_used_size_bytes",
               "interval": "",
-              "legendFormat": "Volume: {{volume}} - Used",
+              "legendFormat": "Pool: {{name}} - Used",
               "refId": "B"
             }
           ],
-          "title": "OpenEBS Volume Usage",
+          "title": "Mayastor Diskpool Usage",
           "type": "timeseries"
         },
         {
@@ -168,13 +168,13 @@ data:
           "pluginVersion": "8.0.0",
           "targets": [
             {
-              "expr": "(openebs_volume_usage_bytes / openebs_volume_capacity_bytes) * 100",
+              "expr": "(diskpool_used_size_bytes / diskpool_total_size_bytes) * 100",
               "interval": "",
-              "legendFormat": "{{volume}}",
+              "legendFormat": "{{name}}",
               "refId": "A"
             }
           ],
-          "title": "Volume Usage Percentage",
+          "title": "Diskpool Usage Percentage",
           "type": "gauge"
         },
         {
@@ -249,19 +249,19 @@ data:
           },
           "targets": [
             {
-              "expr": "rate(openebs_volume_read_iops[5m])",
+              "expr": "rate(diskpool_num_read_ops[5m])",
               "interval": "",
-              "legendFormat": "Read IOPS - {{volume}}",
+              "legendFormat": "Read IOPS - {{name}}",
               "refId": "A"
             },
             {
-              "expr": "rate(openebs_volume_write_iops[5m])",
+              "expr": "rate(diskpool_num_write_ops[5m])",
               "interval": "",
-              "legendFormat": "Write IOPS - {{volume}}",
+              "legendFormat": "Write IOPS - {{name}}",
               "refId": "B"
             }
           ],
-          "title": "Volume IOPS",
+          "title": "Diskpool IOPS",
           "type": "timeseries"
         }
       ],
@@ -329,7 +329,7 @@ data:
           "pluginVersion": "8.0.0",
           "targets": [
             {
-              "expr": "openebs_volume_capacity_bytes{engine=\"mayastor\"}",
+              "expr": "diskpool_total_size_bytes",
               "format": "table",
               "instant": true,
               "interval": "",
