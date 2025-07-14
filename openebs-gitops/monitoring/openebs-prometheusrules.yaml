@@ -1,0 +1,38 @@
+# openebs-prometheusrules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openebs-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+    - name: openebs.rules
+      rules:
+        - alert: OpenEBSVolumeHigh
+          expr: (openebs_volume_usage_bytes / openebs_volume_capacity_bytes) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenEBS volume usage is high"
+            description: "Volume {{ $labels.volume }} usage is above 80%"
+
+        - alert: OpenEBSPoolHigh
+          expr: (openebs_pool_usage_bytes / openebs_pool_capacity_bytes) * 100 > 85
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenEBS pool usage is critically high"
+            description: "Pool {{ $labels.pool }} usage is above 85%"
+
+        - alert: OpenEBSComponentDown
+          expr: up{job=~"openebs-.*"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenEBS component is down"
+            description: "OpenEBS component {{ $labels.job }} is down"

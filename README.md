@@ -1,5 +1,38 @@
 # ops-microk8s
 
+Project to create a microk8s cluster with 5 nodes.
+
+```bash
+☸ microk8s (monitoring) in ops-microk8s [✘!?] took 8m0s
+✗ k get no
+NAME     STATUS   ROLES    AGE     VERSION
+mullet   Ready    <none>   30d     v1.32.3
+shamu    Ready    <none>   22d     v1.32.3
+trout    Ready    <none>   22d     v1.32.3
+tuna     Ready    <none>   4d20h   v1.32.3
+whale    Ready    <none>   22d     v1.32.3
+
+➜ microk8s status
+microk8s is running
+high-availability: yes
+  datastore master nodes: 192.168.0.101:19001 192.168.0.107:19001 192.168.0.102:19001
+  datastore standby nodes: none
+addons:
+  enabled:
+    dns                  # (core) CoreDNS
+    ha-cluster           # (core) Configure high availability on the current node
+    helm                 # (core) Helm - the package manager for Kubernetes
+    helm3                # (core) Helm 3 - the package manager for Kubernetes
+    metallb              # (core) Loadbalancer for your Kubernetes cluster
+
+➜ kubectl get nodes -l node.kubernetes.io/microk8s-controlplane=microk8s-controlplane
+NAME     STATUS   ROLES    AGE   VERSION
+mullet   Ready    <none>   30d   v1.32.3
+trout    Ready    <none>   22d   v1.32.3
+whale    Ready    <none>   22d   v1.32.3
+
+```
+
 Building the kubernetes cluster consists of the following steps:
 
 1. Install node hardware/machines/os.
@@ -8,6 +41,8 @@ Building the kubernetes cluster consists of the following steps:
 1. Add initial set of services to the cluster with Microk8s addons.
 
 ## Addons
+
+Will not use the openebs, mayastor or prometheus addons, but will install these with argocd and helm.
 
 ```bash
  microk8s enable dns
@@ -21,7 +56,7 @@ Building the kubernetes cluster consists of the following steps:
 ## ArgoCD
 
 ```bash
-# Helm first to get the correct values file
+# Experiment with Helm first to get the correct values file
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 helm install argocd argo/argo-cd -n argocd --create-namespace
@@ -30,11 +65,28 @@ helm install argocd argo/argo-cd -n argocd --create-namespace
 
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
-# Self managed via helm values
+# Self manage argocd via helm values
 kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 ```
 
-## OpenEBS via helm
+## OpenEBS
+
+### Project status
+
+[OpenEBS roadmap](https://github.com/openebs/openebs/blob/main/ROADMAP.md)
+
+[Deprecated Projects](https://github.com/openebs/openebs/issues/3709)
+
+Focus on these engines and release +4.2
+
+Moving forward, the new OpenEBS product architecture and Roadmap centers round 2 core storage services. ‘Local’ and ‘Replicated’. These include the following Data Engines:
+
+1. LocalPV-HostPath
+2. LocalPV-LVM
+3. LocalPV-ZFS
+4. Mayastor
+
+### Helm install
 
 ```bash
 
@@ -71,6 +123,8 @@ For more information,
 
 ### Label nodes
 
+Label all the nodes to use mayastor as these all have a 4TB external drive to use for the diskpools.
+
 ```bash
 
 kubectl label node whale openebs.io/engine=mayastor
@@ -97,9 +151,50 @@ k apply -f openebs-gitops/diskpools/whale-pool.yaml
 
 ```
 
+### Storage classes
+
+`k apply -f openebs-gitops/storageclasses/mayastor-storage-classes.yaml `
+
 ### Problems
 
-**Fixed by the values file.**
+#### Mounting problems
+
+Will have problems mounting if:
+
+Setup instructions from the openebs docs. These have been incorporated in the `openebs-gitops/helm/openebs-mayastor-values.yaml` file.
+
+If you are utilizing a custom Kubelet location or a Kubernetes distribution that uses a custom Kubelet location, it is necessary to modify the Kubelet directory in the Helm values at installation time. This can be accomplished by using the --set flag option in the Helm install command, as follows:
+
+For Local PV LVM
+--set lvm-localpv.lvmNode.kubeletDir=<your-directory-path>
+For Local PV ZFS
+--set zfs-localpv.zfsNode.kubeletDir=<your-directory-path>
+For Replicated PV Mayastor
+--set mayastor.csi.node.kubeletDir=<your-directory-path>
+Specifically:
+
+For MicroK8s, the Kubelet directory must be updated to /var/snap/microk8s/common/var/lib/kubelet/ by replacing the default /var/lib/kubelet/ with /var/snap/microk8s/common/var/lib/kubelet/.
+
+```bash
+
+Events:
+  Type     Reason       Age              From               Message
+  ----     ------       ----             ----               -------
+  Normal   Scheduled    7s               default-scheduler  Successfully assigned monitoring/prometheus-prometheus-stack-kube-prom-prometheus-0 to whale
+  Warning  FailedMount  3s (x4 over 7s)  kubelet            MountVolume.SetUp failed for volume "pvc-b2a1f151-b1a5-4c01-b7fa-158eb976fb61" : rpc error: code = Internal desc =
+
+  Failed to find parent dir for mountpoint
+
+   /var/snap/microk8s/common/var/lib/kubelet/pods/19c34319-4773-462a-974e-7ced70545acb/volumes/kubernetes.io~csi/pvc-b2a1f151-b1a5-4c01-b7fa-158eb976fb61/mount, volume b2a1f151-b1a5-4c01-b7fa-158eb976fb61
+
+
+```
+
+#### IOVA
+
+This problem will show up in pods failing to initialize.
+
+These fixes have been incorporated in the `openebs-gitops/helm/openebs-mayastor-values.yaml` file.
 
 ```bash
 ➜ kubectl logs openebs-io-engine-9fpxh -n openebs -c io-engine
@@ -242,11 +337,9 @@ note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose bac
 
 ```
 
-Fixed by updated values file.
+### microk8s addon
 
-## OpenEBS microk8s addon
-
-Abandoned this in favor of helm install. See above.
+Abandoned this in favor of helm install (See above.) as this add on is a very old version and I had problems creating diskpools for mayastor on tuna node.
 
 [Mayastor addon](https://microk8s.io/docs/addon-mayastor)
 
@@ -292,7 +385,9 @@ Mayastor will run for all nodes in your MicroK8s cluster by default. Use the
 
 ```
 
-### Problems
+#### Problems
+
+Similar problems with helm..
 
 The io-engine pods will not start and will show this error:
 
@@ -362,7 +457,7 @@ openebs-gitops/
 
 ### Prerequisite
 
-On each node
+On each Ubuntu node these configurations are necessary prior to installing openebs and mayastor.
 
 ```bash
 # HugePages
@@ -375,8 +470,41 @@ sudo modprobe nvme_tcp
 echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 ```
 
-### Bootstrap Argo CD:
+## Monitoring
 
 ```bash
-kubectl apply -n argocd -f openebs-gitops/root-app-of-apps.yaml
+helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --values monitoring/helm/prometheus-values.yaml \
+  --create-namespace \
+  --timeout 15m
+
+Release "prometheus-stack" does not exist. Installing it now.
+NAME: prometheus-stack
+LAST DEPLOYED: Fri Jul 11 19:50:24 2025
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+NOTES:
+kube-prometheus-stack has been installed. Check its status by running:
+  kubectl --namespace monitoring get pods -l "release=prometheus-stack"
+
+Get Grafana 'admin' user password by running:
+
+  kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+
+Access Grafana local instance:
+
+  export POD_NAME=$(kubectl --namespace monitoring get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=prometheus-stack" -oname)
+  kubectl --namespace monitoring port-forward $POD_NAME 3000
+
+Visit https://github.com/prometheus-operator/kube-prometheus for instructions on how to create & configure Alertmanager and Prometheus instances using the Operator.
+
+
+☸ microk8s (openebs) in ops-microk8s [!?] took 24s
+➜   kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+openebs-admin-secure-password
+
+
+
 ```

@@ -1,5 +1,6 @@
 # OpenEBS Mayastor Helm Values File
-# This configuration enables Mayastor while disabling other OpenEBS engines
+# This configuration enables Mayastor while disabling other OpenEBS engines and NATS
+# Updated for MicroK8s compatibility with correct kubelet path
 
 # Global OpenEBS settings
 global:
@@ -17,6 +18,36 @@ mayastor:
     # IO Engine configuration - Fix for IOVA mode
     # Pass additional arguments to the Environment Abstraction Layer
     envcontext: "iova-mode=pa"
+
+  # CSI configuration with MicroK8s kubelet path
+  csi:
+    node:
+      kubeletDir: /var/snap/microk8s/common/var/lib/kubelet
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+      securityContext:
+        privileged: true
+        runAsUser: 0
+        runAsNonRoot: false
+        allowPrivilegeEscalation: true
+        capabilities:
+          add:
+            - SYS_ADMIN
+            - DAC_OVERRIDE
+            - SYS_CHROOT
+            - MKNOD
+        seLinuxOptions:
+          type: spc_t
+      nodeSelector: {}
+      tolerations: []
+      affinity: {}
+      hostNetwork: true
+      hostPID: true
 
   # Mayastor Control Plane
   controlPlane:
@@ -79,27 +110,6 @@ mayastor:
     tolerations: []
     affinity: {}
 
-  # CSI Node
-  csiNode:
-    resources:
-      limits:
-        cpu: 500m
-        memory: 512Mi
-      requests:
-        cpu: 250m
-        memory: 256Mi
-
-    nodeSelector: {}
-    tolerations: []
-    affinity: {}
-
-  # Image settings - remove to use chart defaults
-  # image:
-  #   registry: docker.io
-  #   repository: openebs/mayastor
-  #   tag: ""  # Leave empty to use chart default
-  #   pullPolicy: IfNotPresent
-
   # Service configuration
   service:
     type: ClusterIP
@@ -112,11 +122,11 @@ mayastor:
     isDefaultClass: false
     reclaimPolicy: Delete
     allowVolumeExpansion: true
-    volumeBindingMode: Immediate
+    volumeBindingMode: WaitForFirstConsumer # Better for pod scheduling
     parameters:
-      repl: "1" # Number of replicas
+      repl: "3" # Updated to match your Prometheus storage class
       protocol: "nvmf" # Protocol to use (nvmf or iscsi)
-      fsType: "ext4" # Filesystem type
+      csi.storage.k8s.io/fstype: "ext4" # Updated parameter name (fixes deprecation warning)
     allowedTopologies: []
 
   # Monitoring and observability
@@ -128,11 +138,11 @@ mayastor:
       port: 9090
       path: /metrics
 
-  # Security context
+  # Security context - Updated for MicroK8s compatibility
   securityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-    fsGroup: 2000
+    runAsNonRoot: false # Allow root execution
+    # runAsUser: 1000     # Commented out for CSI compatibility
+    # fsGroup: 2000       # Commented out for CSI compatibility
 
 # Disable other OpenEBS engines to focus on Mayastor
 # Local PV HostPath
@@ -234,3 +244,47 @@ crds:
   csi:
     volumeSnapshots:
       enabled: true
+
+# EXPLICITLY DISABLE NATS COMPONENTS
+# Add these sections to disable NATS messaging components
+nats:
+  enabled: false
+
+# If using older OpenEBS chart versions, also disable these
+messaging:
+  enabled: false
+  nats:
+    enabled: false
+
+# Event exporter that might depend on NATS
+eventExporter:
+  enabled: false
+
+# Webhook configurations that might use NATS
+webhooks:
+  enabled: false
+
+# OpenEBS specific messaging components
+openebs:
+  messaging:
+    enabled: false
+  nats:
+    enabled: false
+  eventExporter:
+    enabled: false
+
+# Disable built-in MinIO
+minio:
+  enabled: false
+
+# Configure Loki to use your existing MinIO
+loki:
+  enabled: true
+  loki:
+    storage_config:
+      aws:
+        endpoint: "http://trout:9000"
+        access_key_id: "jackcondor"
+        secret_access_key: "xidejc88wiix3"
+        s3forcepathstyle: true
+        bucketnames: "openebs-logs"

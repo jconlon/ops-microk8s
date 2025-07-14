@@ -1,0 +1,216 @@
+# prometheus-values.yaml
+# Configuration for Prometheus stack with MetalLB LoadBalancer services
+
+prometheus:
+  prometheusSpec:
+    # Storage configuration using HA Mayastor for critical metrics data
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: mayastor-monitoring-ha # 3 replicas for HA
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+    # Resource limits
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+
+    # Retention policy
+    retention: 30d
+    retentionSize: 45GB
+
+    # Additional configuration for better performance
+    walCompression: true
+    enableFeatures:
+      - exemplar-storage
+      - memory-snapshot-on-shutdown
+
+    # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus-stack
+
+    # PrometheusRule selector - allows automatic discovery of PrometheusRules
+    ruleSelector:
+      matchLabels:
+        release: prometheus-stack
+
+    # External URL configuration for LoadBalancer access
+    externalUrl: "http://prometheus.verticon.com"
+
+  # Prometheus service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 9090 # Internal Prometheus port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.202"
+
+# Grafana configuration
+grafana:
+  # Enable Grafana
+  enabled: true
+
+  # Admin password (CHANGE THIS!)
+  adminPassword: "openebs-admin-secure-password"
+
+  # Persistence using balanced Mayastor for dashboard data
+  persistence:
+    enabled: true
+    storageClassName: mayastor-monitoring-balanced # 2 replicas for good availability
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Resources
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+  # Service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 3000 # Internal Grafana port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.201"
+
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: "http://grafana.verticon.com/"
+      serve_from_sub_path: false
+      domain: "grafana.verticon.com"
+    security:
+      allow_embedding: true
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+
+  # Sidecar configuration to automatically discover dashboard ConfigMaps
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /tmp/dashboards
+      searchNamespace: monitoring
+      provider:
+        foldersFromFilesStructure: true
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+
+# Alertmanager configuration
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: mayastor-monitoring-balanced # 2 replicas for alerts data
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Resource limits
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    # External URL configuration for LoadBalancer access
+    externalUrl: "http://alertmanager.verticon.com"
+
+  # Alertmanager service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 9093 # Internal AlertManager port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.203"
+
+# Node exporter (recommended for infrastructure monitoring)
+nodeExporter:
+  enabled: true
+
+# Kube-state-metrics (recommended for Kubernetes object metrics)
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus operator
+prometheusOperator:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+# Default ServiceMonitor selectors
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: true
+    configReloaders: true
+    general: true
+    k8s: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubeProxy: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeScheduler: true
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+
+# Global configuration
+global:
+  rbac:
+    create: true
+    pspEnabled: false
+
+# Cleanup policy
+cleanupPolicy:
+  enabled: true
+  retention: 30d
+
+# Disable unnecessary components for MicroK8s
+kubeProxy:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false

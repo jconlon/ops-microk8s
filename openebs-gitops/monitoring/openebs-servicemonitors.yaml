@@ -1,0 +1,32 @@
+# openebs-servicemonitors-fixed.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openebs-io-engine-metrics
+  namespace: openebs
+  labels:
+    release: prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: metrics-exporter-io-engine # Matches the actual service label
+  endpoints:
+    - port: metrics # Port name from the service description
+      interval: 30s
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: openebs-callhome-stats
+  namespace: openebs
+  labels:
+    release: prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: obs-callhome # Matches the actual service label
+  endpoints:
+    - port: https # Use port 9090 instead of 9091
+      interval: 30s
+      path: /stats # Use /stats instead of /metrics
