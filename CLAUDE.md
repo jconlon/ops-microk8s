@@ -80,6 +80,9 @@ helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-sta
 
 # Get Grafana admin password
 kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+
+# Apply OpenEBS monitoring configurations
+kubectl apply -f openebs-gitops/monitoring/
 ```
 
 ### Development Environment
@@ -124,14 +127,17 @@ ops-microk8s/
 │   └── mayastor-app.yaml
 ├── devbox.json                   # Development environment (argocd, k9s)
 ├── monitoring/                   # Prometheus/Grafana configurations
-│   ├── helm/
-│   │   └── prometheus-values.yaml  # Main monitoring stack config
-│   └── manifests/               # Additional monitoring configs
+│   └── helm/
+│       └── prometheus-values.yaml  # Main monitoring stack config
 └── openebs-gitops/              # OpenEBS storage configurations
     ├── diskpools/               # Mayastor diskpool definitions per node
     ├── helm/
     │   └── openebs-mayastor-values.yaml  # Main OpenEBS config
-    ├── monitoring/              # OpenEBS monitoring rules
+    ├── monitoring/              # OpenEBS monitoring configurations
+    │   ├── grafana-config-map.yaml     # OpenEBS Grafana dashboards
+    │   ├── grafana-pvc.yaml            # Grafana storage
+    │   ├── openebs-prometheusrules.yaml # OpenEBS alerting rules
+    │   └── openebs-servicemonitors.yaml # OpenEBS metrics collection
     └── storageclasses/          # Storage class definitions
 ```
 
