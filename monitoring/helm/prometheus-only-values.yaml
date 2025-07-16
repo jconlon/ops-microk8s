@@ -1,0 +1,124 @@
+# prometheus-only-values.yaml
+# Prometheus + Operator + Exporters only
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Storage configuration using HA Mayastor for critical metrics data
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: mayastor-monitoring-ha # 3 replicas for HA
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+    # Resource limits
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+
+    # Retention policy
+    retention: 30d
+    retentionSize: 45GB
+
+    # Additional configuration for better performance
+    walCompression: true
+    enableFeatures:
+      - exemplar-storage
+      - memory-snapshot-on-shutdown
+
+    # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus-stack
+
+    # PrometheusRule selector - allows automatic discovery of PrometheusRules
+    ruleSelector:
+      matchLabels:
+        release: prometheus-stack
+
+    # External URL configuration for LoadBalancer access
+    externalUrl: "http://prometheus.verticon.com"
+
+  # Prometheus service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 9090 # Internal Prometheus port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.202"
+
+# Enable operator and exporters
+prometheusOperator:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+# Disable other components
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+
+# Default rules
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: true
+    configReloaders: true
+    general: true
+    k8s: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubeProxy: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeScheduler: true
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+
+# Global configuration
+global:
+  rbac:
+    create: true
+    pspEnabled: false
+
+# Disable unnecessary components for MicroK8s
+kubeProxy:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false

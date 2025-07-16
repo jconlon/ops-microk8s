@@ -1,0 +1,82 @@
+# grafana-only-values.yaml
+# Grafana only
+
+grafana:
+  enabled: true
+  
+  # Admin password (CHANGE THIS!)
+  adminPassword: "openebs-admin-secure-password"
+
+  # Persistence using balanced Mayastor for dashboard data
+  persistence:
+    enabled: true
+    storageClassName: mayastor-monitoring-balanced # 2 replicas for good availability
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+
+  # Resources
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+  # Service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 3000 # Internal Grafana port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.201"
+
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: "http://grafana.verticon.com/"
+      serve_from_sub_path: false
+      domain: "grafana.verticon.com"
+    security:
+      allow_embedding: true
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+
+  # Sidecar configuration to automatically discover dashboard ConfigMaps
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /tmp/dashboards
+      searchNamespace: monitoring
+      provider:
+        foldersFromFilesStructure: true
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+
+# Disable all other components
+prometheus:
+  enabled: false
+prometheusOperator:
+  enabled: false
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+
+# No default rules needed for Grafana only
+defaultRules:
+  create: false
+
+# Global configuration
+global:
+  rbac:
+    create: true
+    pspEnabled: false

@@ -1,0 +1,56 @@
+# alertmanager-only-values.yaml
+# AlertManager only
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: mayastor-monitoring-balanced # 2 replicas for alerts data
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Resource limits
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    # External URL configuration for LoadBalancer access
+    externalUrl: "http://alertmanager.verticon.com"
+
+  # Alertmanager service configuration for MetalLB
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 9093 # Internal AlertManager port
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.203"
+
+# Disable all other components
+prometheus:
+  enabled: false
+prometheusOperator:
+  enabled: false
+grafana:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+
+# No default rules needed for AlertManager only
+defaultRules:
+  create: false
+
+# Global configuration
+global:
+  rbac:
+    create: true
+    pspEnabled: false

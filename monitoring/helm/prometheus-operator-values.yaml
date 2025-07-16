@@ -1,0 +1,34 @@
+# prometheus-operator-values.yaml
+# Prometheus Operator only - provides CRDs and operator
+
+prometheusOperator:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+
+# Disable everything else - operator only
+prometheus:
+  enabled: false
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+
+# Global configuration
+global:
+  rbac:
+    create: true
+    pspEnabled: false
+
+# Default rules - minimal for operator
+defaultRules:
+  create: false
