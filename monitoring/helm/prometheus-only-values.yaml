@@ -64,6 +64,8 @@ prometheusOperator:
     requests:
       cpu: 100m
       memory: 100Mi
+  admissionWebhooks:
+    enabled: false
 
 nodeExporter:
   enabled: true
