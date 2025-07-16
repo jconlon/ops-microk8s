@@ -78,9 +78,7 @@ grafana:
       provider:
         foldersFromFilesStructure: true
     datasources:
-      enabled: true
-      label: grafana_datasource
-      labelValue: "1"
+      enabled: false
 
 # Disable all other components
 prometheus:
