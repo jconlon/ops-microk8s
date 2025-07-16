@@ -44,6 +44,29 @@ grafana:
       enabled: true
       org_role: Viewer
 
+  # Datasource configuration for split monitoring stack
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: "Prometheus"
+          type: prometheus
+          uid: prometheus
+          url: http://prometheus-kube-prometheus-prometheus.monitoring:9090/
+          access: proxy
+          isDefault: true
+          jsonData:
+            httpMethod: POST
+            timeInterval: 30s
+        - name: "Alertmanager"
+          type: alertmanager
+          uid: alertmanager
+          url: http://alertmanager-kube-promethe-alertmanager.monitoring:9093/
+          access: proxy
+          jsonData:
+            handleGrafanaManagedAlerts: false
+            implementation: prometheus
+
   # Sidecar configuration to automatically discover dashboard ConfigMaps
   sidecar:
     dashboards:
