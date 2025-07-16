@@ -1,0 +1,84 @@
+#!/usr/bin/env nu
+
+source scripts/argocd.nu
+# This script provides various operations related to the ops microk8s environment.
+def main [] {}
+
+
+# Set up all necessary configurations and authentications
+#
+# This function performs the following tasks:
+# 1. Removes any existing .env file
+# 2. Authenticates with Google Cloud
+# 3. Confirms GitHub authentication for a specified user and host
+#
+# Category: Ops
+#
+# Usage:
+#  ops setup
+#
+# Example:
+#   ops setup
+#
+# Note: This command requires user interaction to input GitHub credentials
+#[command( category: "Ops", Description: "Intial setup")]
+def "main setup" [] {
+    rm --force .env
+
+    # main gcloud auth
+
+    # let github_user = (input "Enter GitHub username: ")
+    # let github_host = (input "Enter GitHub hostname: " | default "github.pie.apple.com")
+
+    # main github confirm-auth { gh_user: $github_user, github_host: $github_host }
+
+}
+
+def "main test" [] {
+   print "Hello"
+
+}
+
+def "main prompt_with_default" [] {
+
+    let default_hostname = "myhost"
+
+    let message = "Hostname? "
+    let user_input = (input $"(ansi green)($message) (ansi yellow)[default: ($default_hostname)]: (ansi reset) ")
+
+    if ($user_input | is-empty) {
+        $default_hostname
+    } else {
+        $user_input
+    }
+}
+
+# main github issues
+# This script prompts the user to select between querying issues for the current repository or all repositories.
+# It then retrieves GitHub issues using the `gh` CLI and formats them into a Nushell table.
+def "main github issues" [] {
+
+    # Prompt the user with a selection choice: "Repos?" with choices: 'current' or 'all'
+    let repo_choice = (["current", "all"] | input list "Repos?")
+
+    # If the user selects "current", run `gh issue list --assignee "@me"` and return as a Nushell datatable
+    if $repo_choice == "current" {
+        gh issue list --assignee "@me" --json title,number,state,url | from json
+    } else {
+        # If the user selects "all", get all repositories and retrieve issues for each
+        let repos = (gh repo list --json nameWithOwner -q '.[].nameWithOwner' | from json)
+
+        # Iterate over each repository and fetch issues
+        let all_issues = ($repos | each { |repo|
+            gh issue list --repo $repo --assignee "@me" --json title,number,state,url | from json | each { |issue|
+                # Add the repository name as a column to each issue
+                $issue | insert repo $repo
+            }
+        })
+
+        # Flatten the results into a single table
+        $all_issues | flatten
+    }
+}
+
+

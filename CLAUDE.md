@@ -9,22 +9,25 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
 ## Architecture
 
 ### Cluster Configuration
+
 - **Platform**: MicroK8s v1.32.3 on Ubuntu
 - **Nodes**: 5-node HA cluster (3 control plane nodes: mullet, trout, whale)
 - **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.220
 - **Storage**: OpenEBS Mayastor with external 4TB drives on each node
 
 ### Key Components
+
 - **ArgoCD**: GitOps deployment tool, self-managed via Helm
 - **OpenEBS**: Storage management with Mayastor engine for replicated volumes
 - **Monitoring**: Prometheus stack with Grafana dashboards
-- **Storage Classes**: 
+- **Storage Classes**:
   - `mayastor-monitoring-ha` (3 replicas)
   - `mayastor-monitoring-balanced` (2 replicas)
 
 ## Development Commands
 
 ### Cluster Management
+
 ```bash
 # Check cluster status
 microk8s status
@@ -36,6 +39,7 @@ microk8s enable metallb:192.168.0.200-192.168.0.220
 ```
 
 ### ArgoCD Deployment
+
 ```bash
 # Initial ArgoCD installation
 helm repo add argo https://argoproj.github.io/argo-helm
@@ -49,6 +53,7 @@ kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 ```
 
 ### OpenEBS Mayastor
+
 ```bash
 # Install OpenEBS with Mayastor
 helm upgrade --install openebs openebs/openebs \
@@ -70,6 +75,7 @@ kubectl apply -f openebs-gitops/storageclasses/mayastor-storage-classes.yaml
 ```
 
 ### Monitoring Stack
+
 ```bash
 # Install Prometheus stack
 helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
@@ -86,6 +92,7 @@ kubectl apply -f openebs-gitops/monitoring/
 ```
 
 ### Development Environment
+
 ```bash
 # Use devbox for development tools
 devbox shell  # Provides argocd and k9s
@@ -97,11 +104,14 @@ k9s
 ## Important Configuration Details
 
 ### MicroK8s Specifics
+
 - **Kubelet Directory**: `/var/snap/microk8s/common/var/lib/kubelet/` (configured in Helm values)
 - **IOVA Mode**: Mayastor requires `--iova-mode=pa` for io-engine pods
 
 ### Node Prerequisites
+
 Each Ubuntu node requires:
+
 ```bash
 # HugePages configuration
 sudo sysctl vm.nr_hugepages=1024
@@ -113,8 +123,9 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 ```
 
 ### Service Access
+
 - **Grafana**: http://grafana.verticon.com (192.168.0.201:80)
-- **Prometheus**: http://prometheus.verticon.com (192.168.0.202:80)  
+- **Prometheus**: http://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: http://alertmanager.verticon.com (192.168.0.203:80)
 
 ## File Structure
@@ -144,12 +155,14 @@ ops-microk8s/
 ## Troubleshooting
 
 ### Common Issues
+
 1. **Mayastor io-engine pods failing**: Check IOVA mode configuration in DaemonSet
 2. **Volume mount failures**: Verify kubelet directory path in Helm values
 3. **Storage provisioning issues**: Ensure diskpools are created and healthy
 4. **Network connectivity**: Verify MetalLB IP range doesn't conflict with PiHole
 
 ### Useful Commands
+
 ```bash
 # Check Mayastor status
 kubectl get pods -l app=io-engine -n openebs
@@ -162,3 +175,14 @@ kubectl get pv,pvc --all-namespaces
 kubectl get pods -n monitoring
 kubectl get servicemonitors,prometheusrules --all-namespaces
 ```
+
+## Memories
+
+- Memorize through MCP server `memory` to always use context7 MCP server to find latest information from docs.
+- Set the timeout for executing Bash commands to 10 minutes
+- When asked to show or get files, I want you to open them in VS Code using `code` command.
+- When asked to get or fetch a command use `xclip` to copy the command to memory.
+- To login to argocd server use the command: `devbox run argocd-login`
+- Always login to argocd server at the start of all sessions.
+- Once argocd server is logged into all argocd commands should be run with this prefix: `devbox run -- argocd`
+- For troubleshooting in in addition to all other commands use any kubectl krew tools specified in: kubectl_krew_commands.md
