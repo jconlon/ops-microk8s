@@ -34,14 +34,10 @@ prometheus:
       - memory-snapshot-on-shutdown
 
     # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
-    serviceMonitorSelector:
-      matchLabels:
-        release: prometheus-stack
+    serviceMonitorSelector: {}
 
     # PrometheusRule selector - allows automatic discovery of PrometheusRules
-    ruleSelector:
-      matchLabels:
-        release: prometheus-stack
+    ruleSelector: {}
 
     # External URL configuration for LoadBalancer access
     externalUrl: "http://prometheus.verticon.com"
