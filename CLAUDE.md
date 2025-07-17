@@ -124,29 +124,43 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 
 ### Service Access
 
-- **Grafana**: http://grafana.verticon.com (192.168.0.201:80)
-- **Prometheus**: http://prometheus.verticon.com (192.168.0.202:80)
-- **AlertManager**: http://alertmanager.verticon.com (192.168.0.203:80)
+- **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
+- **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
+- **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
 
 ## File Structure
 
 ```
 ops-microk8s/
 ├── README.md                     # Detailed setup documentation
+├── CLAUDE.md                     # Claude Code instructions and guidance
+├── devbox.json                   # Development environment (argocd, k9s)
+├── scripts/
+│   └── argocd.nu                 # ArgoCD login script (nushell)
 ├── argoCD-apps/                  # ArgoCD application definitions
 │   ├── argocd-self-managed.yaml
-│   └── mayastor-app.yaml
-├── devbox.json                   # Development environment (argocd, k9s)
-├── monitoring/                   # Prometheus/Grafana configurations
+│   ├── monitoring-apps.yaml     # App of Apps for monitoring stack
+│   ├── monitoring/              # Child applications for monitoring
+│   │   ├── prometheus-app.yaml
+│   │   ├── grafana-app.yaml
+│   │   └── alertmanager-app.yaml
+│   ├── openebs-apps/            # App of Apps for OpenEBS
+│   │   ├── openebs-root.yaml
+│   │   ├── openebs-mayastor.yaml
+│   │   ├── openebs-diskpools.yaml
+│   │   ├── openebs-storageclasses.yaml
+│   │   └── openebs-monitoring.yaml
+├── monitoring/                   # Split monitoring stack configurations
 │   └── helm/
-│       └── prometheus-values.yaml  # Main monitoring stack config
+│       ├── prometheus-only-values.yaml    # Prometheus + operator + exporters
+│       ├── grafana-only-values.yaml       # Grafana standalone config
+│       └── alertmanager-only-values.yaml  # AlertManager standalone config
 └── openebs-gitops/              # OpenEBS storage configurations
     ├── diskpools/               # Mayastor diskpool definitions per node
     ├── helm/
-    │   └── openebs-mayastor-values.yaml  # Main OpenEBS config
+    │   └── openebs-mayastor-values.yaml  # Main OpenEBS Helm config
     ├── monitoring/              # OpenEBS monitoring configurations
-    │   ├── grafana-config-map.yaml     # OpenEBS Grafana dashboards
-    │   ├── grafana-pvc.yaml            # Grafana storage
+    │   ├── grafana-config-map.yaml      # OpenEBS Grafana dashboards
     │   ├── openebs-prometheusrules.yaml # OpenEBS alerting rules
     │   └── openebs-servicemonitors.yaml # OpenEBS metrics collection
     └── storageclasses/          # Storage class definitions
