@@ -186,3 +186,4 @@ kubectl get servicemonitors,prometheusrules --all-namespaces
 - Always login to argocd server at the start of all sessions.
 - Once argocd server is logged into all argocd commands should be run with this prefix: `devbox run -- argocd`
 - For troubleshooting in in addition to all other commands use any kubectl krew tools specified in: kubectl_krew_commands.md
+- When connecting to verticon.com servers use https not http
