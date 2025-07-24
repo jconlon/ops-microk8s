@@ -51,14 +51,15 @@ spec:
     enabled: true
     enablePodMonitor: true
 
-  # Backup configuration
-  backup:
-    retentionPolicy: "30d"
-    barmanObjectStore:
-      wal:
-        retention: "7d"
-      data:
-        retention: "30d"
+  # Backup configuration (will be configured later with object storage)
+  # backup:
+  #   retentionPolicy: "30d"
+  #   barmanObjectStore:
+  #     destinationPath: "s3://postgresql-backups/production"
+  #     wal:
+  #       retention: "7d"
+  #     data:
+  #       retention: "30d"
 
   # Security context
   securityContext:
