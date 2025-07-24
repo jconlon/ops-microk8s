@@ -32,7 +32,7 @@ spec:
   # Monitoring configuration
   monitoring:
     enabled: true
-    enablePodMonitor: true
+    enablePodMonitor: false  # We'll create our own PodMonitor with correct labels
 
   # Storage configuration using OpenEBS Mayastor (using pvcTemplate)
   storage:
