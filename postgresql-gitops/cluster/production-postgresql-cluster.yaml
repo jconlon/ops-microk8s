@@ -29,25 +29,16 @@ spec:
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
       # Note: SSL and shared_preload_libraries are handled by CloudNativePG operator
 
-  # Storage configuration using OpenEBS Mayastor
+  # Storage configuration using OpenEBS Mayastor (using pvcTemplate)
   storage:
-    size: 100Gi
-    storageClassName: mayastor-postgresql-ha
+    pvcTemplate:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: mayastor-postgresql-ha
     resizeInUseVolumes: true
-
-  # Resource configuration
-  resources:
-    requests:
-      memory: "1Gi"
-      cpu: "500m"
-    limits:
-      memory: "2Gi"
-      cpu: "1000m"
-
-  # Monitoring configuration
-  monitoring:
-    enabled: true
-    enablePodMonitor: true
 
   # Backup configuration (will be configured later with object storage)
   # backup:
@@ -58,26 +49,6 @@ spec:
   #       retention: "7d"
   #     data:
   #       retention: "30d"
-
-  # Security context
-  securityContext:
-    runAsUser: 999
-    runAsGroup: 999
-    fsGroup: 999
-    fsGroupChangePolicy: "OnRootMismatch"
-
-  # Affinity to spread across nodes
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            cnpg.io/cluster: production-postgresql
-        topologyKey: kubernetes.io/hostname
-
-  # Node selection for PostgreSQL workloads
-  nodeSelector:
-    node-role.kubernetes.io/worker: ""
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:
