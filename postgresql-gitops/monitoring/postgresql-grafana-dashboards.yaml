@@ -103,9 +103,9 @@ data:
           },
           "targets": [
             {
-              "expr": "pg_up{cluster_name=\"production-postgresql\"}",
+              "expr": "up{job=\"postgresql-system/postgresql-cluster-metrics\"}",
               "interval": "",
-              "legendFormat": "{{instance}} - Up",
+              "legendFormat": "{{pod}} - Up",
               "refId": "A"
             }
           ],
@@ -184,9 +184,9 @@ data:
           },
           "targets": [
             {
-              "expr": "pg_stat_database_numbackends{cluster_name=\"production-postgresql\"}",
+              "expr": "cnpg_backends_total{cnpg_cluster=\"production-postgresql\"}",
               "interval": "",
-              "legendFormat": "{{datname}} - Connections",
+              "legendFormat": "{{pod}} - Total Backends",
               "refId": "A"
             }
           ],
@@ -265,7 +265,7 @@ data:
           },
           "targets": [
             {
-              "expr": "pg_stat_database_size{cluster_name=\"production-postgresql\"}",
+              "expr": "cnpg_pg_database_size_bytes{cnpg_cluster=\"production-postgresql\"}",
               "interval": "",
               "legendFormat": "{{datname}} - Size",
               "refId": "A"
