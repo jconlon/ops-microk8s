@@ -1,0 +1,88 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: production-postgresql
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: postgresql
+spec:
+  instances: 3  # 1 primary + 2 read replicas for HA
+  
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      # Performance tuning for 3 instances
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "64MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      # Logging
+      log_statement: "all"
+      log_min_duration_statement: "1000"
+      log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
+      # Security
+      ssl: "on"
+      shared_preload_libraries: "pg_stat_statements"
+
+  # Storage configuration using OpenEBS Mayastor
+  storage:
+    size: 100Gi
+    storageClassName: mayastor-postgresql-ha
+    resizeInUseVolumes: true
+
+  # Resource configuration
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+  # Monitoring configuration
+  monitoring:
+    enabled: true
+    enablePodMonitor: true
+
+  # Backup configuration
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      wal:
+        retention: "7d"
+      data:
+        retention: "30d"
+
+  # Security context
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: "OnRootMismatch"
+
+  # Affinity to spread across nodes
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            cnpg.io/cluster: production-postgresql
+        topologyKey: kubernetes.io/hostname
+
+  # Node selection for PostgreSQL workloads
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+
+  # Tolerations for dedicated nodes (if needed)
+  # tolerations:
+  # - key: "postgresql"
+  #   operator: "Equal"
+  #   value: "true"
+  #   effect: "NoSchedule"

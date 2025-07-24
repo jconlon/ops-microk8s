@@ -1,0 +1,17 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: mayastor-postgresql-ha
+  labels:
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: postgresql
+parameters:
+  repl: "3"  # 3 replicas for high availability
+  protocol: nvmf
+  ioTimeout: "60"
+  # Optimized for database workloads
+  local: "false"
+provisioner: io.openebs.csi-mayastor
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+reclaimPolicy: Retain
