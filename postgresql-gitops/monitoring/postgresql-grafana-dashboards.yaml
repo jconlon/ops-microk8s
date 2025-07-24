@@ -2,9 +2,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgresql-dashboards
-  namespace: postgresql-system
+  namespace: monitoring  # Move to monitoring namespace where Grafana runs
   labels:
     grafana_dashboard: "1"
+    release: grafana  # Required for Grafana discovery
     app.kubernetes.io/name: postgresql
     app.kubernetes.io/component: dashboards
     app.kubernetes.io/part-of: postgresql

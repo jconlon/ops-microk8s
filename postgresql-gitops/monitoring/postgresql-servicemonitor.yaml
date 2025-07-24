@@ -21,9 +21,9 @@ spec:
     path: /metrics
 
 ---
-# ServiceMonitor for CloudNativePG operator metrics
+# PodMonitor for CloudNativePG operator metrics
 apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
+kind: PodMonitor
 metadata:
   name: cnpg-operator-metrics
   namespace: cnpg-system
@@ -35,7 +35,7 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: cloudnative-pg
-  endpoints:
+  podMetricsEndpoints:
   - port: metrics
     interval: 30s
     path: /metrics
