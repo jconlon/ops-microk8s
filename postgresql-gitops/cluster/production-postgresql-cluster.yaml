@@ -29,6 +29,11 @@ spec:
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
       # Note: SSL and shared_preload_libraries are handled by CloudNativePG operator
 
+  # Monitoring configuration
+  monitoring:
+    enabled: true
+    enablePodMonitor: true
+
   # Storage configuration using OpenEBS Mayastor (using pvcTemplate)
   storage:
     pvcTemplate:
