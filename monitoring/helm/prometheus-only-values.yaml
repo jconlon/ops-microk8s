@@ -33,11 +33,7 @@ prometheus:
       - exemplar-storage
       - memory-snapshot-on-shutdown
     
-    # Query and storage limits to prevent disk space issues
-    queryMaxConcurrency: 20
-    queryMaxSamples: 50000000
-    
-    # WAL settings to prevent runaway disk usage
+    # Additional scrape configs (empty but required for some configurations)
     additionalScrapeConfigs: []
 
     # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
