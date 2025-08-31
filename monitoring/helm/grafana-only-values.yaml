@@ -43,6 +43,17 @@ grafana:
     auth.anonymous:
       enabled: true
       org_role: Viewer
+    # Database and cleanup settings to prevent disk space issues
+    database:
+      log_queries: false
+      max_idle_conn: 2
+      max_open_conn: 10
+    log:
+      mode: console
+      level: warn
+    # Prevent excessive disk usage from temporary files
+    paths:
+      temp_data_lifetime: 24h
 
   # Datasource configuration for split monitoring stack
   datasources:

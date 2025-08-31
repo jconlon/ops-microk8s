@@ -12,7 +12,7 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 50Gi
+              storage: 100Gi
 
     # Resource limits
     resources:
@@ -23,15 +23,23 @@ prometheus:
         cpu: 1000m
         memory: 4Gi
 
-    # Retention policy
+    # Retention policy - keep within 90Gi of 100Gi allocation
     retention: 30d
-    retentionSize: 45GB
+    retentionSize: 90GB
 
     # Additional configuration for better performance
     walCompression: true
     enableFeatures:
       - exemplar-storage
       - memory-snapshot-on-shutdown
+    
+    # Query and storage limits to prevent disk space issues
+    queryLogFile: "/tmp/query.log"
+    queryMaxConcurrency: 20
+    queryMaxSamples: 50000000
+    
+    # WAL settings to prevent runaway disk usage
+    additionalScrapeConfigs: []
 
     # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
     serviceMonitorSelector: {}
