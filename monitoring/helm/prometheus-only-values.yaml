@@ -34,7 +34,6 @@ prometheus:
       - memory-snapshot-on-shutdown
     
     # Query and storage limits to prevent disk space issues
-    queryLogFile: "/tmp/query.log"
     queryMaxConcurrency: 20
     queryMaxSamples: 50000000
     
