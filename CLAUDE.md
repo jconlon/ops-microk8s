@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## System Prompt: Startup, Global–Project Memory, and User Identification
+
+For every Claude Code session in this project, follow these startup steps in order:
+
+1. **User Identification (Global Memory)**
+
+   - Retrieve user identification from global memory (via the memory MCP persistent store).
+   - If "jconlon" is not already identified as the default_user in global memory, add or update this entity accordingly.
+   - Throughout all interactions, treat "jconlon" as the default_user.
+
+2. **Global Memory Retrieval**
+
+   - Say "Remembering global memory..." and retrieve all relevant information from the global memory store (via memory MCP server).
+   - When discussing persistent rules or reusable procedures, specify that these come from global memory.
+
+3. **Project Memory Retrieval**
+
+   - Say "Remembering project memory..." and load all project-specific context from the "Memories" section of this CLAUDE.md.
+   - When referencing local workflows, specific script usage, infrastructure, or sensitive details, make clear these originate solely from project memory.
+
+4. **Memory Context Usage**
+   - When providing answers or executing tasks, always clarify which memory source (global or project) the information is from:
+     - e.g., "According to global memory..." or "From project memory..."
+   - If it is ever unclear where new information belongs, ask:  
+     “Should this be remembered globally (across all projects) or for this project only?”
+
+Please follow these memory protocols at the beginning of each Claude Code session or chat in this repository. Refer to the [Memory Integration Protocol](#memory-integration-protocol), [Memories](#memories), and [Global Persistent Memory (via Memory MCP)](#global-persistent-memory-via-memory-mcp) sections below for operational details.
+
 ## Repository Overview
 
 This repository contains the infrastructure configuration for a MicroK8s cluster with 5 nodes: mullet, shamu, trout, tuna, and whale. The cluster uses OpenEBS Mayastor for replicated storage and includes monitoring with Prometheus/Grafana.
@@ -190,14 +218,52 @@ kubectl get pods -n monitoring
 kubectl get servicemonitors,prometheusrules --all-namespaces
 ```
 
+## Memory Integration Protocol
+
+- On startup, perform user identification from global memory (see steps above).
+- Next, load and review all global memory for persistent context, and then project memory for repository-local instructions and facts.
+- Use the **Memories** section (see below) for all instructions, settings, and workflow items unique to this project.
+- Use global persistent memory (via the `memory` MCP server) for cross-project or organization-wide information, such as recurring procedures or general preferences.
+- If there is any doubt about the scope of a memory, clarify with the user before storing or retrieving it.  
+  _Example: "Should this be global or project specific?"_
+- Always reference both memories when answering or planning.
+
+_When updating or storing new items, clearly state whether you’re updating project memory (Memories section) or global persistent memory (via MCP)._
+
+---
+
 ## Memories
 
-- Memorize through MCP server `memory` to always use context7 MCP server to find latest information from docs.
-- Set the timeout for executing Bash commands to 10 minutes
-- When asked to show or get files, I want you to open them in VS Code using `code` command.
+_Project-specific instructions and facts—use only within this repository:_
+
+- Always use context7 MCP server to find latest documentation info.
+- Set the timeout for executing Bash commands to 10 minutes.
+- When asked to show or get files, open them in VS Code using `code` command.
 - When asked to get or fetch a command use `xclip` to copy the command to memory.
-- To login to argocd server use the command: `devbox run argocd-login`
-- Always login to argocd server at the start of all sessions.
-- Once argocd server is logged into all argocd commands should be run with this prefix: `devbox run -- argocd`
-- For troubleshooting in in addition to all other commands use any kubectl krew tools specified in: kubectl_krew_commands.md
-- When connecting to verticon.com servers use https not http
+- To login to ArgoCD server use the command: `devbox run -- argocd-login`
+- Always login to ArgoCD server at the start of all sessions.
+- All argocd commands should be run with this prefix: `devbox run -- argocd`
+- For troubleshooting, use any kubectl krew tools specified in: kubectl_krew_commands.md
+- When connecting to verticon.com servers use https not http.
+- To get ArgoCD password:  
+  `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
+- ArgoCD username is `admin`
+- For postgresql cli use: `devbox run psql`
+
+---
+
+## Global Persistent Memory (via Memory MCP)
+
+_Cross-project, persistent knowledge and identification for usage in all Claude projects:_
+
+- User identification: The default_user is "jconlon".
+- For all global procedures, organizational policies, or personal preferences needed across repositories, store and recall them in global memory via the memory MCP persistent store.
+- To add or update a global memory, say or type:  
+  `Add to global memory: <your fact, rule, or process>`
+- When retrieving information, always check both project memory (Memories) and global memory for relevant context.
+- If you are uncertain about memory scope, clarify:  
+  “Is this for this project only or for global memory?”
+- Examples of global memory items:
+  - "Always rotate credentials every 90 days."
+  - "After each release, update CHANGELOG and deployment checklist."
+  - "Default user is jconlon; treat jconlon as owner in all sessions."

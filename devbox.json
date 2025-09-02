@@ -3,7 +3,8 @@
   "packages": [
     "argocd@latest",
     "nushell@0.100.0",
-    "k9s@latest"
+    "k9s@latest",
+    "postgresql@latest"
   ],
   "shell": {
     "init_hook": [
@@ -11,7 +12,7 @@
       "export PATH=$PATH:$PWD"
     ],
     "scripts": {
-      "argocd-login":            ["./ops argocd login"],
+      "argocd-login": ["./ops argocd login"],
       "test": [
         "echo \"Error: no test specified\" && exit 1"
       ]
