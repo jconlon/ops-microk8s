@@ -1,0 +1,6 @@
+NAME          NODE     STATE     POOL_STATUS   ENCRYPTED   CAPACITY   USED        AVAILABLE
+pool-mullet   mullet   Created   Online        false       3.6 TiB    601.8 GiB   3 TiB
+pool-shamu    shamu    Created   Online        false       3.6 TiB    550.6 GiB   3.1 TiB
+pool-trout    trout    Created   Online        false       3.6 TiB    502.7 GiB   3.1 TiB
+pool-tuna     tuna     Created   Online        false       3.6 TiB    51.5 GiB    3.6 TiB
+pool-whale    whale    Created   Online        false       3.6 TiB    451.7 GiB   3.2 TiB

@@ -1,0 +1,10 @@
+ ID                                    REPLICAS  TARGET-NODE  ACCESSIBILITY  STATUS    SIZE     THIN-PROVISIONED  ALLOCATED  SNAPSHOTS  SOURCE  CLEAN-SHUTDOWN  ENCRYPTED 
+ 05ea93d2-357d-4616-b4f5-84f46c925ea7  2         <none>       <none>         Degraded  10 GiB   true              392 MiB    0          <none>  true            false 
+ 1b16e673-c417-4976-96fc-4870f846b881  3         <none>       <none>         Online    100 GiB  false             100 GiB    0          <none>  true            false 
+ 1bfae019-1bd4-4e0c-ba62-1a5e1ca28038  2         <missing>    <none>         Degraded  10 GiB   true              292 MiB    0          <none>  false           false 
+ 7a413808-2619-43e8-834e-63d0b3d45ca8  3         <missing>    <none>         Degraded  100 GiB  false             100 GiB    0          <none>  false           false 
+ 84ef5000-0fc3-487f-8d4b-96960faf9ccc  3         trout        nvmf           Degraded  100 GiB  false             100 GiB    0          <none>  false           false 
+ 8c39869a-9fe5-47eb-9098-b0d9aa47467d  3         shamu        nvmf           Unknown   100 GiB  false             100 GiB    0          <none>  false           false 
+ cd249af7-b485-4080-829d-d9f6b603518a  3         <none>       <none>         Degraded  100 GiB  false             100 GiB    0          <none>  false           false 
+ d4e491f8-2664-416d-942c-28ebff7606f8  2         <none>       <none>         Degraded  10 GiB   true              388 MiB    0          <none>  true            false 
+ e47d6e2e-2f13-474c-b85d-783ea1ef35bb  2         trout        nvmf           Degraded  10 GiB   true              1.2 GiB    0          <none>  false           false 

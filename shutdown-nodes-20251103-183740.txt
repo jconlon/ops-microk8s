@@ -1,0 +1,6 @@
+NAME     STATUS   ROLES    AGE    VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION     CONTAINER-RUNTIME
+mullet   Ready    <none>   143d   v1.32.9   192.168.0.101   <none>        Ubuntu 22.04.5 LTS   6.8.0-85-generic   containerd://1.6.36
+shamu    Ready    <none>   135d   v1.32.9   192.168.0.104   <none>        Ubuntu 24.04.3 LTS   6.8.0-62-generic   containerd://1.6.36
+trout    Ready    <none>   135d   v1.32.9   192.168.0.102   <none>        Ubuntu 24.04.3 LTS   6.8.0-87-generic   containerd://1.6.36
+tuna     Ready    <none>   117d   v1.32.9   192.168.0.103   <none>        Ubuntu 24.04.3 LTS   6.8.0-62-generic   containerd://1.6.36
+whale    Ready    <none>   135d   v1.32.9   192.168.0.107   <none>        Ubuntu 22.04.5 LTS   6.8.0-85-generic   containerd://1.6.36

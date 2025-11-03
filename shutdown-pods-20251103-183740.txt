@@ -1,0 +1,67 @@
+NAMESPACE           NAME                                                     READY   STATUS             RESTARTS         AGE
+argocd              argocd-application-controller-0                          1/1     Running            1 (7m28s ago)    52m
+argocd              argocd-applicationset-controller-68557bd74f-cnz5p        1/1     Running            1 (7m28s ago)    126d
+argocd              argocd-redis-7f855978d6-9m4pj                            1/1     Running            1 (7m28s ago)    126d
+argocd              argocd-repo-server-844d48456d-lngwv                      1/1     Running            1 (7m28s ago)    126d
+argocd              argocd-server-5754fc5886-ntk9j                           1/1     Running            1 (7m28s ago)    126d
+cnpg-system         cnpg-controller-manager-d69494fff-c84qc                  1/1     Running            5 (16m ago)      21d
+kube-system         calico-kube-controllers-5947598c79-f962l                 1/1     Running            7 (7m28s ago)    68d
+kube-system         calico-node-dwmjz                                        1/1     Running            0                20d
+kube-system         calico-node-gnvrb                                        1/1     Running            1 (7m28s ago)    20d
+kube-system         calico-node-ml2wt                                        1/1     Running            3 (89m ago)      19d
+kube-system         calico-node-n26wl                                        1/1     Running            1 (130d ago)     135d
+kube-system         calico-node-sbrcl                                        1/1     Running            0                117d
+kube-system         coredns-79b94494c7-lndd4                                 1/1     Running            0                21d
+metallb-system      controller-7ffc454778-p2cqn                              1/1     Running            1 (7m28s ago)    21d
+metallb-system      speaker-g6g64                                            1/1     Running            5 (21d ago)      130d
+metallb-system      speaker-jpck9                                            1/1     Running            0                117d
+metallb-system      speaker-rnk9l                                            1/1     Running            1 (130d ago)     130d
+metallb-system      speaker-sjnk4                                            1/1     Running            6321 (89m ago)   130d
+metallb-system      speaker-xlfwh                                            1/1     Running            2 (7m28s ago)    130d
+monitoring          alertmanager-alertmanager-kube-promethe-alertmanager-0   2/2     Running            2 (7m28s ago)    52m
+monitoring          grafana-676bd976df-8s4qs                                 2/2     Running            0                21d
+monitoring          prometheus-kube-prometheus-operator-5c9b44fc44-g5w5c     1/1     Running            1 (7m28s ago)    68d
+monitoring          prometheus-kube-state-metrics-7f5f75c85d-cnsfl           1/1     Running            9 (7m28s ago)    68d
+monitoring          prometheus-prometheus-kube-prometheus-prometheus-0       2/2     Running            0                19d
+monitoring          prometheus-prometheus-node-exporter-bgmk7                1/1     Running            9258 (89m ago)   110d
+monitoring          prometheus-prometheus-node-exporter-fz6rv                1/1     Running            0                110d
+monitoring          prometheus-prometheus-node-exporter-l95pp                1/1     Running            1 (7m28s ago)    110d
+monitoring          prometheus-prometheus-node-exporter-qqlfm                1/1     Running            0                110d
+monitoring          prometheus-prometheus-node-exporter-zkstx                1/1     Running            3 (21d ago)      110d
+openebs             openebs-mayastor-agent-core-6d97b4f676-tznv8             2/2     Running            0                21m
+openebs             openebs-mayastor-agent-ha-node-79j7q                     1/1     Running            1738 (89m ago)   111d
+openebs             openebs-mayastor-agent-ha-node-7wd9s                     1/1     Running            1 (7m28s ago)    111d
+openebs             openebs-mayastor-agent-ha-node-8jhqc                     1/1     Running            0                111d
+openebs             openebs-mayastor-agent-ha-node-8zjmd                     1/1     Running            3 (21d ago)      111d
+openebs             openebs-mayastor-agent-ha-node-b8qwg                     1/1     Running            0                111d
+openebs             openebs-mayastor-alloy-4xnjx                             2/2     Running            0                111d
+openebs             openebs-mayastor-alloy-frq5f                             2/2     Running            2 (7m28s ago)    111d
+openebs             openebs-mayastor-alloy-kp6jl                             2/2     Running            6 (21d ago)      111d
+openebs             openebs-mayastor-alloy-pdkv7                             1/2     Running            0                111d
+openebs             openebs-mayastor-alloy-xb78n                             2/2     Running            14 (89m ago)     111d
+openebs             openebs-mayastor-api-rest-68894f95b4-wndj4               1/1     Running            2 (5m36s ago)    68d
+openebs             openebs-mayastor-csi-controller-6f4cf44b57-f88f2         6/6     Running            0                21m
+openebs             openebs-mayastor-csi-node-7wgvc                          2/2     Running            6 (21d ago)      111d
+openebs             openebs-mayastor-csi-node-8759r                          2/2     Running            3325 (89m ago)   111d
+openebs             openebs-mayastor-csi-node-8z8vj                          2/2     Running            0                111d
+openebs             openebs-mayastor-csi-node-f4ctp                          2/2     Running            0                111d
+openebs             openebs-mayastor-csi-node-qz6wp                          2/2     Running            2 (7m28s ago)    111d
+openebs             openebs-mayastor-etcd-0                                  1/1     Running            5 (7m45s ago)    52m
+openebs             openebs-mayastor-etcd-1                                  0/1     ImagePullBackOff   0                4m53s
+openebs             openebs-mayastor-etcd-2                                  1/1     Running            0                5m59s
+openebs             openebs-mayastor-io-engine-2hjsv                         2/2     Running            6 (21d ago)      111d
+openebs             openebs-mayastor-io-engine-lxgjn                         2/2     Running            0                111d
+openebs             openebs-mayastor-io-engine-qp88s                         2/2     Running            0                31m
+openebs             openebs-mayastor-io-engine-t28mx                         2/2     Running            0                111d
+openebs             openebs-mayastor-io-engine-tj74h                         2/2     Running            0                5m23s
+openebs             openebs-mayastor-localpv-provisioner-c5d657dff-ldkr5     1/1     Running            4 (16m ago)      21d
+openebs             openebs-mayastor-loki-0                                  2/2     Running            0                111d
+openebs             openebs-mayastor-loki-1                                  2/2     Running            0                111d
+openebs             openebs-mayastor-loki-2                                  2/2     Running            2 (7m28s ago)    111d
+openebs             openebs-mayastor-nats-0                                  3/3     Running            0                111d
+openebs             openebs-mayastor-nats-1                                  3/3     Running            0                111d
+openebs             openebs-mayastor-nats-2                                  3/3     Running            3 (7m28s ago)    52m
+openebs             openebs-mayastor-obs-callhome-5cc598b77-zbh2p            2/2     Running            2 (7m28s ago)    21d
+openebs             openebs-mayastor-operator-diskpool-67d68695c6-wldw2      1/1     Running            0                21d
+postgresql-system   production-postgresql-1                                  0/1     Init:0/1           0                4h56m
+postgresql-system   production-postgresql-2                                  0/1     Error              3750             21d
