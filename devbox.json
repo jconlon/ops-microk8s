@@ -4,7 +4,8 @@
     "argocd@latest",
     "nushell@0.100.0",
     "k9s@latest",
-    "postgresql@latest"
+    "postgresql@latest",
+    "barman@latest"
   ],
   "shell": {
     "init_hook": [

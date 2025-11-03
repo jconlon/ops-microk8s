@@ -8,8 +8,8 @@ metadata:
     app.kubernetes.io/component: database
     app.kubernetes.io/part-of: postgresql
 spec:
-  instances: 3  # 1 primary + 2 read replicas for HA
-  
+  instances: 3 # 1 primary + 2 read replicas for HA
+
   # PostgreSQL configuration
   postgresql:
     parameters:
@@ -34,8 +34,7 @@ spec:
 
   # Monitoring configuration
   monitoring:
-    enabled: true
-    enablePodMonitor: false  # We'll create our own PodMonitor with correct labels
+    enablePodMonitor: false # We'll create our own PodMonitor with correct labels
 
   # Storage configuration using OpenEBS Mayastor (using pvcTemplate)
   storage:
@@ -48,15 +47,25 @@ spec:
       storageClassName: mayastor-postgresql-ha
     resizeInUseVolumes: true
 
-  # Backup configuration (will be configured later with object storage)
-  # backup:
-  #   retentionPolicy: "30d"
-  #   barmanObjectStore:
-  #     destinationPath: "s3://postgresql-backups/production"
-  #     wal:
-  #       retention: "7d"
-  #     data:
-  #       retention: "30d"
+  # Backup configuration using AWS S3
+  backup:
+    retentionPolicy: "7d"
+    barmanObjectStore:
+      destinationPath: "s3://postgresql-microk8s-one/postgresql-backups/production/"
+      s3Credentials:
+        accessKeyId:
+          name: aws-s3-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: aws-s3-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+        maxParallel: 2
+      data:
+        compression: gzip
+        jobs: 2
+    target: primary
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:

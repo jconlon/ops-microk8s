@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-backup-storage
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: postgresql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: mayastor-monitoring-balanced
+  resources:
+    requests:
+      storage: 200Gi
