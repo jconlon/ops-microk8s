@@ -1,0 +1,88 @@
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: rook-ceph
+  namespace: rook-ceph
+spec:
+  cephVersion:
+    image: quay.io/ceph/ceph:v18.2.4
+    allowUnsupported: false
+
+  dataDirHostPath: /var/lib/rook
+
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+
+  mgr:
+    count: 2
+    allowMultiplePerNode: false
+    modules:
+      - name: pg_autoscaler
+        enabled: true
+
+  dashboard:
+    enabled: true
+    ssl: false
+
+  monitoring:
+    enabled: true
+    createPrometheusRules: true
+
+  network:
+    provider: host
+
+  crashCollector:
+    disable: false
+
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    nodes:
+      - name: gold
+        devices:
+          - name: /dev/sdb
+      - name: squid
+        devices:
+          - name: /dev/sdb
+      - name: puffer
+        devices:
+          - name: /dev/sdb
+      - name: carp
+        devices:
+          - name: /dev/sdb
+
+  placement:
+    all:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: ceph-node
+                  operator: In
+                  values:
+                    - "true"
+      tolerations:
+        - effect: NoSchedule
+          key: ceph-node
+          operator: Exists
+
+  resources:
+    mgr:
+      limits:
+        memory: "1Gi"
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+    mon:
+      limits:
+        memory: "2Gi"
+      requests:
+        cpu: "1000m"
+        memory: "1Gi"
+    osd:
+      limits:
+        memory: "4Gi"
+      requests:
+        cpu: "1000m"
+        memory: "2Gi"
