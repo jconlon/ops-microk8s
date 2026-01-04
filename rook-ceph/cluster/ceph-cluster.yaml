@@ -27,7 +27,6 @@ spec:
 
   monitoring:
     enabled: true
-    createPrometheusRules: true
 
   network:
     provider: host
