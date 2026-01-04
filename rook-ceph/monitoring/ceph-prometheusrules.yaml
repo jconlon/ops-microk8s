@@ -1,0 +1,57 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ceph-alerts
+  namespace: rook-ceph
+  labels:
+    prometheus: kube-prometheus
+    release: prometheus-stack
+spec:
+  groups:
+    - name: ceph.rules
+      interval: 30s
+      rules:
+        - alert: CephClusterWarning
+          expr: ceph_health_status == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph cluster in warning state"
+            description: "Ceph cluster health is in WARNING state"
+
+        - alert: CephClusterError
+          expr: ceph_health_status == 2
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph cluster in error state"
+            description: "Ceph cluster health is in ERROR state"
+
+        - alert: CephOSDDown
+          expr: ceph_osd_up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph OSD is down"
+            description: "OSD {{ $labels.ceph_daemon }} is down"
+
+        - alert: CephOSDNearFull
+          expr: ceph_osd_utilization > 85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph OSD near full"
+            description: "OSD {{ $labels.ceph_daemon }} is {{ $value }}% full"
+
+        - alert: CephOSDFull
+          expr: ceph_osd_utilization > 95
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph OSD critically full"
+            description: "OSD {{ $labels.ceph_daemon }} is {{ $value }}% full"

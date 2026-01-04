@@ -5,10 +5,13 @@ This document provides procedures for gracefully shutting down and restarting th
 ## Cluster Overview
 
 - **Platform**: MicroK8s v1.32.3 on Ubuntu
-- **Nodes**: 5 nodes total
+- **Nodes**: 8 nodes total
   - Control plane nodes: mullet, trout, whale
-  - Worker nodes: shamu, tuna
-- **Storage**: OpenEBS Mayastor with external 4TB drives
+  - Worker nodes (Mayastor): tuna
+  - Worker nodes (Rook/Ceph migration): gold, squid, puffer, carp
+- **Storage**:
+  - Current: OpenEBS Mayastor with external 4TB drives on original nodes
+  - Migration: Rook/Ceph on Dell R320 nodes
 - **Key Applications**:
   - PostgreSQL cluster (production-postgresql) - 3 instances with S3 backups
   - Monitoring stack (Prometheus, Grafana, AlertManager)
@@ -144,10 +147,13 @@ Prevent new pods from being scheduled:
 ```bash
 # Cordon all nodes
 kubectl cordon mullet
-kubectl cordon shamu
 kubectl cordon trout
 kubectl cordon tuna
 kubectl cordon whale
+kubectl cordon gold
+kubectl cordon squid
+kubectl cordon puffer
+kubectl cordon carp
 
 # Verify all nodes are cordoned
 kubectl get nodes
@@ -193,23 +199,42 @@ Drain and shutdown nodes one at a time, starting with worker nodes:
 
 #### 3.1 Drain Worker Nodes First
 
+Drain Dell R320 nodes first (Rook/Ceph migration nodes):
+
 ```bash
-# Drain shamu (worker node)
-kubectl drain shamu --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
+# Drain gold (Dell R320)
+kubectl drain gold --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
+kubectl get pods --all-namespaces -o wide | grep gold
+ssh gold
+sudo shutdown -h now
+exit
 
-# Wait for all pods to be evicted
-kubectl get pods --all-namespaces -o wide | grep shamu
+# Wait 2-3 minutes, then drain squid
+kubectl drain squid --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
+kubectl get pods --all-namespaces -o wide | grep squid
+ssh squid
+sudo shutdown -h now
+exit
 
-# SSH to shamu and shutdown
-ssh shamu
+# Wait 2-3 minutes, then drain puffer
+kubectl drain puffer --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
+kubectl get pods --all-namespaces -o wide | grep puffer
+ssh puffer
+sudo shutdown -h now
+exit
+
+# Wait 2-3 minutes, then drain carp
+kubectl drain carp --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
+kubectl get pods --all-namespaces -o wide | grep carp
+ssh carp
 sudo shutdown -h now
 exit
 ```
 
-Wait 2-3 minutes for node to fully shutdown, then repeat for next worker node:
+Then drain Mayastor worker node:
 
 ```bash
-# Drain tuna (worker node)
+# Drain tuna (Mayastor worker node)
 kubectl drain tuna --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
 kubectl get pods --all-namespaces -o wide | grep tuna
 ssh tuna
@@ -302,10 +327,17 @@ kubectl get pods -n kube-system
 ### Phase 2: Start Worker Nodes
 
 ```bash
-# Power on tuna
-# Power on shamu
+# Power on tuna (Mayastor worker)
+# Wait for tuna to become Ready
+kubectl get nodes -w
 
-# Wait for nodes to become Ready
+# Power on Dell R320 nodes
+# Power on gold
+# Power on squid
+# Power on puffer
+# Power on carp
+
+# Wait for all nodes to become Ready
 kubectl get nodes -w
 ```
 
@@ -314,10 +346,13 @@ kubectl get nodes -w
 ```bash
 # Uncordon all nodes to allow scheduling
 kubectl uncordon mullet
-kubectl uncordon shamu
 kubectl uncordon trout
 kubectl uncordon tuna
 kubectl uncordon whale
+kubectl uncordon gold
+kubectl uncordon squid
+kubectl uncordon puffer
+kubectl uncordon carp
 
 # Verify all nodes are ready and schedulable
 kubectl get nodes

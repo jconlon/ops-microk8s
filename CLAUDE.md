@@ -32,16 +32,20 @@ Please follow these memory protocols at the beginning of each Claude Code sessio
 
 ## Repository Overview
 
-This repository contains the infrastructure configuration for a MicroK8s cluster with 5 nodes: mullet, shamu, trout, tuna, and whale. The cluster uses OpenEBS Mayastor for replicated storage and includes monitoring with Prometheus/Grafana.
+This repository contains the infrastructure configuration for a MicroK8s cluster with 8 nodes: mullet, trout, tuna, whale, gold, squid, puffer, and carp. The cluster currently uses OpenEBS Mayastor for replicated storage and is migrating to Rook/Ceph. Monitoring is provided by Prometheus/Grafana.
 
 ## Architecture
 
 ### Cluster Configuration
 
 - **Platform**: MicroK8s v1.32.3 on Ubuntu
-- **Nodes**: 5-node HA cluster (3 control plane nodes: mullet, trout, whale)
+- **Nodes**: 8-node HA cluster (3 control plane nodes: mullet, trout, whale)
+  - Original nodes (Mayastor): mullet (Ubuntu 22.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
+  - Dell R320 nodes (Rook/Ceph migration): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
 - **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.220
-- **Storage**: OpenEBS Mayastor with external 4TB drives on each node
+- **Storage**:
+  - Current: OpenEBS Mayastor with external 4TB drives on original nodes
+  - Migration: Rook/Ceph on Dell R320 nodes to replace Mayastor
 
 ### Key Components
 

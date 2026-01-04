@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ceph-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  ceph-cluster.json: |
+    {
+      "__inputs": [],
+      "__requires": [],
+      "annotations": {
+        "list": []
+      },
+      "description": "Ceph Cluster Overview",
+      "editable": true,
+      "gnetId": 2842,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 16,
+      "style": "dark",
+      "tags": ["ceph"],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Ceph Cluster",
+      "uid": "ceph-cluster",
+      "version": 1
+    }
