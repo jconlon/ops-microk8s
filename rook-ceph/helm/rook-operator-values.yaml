@@ -1,0 +1,73 @@
+# Rook Operator Helm Values
+# Configures Rook operator to run on Dell R320 nodes only
+
+# Resource limits for operator
+resources:
+  limits:
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector to target only Ceph nodes
+nodeSelector:
+  ceph-node: "true"
+
+# Enable Prometheus monitoring
+monitoring:
+  enabled: true
+
+# Log verbosity
+logLevel: INFO
+
+# Enable device discovery daemon
+discoverDaemonResources:
+  limits:
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Enable CSI drivers
+csi:
+  # MicroK8s specific kubelet directory
+  kubeletDirPath: /var/snap/microk8s/common/var/lib/kubelet
+
+  # Enable host network for CSI
+  enableCSIHostNetwork: true
+
+  # CSI driver resource limits
+  csiRBDProvisionerResource:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  csiRBDPluginResource:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  csiCephFSProvisionerResource:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  csiCephFSPluginResource:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Enable admission controller
+admissionController:
+  tolerations:
+    - key: ceph-node
+      operator: Exists
+      effect: NoSchedule
