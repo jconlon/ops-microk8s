@@ -25,8 +25,8 @@
 
 ### Service-Specific Plugins
 - `kubectl ingress-nginx` - Manage and troubleshoot NGINX Ingress Controller
-- `kubectl mayastor` - Manage Mayastor storage system resources
 - `kubectl minio` - Manage MinIO object storage deployments
+- `kubectl rook-ceph` - Manage Rook/Ceph storage system resources
 
 ### Plugin Management
 - `kubectl krew` - Install, update, and manage kubectl plugins

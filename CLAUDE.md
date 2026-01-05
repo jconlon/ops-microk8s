@@ -32,29 +32,27 @@ Please follow these memory protocols at the beginning of each Claude Code sessio
 
 ## Repository Overview
 
-This repository contains the infrastructure configuration for a MicroK8s cluster with 8 nodes: mullet, trout, tuna, whale, gold, squid, puffer, and carp. The cluster currently uses OpenEBS Mayastor for replicated storage and is migrating to Rook/Ceph. Monitoring is provided by Prometheus/Grafana.
+This repository contains the infrastructure configuration for a MicroK8s cluster with 8 nodes: mullet, trout, tuna, whale, gold, squid, puffer, and carp. The cluster uses Rook/Ceph for distributed replicated storage. Monitoring is provided by Prometheus/Grafana.
 
 ## Architecture
 
 ### Cluster Configuration
 
-- **Platform**: MicroK8s v1.32.3 on Ubuntu
+- **Platform**: MicroK8s v1.32.9 on Ubuntu
 - **Nodes**: 8-node HA cluster (3 control plane nodes: mullet, trout, whale)
-  - Original nodes (Mayastor): mullet (Ubuntu 22.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
-  - Dell R320 nodes (Rook/Ceph migration): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
+  - Original nodes: mullet (Ubuntu 22.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
+  - Dell R320 nodes (Ceph storage): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
 - **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.220
-- **Storage**:
-  - Current: OpenEBS Mayastor with external 4TB drives on original nodes
-  - Migration: Rook/Ceph on Dell R320 nodes to replace Mayastor
+- **Storage**: Rook/Ceph distributed storage with 3-way replication across Dell R320 nodes (16TB total capacity)
 
 ### Key Components
 
 - **ArgoCD**: GitOps deployment tool, self-managed via Helm
-- **OpenEBS**: Storage management with Mayastor engine for replicated volumes
+- **Rook/Ceph**: Distributed storage system with 3-way replication
 - **Monitoring**: Prometheus stack with Grafana dashboards
+- **PostgreSQL**: CloudNativePG operator managing PostgreSQL clusters
 - **Storage Classes**:
-  - `mayastor-monitoring-ha` (3 replicas)
-  - `mayastor-monitoring-balanced` (2 replicas)
+  - `rook-ceph-block` (3-way replication, default for all workloads)
 
 ## Development Commands
 
@@ -84,26 +82,20 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 ```
 
-### OpenEBS Mayastor
+### Rook/Ceph Storage
 
 ```bash
-# Install OpenEBS with Mayastor
-helm upgrade --install openebs openebs/openebs \
-  --namespace openebs \
-  --values openebs-gitops/helm/openebs-mayastor-values.yaml \
-  --create-namespace \
-  --timeout 15m
+# Check Ceph cluster health
+kubectl get cephcluster -n rook-ceph
 
-# Label nodes for Mayastor
-kubectl label node whale openebs.io/engine=mayastor
-kubectl label node tuna openebs.io/engine=mayastor
-kubectl label node trout openebs.io/engine=mayastor
-kubectl label node shamu openebs.io/engine=mayastor
-kubectl label node mullet openebs.io/engine=mayastor
+# Check Ceph status via toolbox
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
-# Apply diskpools
-kubectl apply -f openebs-gitops/diskpools/
-kubectl apply -f openebs-gitops/storageclasses/mayastor-storage-classes.yaml
+# View storage classes
+kubectl get storageclass rook-ceph-block
+
+# Monitor Ceph OSDs
+kubectl get pods -n rook-ceph -l app=rook-ceph-osd
 ```
 
 ### Monitoring Stack
@@ -119,8 +111,6 @@ helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-sta
 # Get Grafana admin password
 kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 
-# Apply OpenEBS monitoring configurations
-kubectl apply -f openebs-gitops/monitoring/
 ```
 
 ### Development Environment
@@ -138,7 +128,7 @@ k9s
 ### MicroK8s Specifics
 
 - **Kubelet Directory**: `/var/snap/microk8s/common/var/lib/kubelet/` (configured in Helm values)
-- **IOVA Mode**: Mayastor requires `--iova-mode=pa` for io-engine pods
+- **Ceph Toolbox**: Use `kubectl exec -n rook-ceph deploy/rook-ceph-tools` to run Ceph commands
 
 ### Node Prerequisites
 
@@ -176,46 +166,52 @@ ops-microk8s/
 │   │   ├── prometheus-app.yaml
 │   │   ├── grafana-app.yaml
 │   │   └── alertmanager-app.yaml
-│   ├── openebs-apps/            # App of Apps for OpenEBS
-│   │   ├── openebs-root.yaml
-│   │   ├── openebs-mayastor.yaml
-│   │   ├── openebs-diskpools.yaml
-│   │   ├── openebs-storageclasses.yaml
-│   │   └── openebs-monitoring.yaml
+│   ├── rook-ceph-apps/          # App of Apps for Rook/Ceph
+│   │   ├── rook-ceph-root.yaml
+│   │   ├── rook-operator-app.yaml
+│   │   ├── ceph-cluster-app.yaml
+│   │   ├── ceph-storageclasses-app.yaml
+│   │   └── ceph-monitoring-app.yaml
+│   └── postgresql/              # PostgreSQL ArgoCD apps
+│       ├── postgresql-operator.yaml
+│       ├── postgresql-cluster.yaml
+│       ├── postgresql-monitoring.yaml
+│       └── postgresql-networking.yaml
 ├── monitoring/                   # Split monitoring stack configurations
 │   └── helm/
 │       ├── prometheus-only-values.yaml    # Prometheus + operator + exporters
 │       ├── grafana-only-values.yaml       # Grafana standalone config
 │       └── alertmanager-only-values.yaml  # AlertManager standalone config
-└── openebs-gitops/              # OpenEBS storage configurations
-    ├── diskpools/               # Mayastor diskpool definitions per node
-    ├── helm/
-    │   └── openebs-mayastor-values.yaml  # Main OpenEBS Helm config
-    ├── monitoring/              # OpenEBS monitoring configurations
-    │   ├── grafana-config-map.yaml      # OpenEBS Grafana dashboards
-    │   ├── openebs-prometheusrules.yaml # OpenEBS alerting rules
-    │   └── openebs-servicemonitors.yaml # OpenEBS metrics collection
-    └── storageclasses/          # Storage class definitions
+├── rook-ceph/                   # Rook/Ceph storage configurations
+│   ├── cluster/                 # Ceph cluster and toolbox
+│   ├── helm/                    # Rook operator Helm values
+│   ├── monitoring/              # Ceph monitoring (Grafana, Prometheus, ServiceMonitor)
+│   └── storageclasses/          # Storage class and block pool definitions
+└── postgresql-gitops/           # PostgreSQL configurations
+    ├── cluster/                 # PostgreSQL cluster definitions
+    ├── monitoring/              # PostgreSQL monitoring
+    └── networking/              # PostgreSQL services
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Mayastor io-engine pods failing**: Check IOVA mode configuration in DaemonSet
-2. **Volume mount failures**: Verify kubelet directory path in Helm values
-3. **Storage provisioning issues**: Ensure diskpools are created and healthy
+1. **Ceph health warnings**: Check OSD status and replication
+2. **Volume mount failures**: Verify Ceph cluster health
+3. **Storage provisioning issues**: Ensure storage class and block pool exist
 4. **Network connectivity**: Verify MetalLB IP range doesn't conflict with PiHole
 
 ### Useful Commands
 
 ```bash
-# Check Mayastor status
-kubectl get pods -l app=io-engine -n openebs
-kubectl get diskpools -n openebs
+# Check Ceph status
+kubectl get cephcluster -n rook-ceph
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
 # Monitor storage
 kubectl get pv,pvc --all-namespaces
+kubectl get storageclass
 
 # Check monitoring stack
 kubectl get pods -n monitoring

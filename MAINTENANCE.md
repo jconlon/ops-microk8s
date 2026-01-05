@@ -7,11 +7,9 @@ This document provides procedures for gracefully shutting down and restarting th
 - **Platform**: MicroK8s v1.32.3 on Ubuntu
 - **Nodes**: 8 nodes total
   - Control plane nodes: mullet, trout, whale
-  - Worker nodes (Mayastor): tuna
-  - Worker nodes (Rook/Ceph migration): gold, squid, puffer, carp
+  - Worker nodes: tuna, gold, squid, puffer, carp
 - **Storage**:
-  - Current: OpenEBS Mayastor with external 4TB drives on original nodes
-  - Migration: Rook/Ceph on Dell R320 nodes
+  - Rook/Ceph distributed storage with 3-way replication across Dell R320 nodes (gold, squid, puffer, carp)
 - **Key Applications**:
   - PostgreSQL cluster (production-postgresql) - 3 instances with S3 backups
   - Monitoring stack (Prometheus, Grafana, AlertManager)
@@ -82,23 +80,26 @@ kubectl describe backup <backup-name> -n postgresql-system | grep Phase
 
 **Expected Output**: Backup phase should be `completed`.
 
-### 4. Check OpenEBS Mayastor Storage
+### 4. Check Rook/Ceph Storage
 
 ```bash
-# Check diskpool status
-kubectl get diskpools -n openebs
+# Check Ceph cluster health
+kubectl get cephcluster -n rook-ceph
 
-# Check Mayastor volumes
-kubectl mayastor get volumes -n openebs
+# Check Ceph status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
-# Verify all volume replicas are healthy
-kubectl mayastor get volume-replica-topologies -n openebs
+# Check Ceph OSD status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd status
+
+# Verify storage health
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph health detail
 ```
 
 **Expected Output**:
-- All diskpools: `Online`
-- All volumes: `Online`
-- All replicas: `Online`
+- Ceph cluster: `Ready`
+- Ceph health: `HEALTH_OK`
+- All OSDs: `up` and `in`
 
 ### 5. Check Monitoring Stack
 
@@ -119,7 +120,7 @@ kubectl get prometheus -n monitoring
 kubectl get nodes -o wide > pre-maintenance-nodes.txt
 kubectl get pods --all-namespaces > pre-maintenance-pods.txt
 kubectl get pv,pvc --all-namespaces > pre-maintenance-storage.txt
-kubectl get diskpools -n openebs > pre-maintenance-diskpools.txt
+kubectl get cephcluster -n rook-ceph > pre-maintenance-ceph.txt
 ```
 
 ---
@@ -163,20 +164,23 @@ kubectl get nodes
 
 ### Phase 2: Storage Preparation
 
-#### 2.1 Verify No Active I/O Operations
+#### 2.1 Verify Ceph Cluster Health
 
 ```bash
-# Check for any ongoing rebuild operations
-kubectl mayastor get rebuild-history -n openebs
+# Check Ceph cluster health
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
-# Check volume replica status
-kubectl mayastor get volume-replica-topologies -n openebs
+# Check for any ongoing recovery or rebalancing
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph health detail
 
-# Ensure no volumes are degraded
-kubectl mayastor get volumes -n openebs | grep -v "Online"
+# Verify OSD status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd status
+
+# Check placement group status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph pg stat
 ```
 
-**Expected Output**: No active rebuilds, all replicas `Online`.
+**Expected Output**: Health `HEALTH_OK`, no active recovery, all OSDs `up` and `in`.
 
 #### 2.2 Scale Down PostgreSQL Replicas (Optional for Complete Shutdown)
 
@@ -231,10 +235,10 @@ sudo shutdown -h now
 exit
 ```
 
-Then drain Mayastor worker node:
+Then drain remaining worker node:
 
 ```bash
-# Drain tuna (Mayastor worker node)
+# Drain tuna (worker node)
 kubectl drain tuna --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
 kubectl get pods --all-namespaces -o wide | grep tuna
 ssh tuna
@@ -327,11 +331,11 @@ kubectl get pods -n kube-system
 ### Phase 2: Start Worker Nodes
 
 ```bash
-# Power on tuna (Mayastor worker)
+# Power on tuna (worker node)
 # Wait for tuna to become Ready
 kubectl get nodes -w
 
-# Power on Dell R320 nodes
+# Power on Dell R320 nodes (Ceph storage nodes)
 # Power on gold
 # Power on squid
 # Power on puffer
@@ -362,33 +366,35 @@ kubectl get nodes
 
 ### Phase 4: Verify Storage Recovery
 
-#### 4.1 Check OpenEBS Mayastor Status
+#### 4.1 Check Rook/Ceph Status
 
 ```bash
-# Wait for Mayastor pods to start (may take 2-5 minutes)
-kubectl get pods -n openebs | grep -E "mayastor|io-engine"
+# Wait for Ceph pods to start (may take 2-5 minutes)
+kubectl get pods -n rook-ceph
 
-# Check diskpool status
-kubectl get diskpools -n openebs
+# Check Ceph cluster status
+kubectl get cephcluster -n rook-ceph
 
-# Verify all diskpools are Online
-kubectl mayastor get pools -n openebs
+# Verify Ceph health
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
+
+# Check OSD status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd status
 ```
 
-**Expected Output**: All diskpools should be `Online`.
+**Expected Output**: Ceph cluster `Ready`, health `HEALTH_OK`, all OSDs `up` and `in`.
 
-#### 4.2 Verify Volume Health
+#### 4.2 Verify Storage Health
 
 ```bash
-# Check volume status
-kubectl mayastor get volumes -n openebs
+# Check for any recovery or rebalancing
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph health detail
 
-# Check replica topology
-kubectl mayastor get volume-replica-topologies -n openebs
+# Check placement group status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph pg stat
 
-# If any volumes show degraded, they should automatically rebuild
-# Monitor rebuild progress
-kubectl mayastor get rebuild-history <volume-id> -n openebs
+# If any placement groups are recovering, monitor progress
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph -w
 ```
 
 ### Phase 5: Verify Application Recovery
@@ -506,68 +512,93 @@ kubectl cnpg promote production-postgresql-1 -n postgresql-system
 kubectl logs production-postgresql-1 -n postgresql-system
 
 # Common issues:
-# 1. Storage I/O errors - check diskpool status
+# 1. Storage I/O errors - check Ceph health
 # 2. WAL archiving failures - check S3 credentials
 # 3. Recovery failures - may need to restore from backup
 
 # Check storage status
-kubectl get diskpools -n openebs
-kubectl mayastor get volumes -n openebs
+kubectl get cephcluster -n rook-ceph
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
 # Restart pod if needed
 kubectl delete pod production-postgresql-1 -n postgresql-system
 ```
 
-### OpenEBS Mayastor Issues
+### Rook/Ceph Storage Issues
 
-#### Diskpools Stuck in Unknown State
+#### Ceph Cluster Not Healthy
 
 ```bash
-# Check io-engine pods
-kubectl get pods -n openebs -l app=io-engine
+# Check Ceph cluster status
+kubectl get cephcluster -n rook-ceph
 
-# Check node labels
-kubectl get nodes --show-labels | grep mayastor
+# Check detailed health
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph health detail
 
-# Restart io-engine on affected node
-kubectl delete pod -n openebs -l app=io-engine,openebs.io/nodename=<node-name>
+# Check Ceph pods
+kubectl get pods -n rook-ceph
 
-# Wait for diskpool to come online
-kubectl get diskpools -n openebs -w
+# Check OSD status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd status
+
+# Restart Ceph operator if needed
+kubectl rollout restart deployment rook-ceph-operator -n rook-ceph
 ```
 
-#### Volume Replicas Degraded
+#### OSD Pods Not Starting
 
 ```bash
-# Check replica status
-kubectl mayastor get volume-replica-topologies -n openebs
+# Check OSD pods
+kubectl get pods -n rook-ceph -l app=rook-ceph-osd
 
-# Volumes should automatically rebuild
-# Monitor rebuild progress
-kubectl mayastor get rebuild-history <volume-id> -n openebs
+# Check OSD logs
+kubectl logs -n rook-ceph -l app=rook-ceph-osd --tail=100
 
-# If rebuild doesn't start automatically, check:
-# 1. All diskpools are Online
-# 2. Network connectivity between nodes
-# 3. io-engine pods are running
+# Common causes:
+# 1. Node not ready
+# 2. Disk not available or has issues
+# 3. Network connectivity issues
+
+# Check node status
+kubectl get nodes
+kubectl describe node <node-name>
+
+# If OSD won't start, restart the pod
+kubectl delete pod -n rook-ceph <osd-pod-name>
+```
+
+#### Placement Groups Degraded
+
+```bash
+# Check placement group status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph pg stat
+
+# Check which PGs are degraded
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph pg dump | grep -E 'degraded|undersized|peering'
+
+# PGs should automatically recover
+# Monitor recovery progress
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph -w
+
+# If recovery doesn't start automatically, check:
+# 1. All OSDs are up and in
+# 2. Network connectivity between Ceph nodes
+# 3. Sufficient storage capacity
 ```
 
 #### Volume Mount Failures
 
 ```bash
-# Check volume target status
-kubectl mayastor get volumes -n openebs
-
-# Check CSI node pods
-kubectl get pods -n openebs -l app=mayastor-csi
+# Check Ceph CSI pods
+kubectl get pods -n rook-ceph -l app=csi-rbdplugin
 
 # Check CSI driver logs
-kubectl logs -n openebs <mayastor-csi-pod> -c mayastor-csi
+kubectl logs -n rook-ceph -l app=csi-rbdplugin --tail=100
 
 # Common causes:
-# 1. io-engine not ready on target node
+# 1. Ceph cluster not healthy
 # 2. Network connectivity issues
-# 3. Volume in degraded state
+# 3. RBD image mapped incorrectly
 
 # Restart pod using the volume if needed
 kubectl delete pod <pod-name> -n <namespace>
@@ -652,8 +683,8 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 2. **Check Storage**:
    ```bash
-   kubectl get diskpools -n openebs
-   kubectl mayastor get pools -n openebs
+   kubectl get cephcluster -n rook-ceph
+   kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
    ```
 
 3. **Check Critical Apps**:
@@ -671,7 +702,7 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
    ```
 
 5. **Restart Services Sequentially**:
-   - Restart storage layer first (OpenEBS)
+   - Restart storage layer first (Rook/Ceph)
    - Then restart databases (PostgreSQL)
    - Finally restart applications
 
@@ -694,10 +725,10 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 - **Node boot time**: 2-3 minutes per node
 - **Kubernetes control plane ready**: 5-10 minutes after first node boots
-- **OpenEBS Mayastor ready**: 2-5 minutes after nodes are Ready
+- **Rook/Ceph ready**: 2-5 minutes after nodes are Ready
 - **PostgreSQL cluster ready**: 3-5 minutes after storage is ready
 - **Full cluster operational**: 15-30 minutes after power-on
-- **Volume rebuilds** (if needed): Varies based on data size, typically 30-60 minutes
+- **Ceph recovery/rebalancing** (if needed): Varies based on data size and cluster load
 
 **Total maintenance window estimate**: 1-2 hours for clean shutdown and restart.
 
@@ -723,6 +754,7 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 - [MicroK8s Documentation](https://microk8s.io/docs)
 - [Kubernetes Node Drain](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)
-- [OpenEBS Mayastor Maintenance](https://openebs.io/docs/user-guides/replicated-storage-user-guide/replicated-pv-mayastor/advanced-operations/kubectl-plugin)
+- [Rook/Ceph Documentation](https://rook.io/docs/rook/latest/)
+- [Ceph Operations](https://docs.ceph.com/en/latest/rados/operations/)
 - [CloudNativePG Kubernetes Upgrade](https://cloudnative-pg.io/documentation/current/kubernetes_upgrade/)
 - [CloudNativePG Automated Failover](https://cloudnative-pg.io/documentation/current/failover/)

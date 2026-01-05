@@ -1,4 +1,7 @@
 # MicroK8s Cluster Recovery Plan
+
+> **HISTORICAL DOCUMENT**: This recovery plan documents the November 2025 incident when the cluster was using OpenEBS Mayastor storage. The cluster has since migrated to Rook/Ceph. This document is preserved for historical reference.
+
 **Date Shutdown:** 2025-11-03 ~23:40 UTC
 **Reason:** Hardware connection issues (whale node), disk issues (trout pool-trout)
 
