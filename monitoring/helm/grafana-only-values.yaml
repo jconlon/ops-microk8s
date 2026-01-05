@@ -7,11 +7,11 @@ grafana:
   # Admin password (CHANGE THIS!)
   adminPassword: "openebs-admin-secure-password"
 
-  # Persistence using balanced Mayastor for dashboard data
+  # Persistence using Rook/Ceph for dashboard data
   persistence:
     enabled: true
-    storageClassName: mayastor-monitoring-balanced # 2 replicas for good availability
-    size: 10Gi
+    storageClassName: rook-ceph-block # 3 replicas on Ceph cluster
+    size: 15Gi
     accessModes:
       - ReadWriteOnce
 
