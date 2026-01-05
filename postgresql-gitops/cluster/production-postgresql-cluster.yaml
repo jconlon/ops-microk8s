@@ -36,15 +36,10 @@ spec:
   monitoring:
     enablePodMonitor: false # We'll create our own PodMonitor with correct labels
 
-  # Storage configuration using OpenEBS Mayastor (using pvcTemplate)
+  # Storage configuration using Rook/Ceph
   storage:
-    pvcTemplate:
-      accessModes:
-        - ReadWriteOnce
-      resources:
-        requests:
-          storage: 100Gi
-      storageClassName: mayastor-postgresql-ha
+    storageClass: rook-ceph-block
+    size: 120Gi
     resizeInUseVolumes: true
 
   # Backup configuration using AWS S3
