@@ -1,8 +1,0 @@
-apiVersion: "openebs.io/v1beta3"
-kind: DiskPool
-metadata:
-  name: pool-tuna
-  namespace: openebs
-spec:
-  node: tuna
-  disks: ["/dev/disk/by-id/scsi-35000000000000001"]
