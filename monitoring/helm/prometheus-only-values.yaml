@@ -4,11 +4,11 @@
 prometheus:
   enabled: true
   prometheusSpec:
-    # Storage configuration using HA Mayastor for critical metrics data
+    # Storage configuration using Rook/Ceph for critical metrics data
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: mayastor-monitoring-ha # 3 replicas for HA
+          storageClassName: rook-ceph-block # 3 replicas on Ceph
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:

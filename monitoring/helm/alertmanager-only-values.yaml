@@ -7,7 +7,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: mayastor-monitoring-balanced # 2 replicas for alerts data
+          storageClassName: rook-ceph-block # 3 replicas on Ceph
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:

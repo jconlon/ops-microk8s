@@ -140,7 +140,7 @@ spec:
       source: production-postgresql-backup
   storage:
     size: 100Gi
-    storageClassName: mayastor-postgresql-ha
+    storageClassName: rook-ceph-block
   externalClusters:
     - name: production-postgresql-backup
       barmanObjectStore:

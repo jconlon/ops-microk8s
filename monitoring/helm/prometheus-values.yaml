@@ -3,11 +3,11 @@
 
 prometheus:
   prometheusSpec:
-    # Storage configuration using HA Mayastor for critical metrics data
+    # Storage configuration using Rook/Ceph for critical metrics data
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: mayastor-monitoring-ha # 3 replicas for HA
+          storageClassName: rook-ceph-block # 3 replicas on Ceph
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -61,10 +61,10 @@ grafana:
   # Admin password (CHANGE THIS!)
   adminPassword: "openebs-admin-secure-password"
 
-  # Persistence using balanced Mayastor for dashboard data
+  # Persistence using Rook/Ceph for dashboard data
   persistence:
     enabled: true
-    storageClassName: mayastor-monitoring-balanced # 2 replicas for good availability
+    storageClassName: rook-ceph-block # 3 replicas on Ceph
     size: 10Gi
     accessModes:
       - ReadWriteOnce
@@ -119,7 +119,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: mayastor-monitoring-balanced # 2 replicas for alerts data
+          storageClassName: rook-ceph-block # 3 replicas on Ceph
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:

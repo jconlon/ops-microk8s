@@ -10,7 +10,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: mayastor-monitoring-balanced
+  storageClassName: rook-ceph-block
   resources:
     requests:
       storage: 200Gi
