@@ -1,0 +1,82 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: rook-ceph-rgw
+  namespace: rook-ceph
+spec:
+  # Metadata pool - always replicated for reliability
+  metadataPool:
+    failureDomain: host
+    replicated:
+      size: 3
+      requireSafeReplicaSize: true
+    parameters:
+      compression_mode: none
+
+  # Data pool - Erasure Coding 2+2 for better capacity
+  # With 4 OSDs: 16TB raw = ~8TB usable (50% efficiency)
+  # Can tolerate 2 OSD failures
+  dataPool:
+    failureDomain: host
+    erasureCoded:
+      dataChunks: 2      # Data chunks
+      codingChunks: 2    # Parity/coding chunks
+    parameters:
+      compression_mode: passive  # Compress large objects
+
+  # Keep pools even if this resource is deleted (safety)
+  preservePoolsOnDelete: true
+
+  # RADOS Gateway configuration
+  gateway:
+    type: s3
+    port: 80
+    # Uncomment for HTTPS (requires certificate)
+    # securePort: 443
+    # sslCertificateRef: rgw-cert-secret
+
+    # Deploy 2 RGW instances for HA and load balancing
+    instances: 2
+
+    # Spread RGW instances across different nodes
+    placement:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - rook-ceph-rgw
+            topologyKey: kubernetes.io/hostname
+
+      # Optional: Prefer non-storage nodes for RGW
+      # nodeAffinity:
+      #   preferredDuringSchedulingIgnoredDuringExecution:
+      #   - weight: 100
+      #     preference:
+      #       matchExpressions:
+      #       - key: role
+      #         operator: NotIn
+      #         values:
+      #         - storage
+
+    # Resource allocation per RGW instance
+    resources:
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+
+    # Priority class for RGW pods
+    priorityClassName: system-cluster-critical
+
+  # Health check configuration
+  healthCheck:
+    bucket:
+      disabled: false
+      interval: 60s

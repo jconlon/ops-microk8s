@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rook-ceph-rgw
+  namespace: rook-ceph
+  labels:
+    app: rook-ceph-rgw
+    rook_cluster: rook-ceph
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: rook-ceph-rgw
+      rook_object_store: rook-ceph-rgw
+
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scheme: http
+
+  namespaceSelector:
+    matchNames:
+    - rook-ceph

@@ -1,0 +1,26 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: postgresql-backup-user
+  namespace: rook-ceph
+  labels:
+    app: postgresql-backup
+spec:
+  store: rook-ceph-rgw
+  displayName: "PostgreSQL Backup Service"
+
+  # Quotas for PostgreSQL backups
+  quotas:
+    maxBuckets: 5           # Limit number of buckets
+    maxSize: "500Gi"        # Maximum 500GB for backups
+    maxObjects: 100000      # Maximum objects
+
+  # Capabilities (optional - defaults to full access)
+  # capabilities:
+  #   user: "*"
+  #   bucket: "*"
+
+---
+# Secret will be auto-created with credentials:
+# - AccessKey: kubectl get secret postgresql-backup-user -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d
+# - SecretKey: kubectl get secret postgresql-backup-user -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d
