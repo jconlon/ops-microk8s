@@ -17,11 +17,10 @@ This directory contains the Rook/Ceph Object Storage (RADOS Gateway) configurati
 object-storage/
 ├── ceph-object-store.yaml       # CephObjectStore CRD (EC 2+2 configuration)
 ├── rgw-service.yaml              # LoadBalancer service (MetalLB IP: 192.168.0.204)
-├── users/
-│   ├── postgresql-user.yaml     # S3 user for PostgreSQL backups (500GB quota)
-│   └── app-user.yaml            # S3 user for application backups (1TB quota)
-└── monitoring/
-    └── servicemonitor.yaml      # Prometheus ServiceMonitor for RGW metrics
+├── postgresql-user.yaml          # S3 user for PostgreSQL backups (500GB quota)
+├── app-user.yaml                 # S3 user for application backups (1TB quota)
+├── servicemonitor.yaml           # Prometheus ServiceMonitor for RGW metrics
+└── README.md                     # This file
 ```
 
 ## Prerequisites
