@@ -9,14 +9,14 @@ This directory contains the Rook/Ceph Object Storage (RADOS Gateway) configurati
 - **Usable Capacity**: ~8TB (50% efficiency)
 - **Failure Tolerance**: Can lose 2 OSDs without data loss
 - **RGW Instances**: 2 (HA with load balancing)
-- **S3 Endpoint**: http://192.168.0.210 (MetalLB LoadBalancer)
+- **S3 Endpoint**: http://192.168.0.204 (MetalLB LoadBalancer)
 
 ## Files
 
 ```
 object-storage/
 ├── ceph-object-store.yaml       # CephObjectStore CRD (EC 2+2 configuration)
-├── rgw-service.yaml              # LoadBalancer service (MetalLB IP: 192.168.0.210)
+├── rgw-service.yaml              # LoadBalancer service (MetalLB IP: 192.168.0.204)
 ├── users/
 │   ├── postgresql-user.yaml     # S3 user for PostgreSQL backups (500GB quota)
 │   └── app-user.yaml            # S3 user for application backups (1TB quota)
@@ -29,7 +29,7 @@ object-storage/
 1. ✅ Rook/Ceph operator installed and running (managed by ArgoCD)
 2. ✅ Ceph cluster healthy (HEALTH_OK)
 3. ✅ 4 clean drives at /dev/sdc on gold, squid, puffer, carp
-4. ✅ MetalLB configured with 192.168.0.210 available
+4. ✅ MetalLB configured with 192.168.0.204 available
 5. ✅ ArgoCD installed and managing cluster
 
 ## Deployment (GitOps)
@@ -70,14 +70,14 @@ kubectl get svc rook-ceph-rgw-external -n rook-ceph
 
 # Expected output:
 # NAME                     TYPE           EXTERNAL-IP       PORT(S)
-# rook-ceph-rgw-external   LoadBalancer   192.168.0.210     80:xxxxx/TCP
+# rook-ceph-rgw-external   LoadBalancer   192.168.0.204     80:xxxxx/TCP
 ```
 
 ### Test S3 Endpoint
 
 ```bash
 # Should return XML (means RGW is responding)
-curl http://192.168.0.210
+curl http://192.168.0.204
 ```
 
 ## Accessing S3 Credentials
@@ -138,7 +138,7 @@ export ACCESS_KEY="<your-access-key>"
 export SECRET_KEY="<your-secret-key>"
 
 # Configure mc alias for RGW
-mc alias set ceph-rgw http://192.168.0.210 $ACCESS_KEY $SECRET_KEY
+mc alias set ceph-rgw http://192.168.0.204 $ACCESS_KEY $SECRET_KEY
 
 # Or with DNS (if configured)
 mc alias set ceph-rgw http://rgw.verticon.com $ACCESS_KEY $SECRET_KEY
@@ -478,7 +478,7 @@ aws configure set aws_access_key_id <AccessKey>
 aws configure set aws_secret_access_key <SecretKey>
 
 # Set endpoint
-export AWS_ENDPOINT_URL="http://192.168.0.210"
+export AWS_ENDPOINT_URL="http://192.168.0.204"
 
 # Create bucket
 aws s3 mb s3://my-bucket
@@ -540,7 +540,7 @@ kubectl logs -n rook-ceph -l app=rook-ceph-operator --tail=100
 
 ```bash
 # Test endpoint connectivity
-curl http://192.168.0.210
+curl http://192.168.0.204
 
 # Verify credentials are correct
 kubectl get secret postgresql-backup-user -n rook-ceph -o yaml
@@ -553,7 +553,7 @@ mc --debug ls ceph-rgw
 
 # Re-add alias if corrupted
 mc alias remove ceph-rgw
-mc alias set ceph-rgw http://192.168.0.210 $ACCESS_KEY $SECRET_KEY
+mc alias set ceph-rgw http://192.168.0.204 $ACCESS_KEY $SECRET_KEY
 ```
 
 ### External IP Not Assigned
@@ -564,7 +564,7 @@ kubectl get pods -n metallb-system
 kubectl logs -n metallb-system -l app=metallb
 
 # Check if IP is already in use
-kubectl get svc -A | grep 192.168.0.210
+kubectl get svc -A | grep 192.168.0.204
 ```
 
 ## DNS Configuration (Optional)
@@ -572,8 +572,8 @@ kubectl get svc -A | grep 192.168.0.210
 Add DNS records (via PiHole or router):
 
 ```
-rgw.verticon.com  A  192.168.0.210
-s3.verticon.com   A  192.168.0.210
+rgw.verticon.com  A  192.168.0.204
+s3.verticon.com   A  192.168.0.204
 ```
 
 Then configure MinIO client with DNS:
