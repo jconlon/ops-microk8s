@@ -13,7 +13,7 @@ metadata:
 spec:
   type: LoadBalancer
   # Fixed IP for S3 endpoint
-  loadBalancerIP: 192.168.0.210
+  loadBalancerIP: 192.168.0.204
 
   ports:
   - name: http

@@ -29,7 +29,6 @@ spec:
 
   # RADOS Gateway configuration
   gateway:
-    type: s3
     port: 80
     # Uncomment for HTTPS (requires certificate)
     # securePort: 443
@@ -74,9 +73,3 @@ spec:
 
     # Priority class for RGW pods
     priorityClassName: system-cluster-critical
-
-  # Health check configuration
-  healthCheck:
-    bucket:
-      disabled: false
-      interval: 60s
