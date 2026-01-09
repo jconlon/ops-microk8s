@@ -36,11 +36,15 @@ prometheus:
     # Additional scrape configs (empty but required for some configurations)
     additionalScrapeConfigs: []
 
-    # ServiceMonitor selector - allows automatic discovery of ServiceMonitors
+    # ServiceMonitor selector - match ALL ServiceMonitors cluster-wide
+    # Setting to {} with nilUsesHelmValues=false prevents Helm from adding release label selector
+    # This allows discovery of ServiceMonitors from any source (grafana, alertmanager, prometheus, ceph, etc.)
     serviceMonitorSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
 
-    # PrometheusRule selector - allows automatic discovery of PrometheusRules
+    # PrometheusRule selector - match ALL PrometheusRules cluster-wide
     ruleSelector: {}
+    ruleSelectorNilUsesHelmValues: false
 
     # External URL configuration for LoadBalancer access
     externalUrl: "http://prometheus.verticon.com"
