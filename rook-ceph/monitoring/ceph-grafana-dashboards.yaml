@@ -5963,6 +5963,6 @@ data:
       },
       "timezone": "",
       "title": "Ceph Cluster",
-      "uid": "ceph-cluster-v2",
+      "uid": "rook-ceph-cluster",
       "version": 0
     }
