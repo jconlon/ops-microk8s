@@ -19,7 +19,6 @@ object-storage/
 ├── rgw-service.yaml              # LoadBalancer service (MetalLB IP: 192.168.0.204)
 ├── postgresql-user.yaml          # S3 user for PostgreSQL backups (500GB quota)
 ├── app-user.yaml                 # S3 user for application backups (1TB quota)
-├── servicemonitor.yaml           # Prometheus ServiceMonitor for RGW metrics
 └── README.md                     # This file
 ```
 
