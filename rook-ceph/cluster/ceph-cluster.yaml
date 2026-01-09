@@ -27,8 +27,6 @@ spec:
 
   monitoring:
     enabled: true
-    serviceMonitorSelectorLabels:
-      release: prometheus
 
   network:
     provider: host
