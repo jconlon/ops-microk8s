@@ -62,6 +62,15 @@ spec:
         jobs: 2
     target: primary
 
+  # Managed roles
+  managed:
+    roles:
+      - name: freshrss
+        ensure: present
+        login: true
+        passwordSecret:
+          name: freshrss-role-password
+
   # Tolerations for dedicated nodes (if needed)
   # tolerations:
   # - key: "postgresql"

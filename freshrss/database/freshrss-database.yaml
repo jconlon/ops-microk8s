@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: freshrss
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: freshrss
+    app.kubernetes.io/component: database
+spec:
+  name: freshrss
+  owner: freshrss
+  cluster:
+    name: production-postgresql
+  databaseReclaimPolicy: retain

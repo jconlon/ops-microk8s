@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: freshrss
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  sources:
+    - repoURL: https://christianhuth.github.io/helm-charts
+      chart: freshrss
+      targetRevision: "2.7.0"
+      helm:
+        valueFiles:
+          - $values/freshrss/helm/freshrss-values.yaml
+    - repoURL: https://github.com/jconlon/ops-microk8s
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: freshrss
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

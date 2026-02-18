@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: freshrss-apps
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jconlon/ops-microk8s
+    targetRevision: HEAD
+    path: argoCD-apps/freshrss
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
