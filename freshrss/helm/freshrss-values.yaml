@@ -50,8 +50,7 @@ externalPostgresql:
   auth:
     database: "freshrss"
     username: "freshrss"
-    existingSecret: "freshrss-db-credentials"
-    userPasswordKey: "password"
+    password: "freshrss-lab-2024"
   hostname: "production-postgresql-rw.postgresql-system.svc.cluster.local"
   port: 5432
 
