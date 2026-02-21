@@ -14,7 +14,7 @@ ingress:
   enabled: false
 
 freshrss:
-  baseUrl: "http://freshrss.verticon.com"
+  baseUrl: "https://freshrss.verticon.com"
   timezone: "America/New_York"
   environment: production
   cronjob:
