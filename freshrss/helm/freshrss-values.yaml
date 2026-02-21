@@ -23,7 +23,7 @@ freshrss:
   database:
     type: postgresql
   initialization:
-    enabled: true
+    enabled: false
     admin:
       username: admin
       password: "freshrss-admin-2024"
