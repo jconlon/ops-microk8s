@@ -26,9 +26,7 @@ freshrss:
     enabled: false
     admin:
       username: admin
-      password: "freshrss-admin-2024"
       email: "jconlon@verticon.com"
-      apiPassword: "freshrss-api-2024"
     apiEnabled: true
     language: en
   persistence:
@@ -50,7 +48,8 @@ externalPostgresql:
   auth:
     database: "freshrss"
     username: "freshrss"
-    password: "freshrss-lab-2024"
+    existingSecret: "freshrss-db-credentials"
+    userPasswordKey: "password"
   hostname: "production-postgresql-rw.postgresql-system.svc.cluster.local"
   port: 5432
 
