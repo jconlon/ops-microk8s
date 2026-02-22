@@ -16,6 +16,7 @@ spec:
         app: rook-ceph-tools
     spec:
       dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: rook-ceph-default
       containers:
         - name: rook-ceph-tools
           image: quay.io/ceph/ceph:v18.2.4
@@ -23,20 +24,96 @@ spec:
             - /bin/bash
             - -c
             - |
-              sleep infinity
+              # Replicate the script from toolbox.sh inline so the ceph image
+              # can be run directly, instead of requiring the rook toolbox
+              CEPH_CONFIG="/etc/ceph/ceph.conf"
+              MON_CONFIG="/etc/rook/mon-endpoints"
+              KEYRING_FILE="/etc/ceph/keyring"
+
+              write_endpoints() {
+                endpoints=$(cat ${MON_CONFIG})
+                mon_endpoints=$(echo "${endpoints}"| sed 's/[a-z0-9_-]\+=//g')
+                DATE=$(date)
+                echo "$DATE writing mon endpoints to ${CEPH_CONFIG}: ${endpoints}"
+                  cat <<EOF > ${CEPH_CONFIG}
+              [global]
+              mon_host = ${mon_endpoints}
+
+              [client.admin]
+              keyring = ${KEYRING_FILE}
+              EOF
+              }
+
+              watch_endpoints() {
+                real_path=$(realpath ${MON_CONFIG})
+                initial_time=$(stat -c %Z "${real_path}")
+                while true; do
+                  real_path=$(realpath ${MON_CONFIG})
+                  latest_time=$(stat -c %Z "${real_path}")
+
+                  if [[ "${latest_time}" != "${initial_time}" ]]; then
+                    write_endpoints
+                    initial_time=${latest_time}
+                  fi
+
+                  sleep 10
+                done
+              }
+
+              ceph_secret=${ROOK_CEPH_SECRET}
+              if [[ "$ceph_secret" == "" ]]; then
+                ceph_secret=$(cat /var/lib/rook-ceph-mon/secret.keyring)
+              fi
+
+              cat <<EOF > ${KEYRING_FILE}
+              [${ROOK_CEPH_USERNAME}]
+              key = ${ceph_secret}
+              EOF
+
+              write_endpoints
+              watch_endpoints
+          imagePullPolicy: IfNotPresent
+          tty: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 2016
+            runAsGroup: 2016
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: ROOK_CEPH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-mon
+                  key: ceph-username
           volumeMounts:
             - mountPath: /etc/ceph
               name: ceph-config
-            - mountPath: /var/lib/ceph
-              name: mon-endpoint-volume
+            - name: mon-endpoint-volume
+              mountPath: /etc/rook
+            - name: ceph-admin-secret
+              mountPath: /var/lib/rook-ceph-mon
+              readOnly: true
       volumes:
-        - name: ceph-config
-          emptyDir: {}
+        - name: ceph-admin-secret
+          secret:
+            secretName: rook-ceph-mon
+            optional: false
+            items:
+              - key: ceph-secret
+                path: secret.keyring
         - name: mon-endpoint-volume
           configMap:
             name: rook-ceph-mon-endpoints
             items:
               - key: data
                 path: mon-endpoints
+        - name: ceph-config
+          emptyDir: {}
       nodeSelector:
         ceph-node: "true"
+      tolerations:
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 5
