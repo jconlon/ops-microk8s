@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily Restic backup to Ceph
+Requires=restic-backup.service
+
+[Timer]
+# Run daily at 3:00 AM
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+# Run 10 minutes after boot if missed
+OnBootSec=10min
+
+[Install]
+WantedBy=timers.target

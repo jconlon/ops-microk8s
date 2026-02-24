@@ -1,0 +1,24 @@
+[Unit]
+Description=Restic prune old snapshots
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jconlon
+Group=jconlon
+WorkingDirectory=/home/jconlon/dotfiles
+
+# Run restic prune via devbox + teller
+ExecStart=/usr/local/bin/devbox run --config /home/jconlon/dotfiles/devbox.json restic-prune-ceph
+
+# Logging
+StandardOutput=append:/var/log/restic-prune.log
+StandardError=append:/var/log/restic-prune.log
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

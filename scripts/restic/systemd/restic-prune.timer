@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly Restic prune (retention policy enforcement)
+Requires=restic-prune.service
+
+[Timer]
+# Run weekly on Sunday at 4:00 AM
+OnCalendar=Sun *-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

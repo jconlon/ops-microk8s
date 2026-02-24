@@ -1,0 +1,24 @@
+[Unit]
+Description=Restic repository verification
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jconlon
+Group=jconlon
+WorkingDirectory=/home/jconlon/dotfiles
+
+# Run restic verify via devbox + teller
+ExecStart=/usr/local/bin/devbox run --config /home/jconlon/dotfiles/devbox.json restic-verify-ceph
+
+# Logging
+StandardOutput=append:/var/log/restic-verify.log
+StandardError=append:/var/log/restic-verify.log
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

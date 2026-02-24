@@ -1,0 +1,24 @@
+[Unit]
+Description=Restic backup to Ceph Object Storage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jconlon
+Group=jconlon
+WorkingDirectory=/home/jconlon/dotfiles
+
+# Run existing restic-backup-ceph script via devbox + teller
+ExecStart=/usr/local/bin/devbox run --config /home/jconlon/dotfiles/devbox.json restic-backup-ceph
+
+# Logging
+StandardOutput=append:/var/log/restic-backup.log
+StandardError=append:/var/log/restic-backup.log
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

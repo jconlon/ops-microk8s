@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily music library sync to Ceph
+Requires=music-sync.service
+
+[Timer]
+# Run daily at 2:00 AM
+OnCalendar=daily
+OnCalendar=02:00
+Persistent=true
+
+# Run 5 minutes after boot if missed
+OnBootSec=5min
+
+[Install]
+WantedBy=timers.target

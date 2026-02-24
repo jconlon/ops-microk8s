@@ -1,0 +1,22 @@
+[Unit]
+Description=Sync pictures library to Ceph Object Storage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jconlon
+Group=jconlon
+WorkingDirectory=/home/jconlon/git/ops-microk8s
+ExecStart=/home/jconlon/git/ops-microk8s/scripts/sync-pictures-to-ceph.sh
+StandardOutput=append:/var/log/pictures-sync.log
+StandardError=append:/var/log/pictures-sync.log
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/usr /boot /etc
+ReadWritePaths=/home/jconlon /var/log
+
+[Install]
+WantedBy=multi-user.target

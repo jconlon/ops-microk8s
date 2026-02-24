@@ -1,0 +1,15 @@
+[Unit]
+Description=Daily pictures library sync to Ceph
+Requires=pictures-sync.service
+
+[Timer]
+# Run daily at 3:00 AM
+OnCalendar=daily
+OnCalendar=03:00
+Persistent=true
+
+# Run 10 minutes after boot if missed
+OnBootSec=10min
+
+[Install]
+WantedBy=timers.target
