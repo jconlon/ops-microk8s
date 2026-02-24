@@ -24,7 +24,9 @@
 - `kubectl ipick` - Interactive pod picker for selecting pods from a list
 
 ### Service-Specific Plugins
+- `kubectl cnpg` - Manage CloudNativePG PostgreSQL clusters. Example: `kubectl cnpg status production-postgresql -n postgresql-system`
 - `kubectl ingress-nginx` - Manage and troubleshoot NGINX Ingress Controller
+- `kubectl mayastor` - Manage Mayastor storage resources
 - `kubectl minio` - Manage MinIO object storage deployments
 - `kubectl rook-ceph` - Manage Rook/Ceph storage system resources
 

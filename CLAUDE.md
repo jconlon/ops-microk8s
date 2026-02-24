@@ -253,12 +253,14 @@ _Project-specific instructions and facts—use only within this repository:_
 - To login to ArgoCD server use the command: `devbox run -- argocd-login`
 - Always login to ArgoCD server at the start of all sessions.
 - All argocd commands should be run with this prefix: `devbox run -- argocd`
-- For troubleshooting, use any kubectl krew tools specified in: kubectl_krew_commands.md
+- For troubleshooting, use kubectl krew tools listed in `kubectl_krew_commands.md`. Run `kubectl plugin list` at startup to confirm available plugins.
 - When connecting to verticon.com servers use https not http.
 - To get ArgoCD password:  
   `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
 - ArgoCD username is `admin`
 - For postgresql cli use: `devbox run psql`
+
+- The `kubectl cnpg` plugin is available for CloudNativePG management. Example: `kubectl cnpg status production-postgresql -n postgresql-system`
 - For available scripts and usage, read `scripts/README.md` at session start.
 - To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
 
