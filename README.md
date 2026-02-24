@@ -158,6 +158,73 @@ helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-sta
 kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
 
+## Restic Backups
+
+Automated incremental backups of `/home/jconlon` to Ceph RGW object storage using [Restic](https://restic.readthedocs.io/). Implemented in [issue #18](https://github.com/jconlon/ops-microk8s/issues/18).
+
+### Overview
+
+- **Repository**: `s3:http://192.168.0.204/restic-backups` (Ceph RGW)
+- **Source**: `/home/jconlon` (excludes Music, Downloads, caches, build artifacts)
+- **Secrets**: Injected at runtime via teller from Google Secret Manager — no credentials on disk
+- **Teller config**: `~/dotfiles/restic/restic/.teller-restic-ceph.yml`
+
+### Schedule
+
+| Operation | Schedule | Purpose |
+|-----------|----------|---------|
+| **Backup** | Daily at 3:00 AM | Incremental backup |
+| **Prune** | Sunday at 4:00 AM | Remove old snapshots, reclaim space |
+| **Verify** | 1st of month at 5:00 AM | Repository integrity check (5% data read) |
+
+All timers have `Persistent=true` — if the machine was off at the scheduled time, the job runs shortly after boot.
+
+### Retention Policy
+
+```
+--keep-hourly 24    # last 24 hours
+--keep-daily 7      # last 7 days
+--keep-weekly 4     # last 4 weeks
+--keep-monthly 6    # last 6 months
+--keep-yearly 2     # last 2 years
+```
+
+### Installation
+
+```bash
+cd scripts/restic/systemd
+sudo ./install-restic.sh
+```
+
+### Verification and Management
+
+```bash
+# Check timer schedule and next run times
+systemctl list-timers restic-*
+
+# Check service status
+systemctl status restic-backup.service
+
+# View logs
+tail -f /var/log/restic-backup.log
+tail -f /var/log/restic-prune.log
+tail -f /var/log/restic-verify.log
+
+# Manual runs
+sudo systemctl start restic-backup.service
+sudo systemctl start restic-prune.service
+sudo systemctl start restic-verify.service
+
+# List recent snapshots
+cd ~/dotfiles
+devbox run -- teller --config restic/restic/.teller-restic-ceph.yml run -- restic snapshots --latest 5
+
+# Check repository size
+devbox run -- teller --config restic/restic/.teller-restic-ceph.yml run -- restic stats --mode restore-size
+```
+
+See [`scripts/restic/systemd/README-restic.md`](scripts/restic/systemd/README-restic.md) for full documentation including troubleshooting and uninstall.
+
 ## Project Structure
 
 ```
@@ -166,7 +233,18 @@ ops-microk8s/
 ├── CLAUDE.md                     # Claude Code instructions and guidance
 ├── devbox.json                   # Development environment (argocd, k9s)
 ├── scripts/
-│   └── argocd.nu                 # ArgoCD login script (nushell)
+│   ├── argocd.nu                 # ArgoCD management commands (nushell)
+│   ├── freshrss.nu               # FreshRSS psql access (nushell)
+│   ├── sync-music-to-ceph.sh     # Sync ~/Music to Ceph RGW (systemd timer)
+│   ├── sync-pictures-to-ceph.sh  # Sync ~/Pictures to Ceph RGW (systemd timer)
+│   ├── systemd/                  # Music/pictures sync systemd units
+│   └── restic/                   # Restic backup scripts and systemd units
+│       ├── restic-prune.sh       # Retention policy enforcement
+│       ├── restic-verify.sh      # Repository integrity verification
+│       └── systemd/              # Backup/prune/verify service+timer units
+├── teller/                       # Teller configs for K8s secret management
+│   ├── .teller-freshrss.yml      # FreshRSS K8s secrets
+│   └── .teller-postgresql.yml    # PostgreSQL Ceph S3 credentials
 ├── argoCD-apps/                  # ArgoCD application definitions
 │   ├── argocd-self-managed.yaml
 │   ├── monitoring-apps.yaml     # App of Apps for monitoring stack
@@ -184,7 +262,8 @@ ops-microk8s/
 │       ├── postgresql-operator.yaml
 │       ├── postgresql-cluster.yaml
 │       ├── postgresql-monitoring.yaml
-│       └── postgresql-networking.yaml
+│       ├── postgresql-networking.yaml
+│       └── postgresql-backup.yaml
 ├── monitoring/                   # Split monitoring stack configurations
 │   └── helm/
 │       ├── prometheus-only-values.yaml    # Prometheus + operator + exporters
@@ -197,6 +276,7 @@ ops-microk8s/
 │   └── storageclasses/          # Storage class and block pool definitions
 └── postgresql-gitops/           # PostgreSQL configurations
     ├── cluster/                 # PostgreSQL cluster definitions
+    ├── backup/                  # ScheduledBackup to Ceph S3 (barman)
     ├── monitoring/              # PostgreSQL monitoring
     └── networking/              # PostgreSQL services
 ```
