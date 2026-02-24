@@ -169,6 +169,9 @@ ops-microk8s/
 │   ├── sync-pictures-to-ceph.sh  # Sync ~/Pictures to Ceph RGW
 │   ├── systemd/                  # Systemd units for sync jobs
 │   └── restic/                   # Restic backup scripts and systemd units
+├── teller/                       # Teller configs for cluster K8s secret management
+│   ├── .teller-freshrss.yml      # FreshRSS secrets (Google Secret Manager → K8s)
+│   └── .teller-postgresql.yml    # PostgreSQL backup S3 credentials
 ├── argoCD-apps/                  # ArgoCD application definitions
 │   ├── argocd-self-managed.yaml
 │   ├── monitoring-apps.yaml     # App of Apps for monitoring stack
@@ -263,6 +266,7 @@ _Project-specific instructions and facts—use only within this repository:_
 - The `kubectl cnpg` plugin is available for CloudNativePG management. Example: `kubectl cnpg status production-postgresql -n postgresql-system`
 - For available scripts and usage, read `scripts/README.md` at session start.
 - To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
+- Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory.
 
 ---
 

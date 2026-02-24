@@ -118,3 +118,45 @@ Verifies repository integrity by reading 5% of stored data and lists the 5 most 
 Typically run via the `restic-verify` systemd timer (monthly, 1st at 5:00 AM).
 
 See [restic/systemd/README-restic.md](restic/systemd/README-restic.md) for full installation and troubleshooting.
+
+---
+
+## Teller Configurations
+
+Cluster teller configs live in `../teller/` (the `teller/` directory at the repo root). They pull secrets from Google Secret Manager and create Kubernetes secrets out-of-band (not managed by ArgoCD).
+
+Run all teller commands from the `ops-microk8s` root directory within a devbox shell.
+
+| Config | Purpose |
+|---|---|
+| `teller/.teller-freshrss.yml` | FreshRSS K8s secrets (`freshrss-db-credentials`, `freshrss-role-password`) |
+| `teller/.teller-postgresql.yml` | PostgreSQL backup S3 credentials (`ceph-s3-credentials`) |
+
+> **Note:** Machine-local teller configs (restic, gitlab) remain in `~/dotfiles`. Only cluster K8s secret configs belong here.
+
+### Example: Recreate FreshRSS secrets
+
+```bash
+# Role password (postgresql-system namespace)
+teller run --config teller/.teller-freshrss.yml -- bash -c 'kubectl create secret generic freshrss-role-password \
+  --namespace postgresql-system \
+  --from-literal=username=freshrss \
+  --from-literal=password="$FRESHRSS_ROLE_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+
+# DB credentials (freshrss namespace)
+teller run --config teller/.teller-freshrss.yml -- bash -c 'kubectl create secret generic freshrss-db-credentials \
+  --namespace freshrss \
+  --from-literal=password="$FRESHRSS_DB_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+```
+
+### Example: Create PostgreSQL backup S3 credentials
+
+```bash
+teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl create secret generic ceph-s3-credentials \
+  --namespace postgresql-system \
+  --from-literal=ACCESS_KEY_ID="$ACCESS_KEY_ID" \
+  --from-literal=ACCESS_SECRET_KEY="$ACCESS_SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+```

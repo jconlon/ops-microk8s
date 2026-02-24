@@ -1,0 +1,12 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      FRESHRSS_DB_PASSWORD:
+        path: projects/1000827005146/secrets/freshrss-db/versions/latest
+      FRESHRSS_ROLE_PASSWORD:
+        path: projects/1000827005146/secrets/freshrss-role/versions/latest
+      FRESHRSS_ADMIN_PASSWORD:
+        path: projects/1000827005146/secrets/freshrss-admin/versions/latest
+      FRESHRSS_API_PASSWORD:
+        path: projects/1000827005146/secrets/freshrss-api/versions/latest

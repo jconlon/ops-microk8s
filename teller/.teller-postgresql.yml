@@ -1,0 +1,8 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      ACCESS_KEY_ID:
+        path: projects/1000827005146/secrets/access-key-ceph-lab/versions/latest
+      ACCESS_SECRET_KEY:
+        path: projects/1000827005146/secrets/secret-key-ceph-lab/versions/latest
