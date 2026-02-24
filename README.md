@@ -171,10 +171,10 @@ Automated incremental backups of `/home/jconlon` to Ceph RGW object storage usin
 
 ### Schedule
 
-| Operation | Schedule | Purpose |
-|-----------|----------|---------|
-| **Backup** | Daily at 3:00 AM | Incremental backup |
-| **Prune** | Sunday at 4:00 AM | Remove old snapshots, reclaim space |
+| Operation  | Schedule                | Purpose                                   |
+| ---------- | ----------------------- | ----------------------------------------- |
+| **Backup** | Daily at 3:00 AM        | Incremental backup                        |
+| **Prune**  | Sunday at 4:00 AM       | Remove old snapshots, reclaim space       |
 | **Verify** | 1st of month at 5:00 AM | Repository integrity check (5% data read) |
 
 All timers have `Persistent=true` — if the machine was off at the scheduled time, the job runs shortly after boot.
