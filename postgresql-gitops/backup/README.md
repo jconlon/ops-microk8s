@@ -102,7 +102,6 @@ spec:
 ## Files
 
 - `scheduled-backup.yaml` — Daily backup schedule (2 AM, with immediate trigger on creation)
-- `postgresql-backup-pvc.yaml` — Local PVC for backup cache (optional)
 - `../cluster/production-postgresql-cluster.yaml` — Cluster with barmanObjectStore configuration
 
 ## Troubleshooting
