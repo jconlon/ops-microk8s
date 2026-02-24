@@ -42,17 +42,18 @@ spec:
     size: 120Gi
     resizeInUseVolumes: true
 
-  # Backup configuration using AWS S3
+  # Backup configuration using internal Ceph S3 (RGW)
   backup:
-    retentionPolicy: "7d"
+    retentionPolicy: "30d"
     barmanObjectStore:
-      destinationPath: "s3://postgresql-microk8s-one/postgresql-backups/production/"
+      destinationPath: "s3://postgresql-backups/production/"
+      endpointURL: "http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80"
       s3Credentials:
         accessKeyId:
-          name: aws-s3-credentials
+          name: ceph-s3-credentials
           key: ACCESS_KEY_ID
         secretAccessKey:
-          name: aws-s3-credentials
+          name: ceph-s3-credentials
           key: ACCESS_SECRET_KEY
       wal:
         compression: gzip

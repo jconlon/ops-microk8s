@@ -1,131 +1,75 @@
 # PostgreSQL Backup Configuration
 
-This directory contains the configuration for automated PostgreSQL backups using CloudNativePG and AWS S3.
+This directory contains the configuration for automated PostgreSQL backups using CloudNativePG and internal Ceph S3 (RGW).
 
 ## Overview
 
-- **Backup Method**: Barman with AWS S3 object storage
+- **Backup Method**: Barman with internal Ceph S3 object storage
+- **S3 Endpoint**: `http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80` (in-cluster)
+- **S3 Bucket**: `postgresql-backups` (on Ceph RGW at 192.168.0.204)
+- **Destination Path**: `s3://postgresql-backups/production/`
 - **Schedule**: Daily at 2 AM
-- **Retention**: 7 days
+- **Retention**: 30 days
 - **Compression**: gzip for both WAL and data
 - **Target**: Primary instance
 
-## Prerequisites
+## Credentials
 
-1. **AWS S3 Bucket**: Create an S3 bucket for PostgreSQL backups
-2. **AWS IAM User**: Create an IAM user with S3 access permissions
-3. **AWS Credentials**: Obtain Access Key ID and Secret Access Key
+S3 credentials are stored in Google Secret Manager and created as a Kubernetes secret
+out-of-band via teller (not managed by ArgoCD).
 
-### Required AWS IAM Permissions
+Secret name: `ceph-s3-credentials` in `postgresql-system` namespace.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:DeleteObject",
-        "s3:ListBucket"
-      ],
-      "Resource": ["arn:aws:s3:::postgresql-microk8s-one"]
-    }
-  ]
-}
-```
-
-## Setup Steps
-
-### 1. Configure AWS Credentials
-
-Edit `aws-credentials-secret.yaml` and replace the placeholder values:
-
-```yaml
-stringData:
-  ACCESS_KEY_ID: "your-aws-access-key-id"
-  ACCESS_SECRET_KEY: "your-aws-secret-access-key"
-```
-
-**Important**: Do not commit this file with real credentials to git!
-
-Apply the secret:
+To recreate the secret (from `ops-microk8s` root directory):
 
 ```bash
-kubectl apply -f postgresql-gitops/backup/aws-credentials-secret.yaml
+teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl create secret generic ceph-s3-credentials \
+  --namespace postgresql-system \
+  --from-literal=ACCESS_KEY_ID="$ACCESS_KEY_ID" \
+  --from-literal=ACCESS_SECRET_KEY="$ACCESS_SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
-### 2. Configure S3 Bucket
+Google Secret Manager keys:
+- `access-key-ceph-lab` → `ACCESS_KEY_ID`
+- `secret-key-ceph-lab` → `ACCESS_SECRET_KEY`
 
-Edit `production-postgresql-cluster.yaml` and update the S3 bucket name:
+## ArgoCD
 
-```yaml
-backup:
-  barmanObjectStore:
-    destinationPath: "s3://your-bucket-name/postgresql-backups/production/"
-```
-
-### 3. Apply Cluster Configuration
-
-Apply the updated cluster configuration:
-
-```bash
-kubectl apply -f postgresql-gitops/cluster/production-postgresql-cluster.yaml
-```
-
-Wait for the cluster to reconcile and start WAL archiving.
-
-### 4. Create Scheduled Backup
-
-Apply the ScheduledBackup resource:
-
-```bash
-kubectl apply -f postgresql-gitops/backup/scheduled-backup.yaml
-```
-
-This will trigger an immediate backup for testing and schedule daily backups at 2 AM.
+This directory is managed by the `postgresql-backup` ArgoCD application with `prune: false`
+so the teller-managed `ceph-s3-credentials` secret is not deleted on sync.
 
 ## Verification
 
 ### Check Backup Status
 
 ```bash
+# Cluster backup summary
+kubectl cnpg status production-postgresql -n postgresql-system
+
 # List all backups
 kubectl get backups -n postgresql-system
-
-# Check specific backup details
-kubectl describe backup <backup-name> -n postgresql-system
 
 # Check ScheduledBackup status
 kubectl get scheduledbackup production-postgresql-daily-backup -n postgresql-system
 ```
 
-### Check Backup Logs
+### Trigger Manual Backup
 
 ```bash
-# View backup job logs
-kubectl logs -n postgresql-system -l job-name=<backup-job-name>
+kubectl cnpg backup production-postgresql -n postgresql-system
 ```
 
 ### Verify S3 Contents
 
 ```bash
-# List backups in S3
-aws s3 ls s3://your-bucket-name/postgresql-backups/production/
-
-# Check base backups
-aws s3 ls s3://your-bucket-name/postgresql-backups/production/base/
-
-# Check WAL archives
-aws s3 ls s3://your-bucket-name/postgresql-backups/production/wals/
+devbox run -- mc ls ceph-rgw/postgresql-backups/production/
+devbox run -- mc ls ceph-rgw/postgresql-backups/production/wals/
 ```
 
-## Restore Procedures
+## Restore Procedure
 
-### Restore to Kubernetes Cluster
-
-Create a new cluster from a backup:
+Create a new cluster from backup:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -139,128 +83,47 @@ spec:
     recovery:
       source: production-postgresql-backup
   storage:
-    size: 100Gi
-    storageClassName: rook-ceph-block
+    size: 120Gi
+    storageClass: rook-ceph-block
   externalClusters:
     - name: production-postgresql-backup
       barmanObjectStore:
-        destinationPath: "s3://your-bucket-name/postgresql-backups/production/"
+        destinationPath: "s3://postgresql-backups/production/"
+        endpointURL: "http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80"
         s3Credentials:
           accessKeyId:
-            name: aws-s3-credentials
+            name: ceph-s3-credentials
             key: ACCESS_KEY_ID
           secretAccessKey:
-            name: aws-s3-credentials
+            name: ceph-s3-credentials
             key: ACCESS_SECRET_KEY
 ```
 
-### Restore to Local PostgreSQL
+## Files
 
-1. **Install Barman CLI** on your local machine:
-
-```bash
-sudo apt install barman-cli
-```
-
-2. **Set AWS credentials**:
-
-```bash
-export AWS_ACCESS_KEY_ID="your-access-key-id"
-export AWS_SECRET_ACCESS_KEY="your-secret-access-key"
-```
-
-3. **List available backups**:
-
-```bash
-barman-cloud-backup-list \
-  s3://your-bucket-name/postgresql-backups/production/ \
-  production-postgresql
-```
-
-4. **Restore a specific backup**:
-
-```bash
-# Stop local PostgreSQL if running
-sudo systemctl stop postgresql
-
-# Remove existing data directory
-sudo rm -rf /var/lib/postgresql/17/main/*
-
-# Restore backup
-sudo -u postgres barman-cloud-restore \
-  s3://your-bucket-name/postgresql-backups/production/ \
-  production-postgresql \
-  <backup-id> \
-  /var/lib/postgresql/17/main
-
-# Start PostgreSQL
-sudo systemctl start postgresql
-```
-
-5. **Point-in-Time Recovery (optional)**:
-
-Create a recovery configuration file:
-
-```bash
-sudo -u postgres cat > /var/lib/postgresql/17/main/recovery.conf <<EOF
-restore_command = 'barman-cloud-wal-restore s3://your-bucket-name/postgresql-backups/production/ production-postgresql %f %p'
-recovery_target_time = '2025-11-03 12:00:00'
-EOF
-```
-
-## Monitoring
-
-Add backup metrics to Grafana:
-
-- Backup success/failure rates
-- Backup duration
-- Backup size
-- WAL archiving lag
-- S3 storage usage
+- `scheduled-backup.yaml` — Daily backup schedule (2 AM, with immediate trigger on creation)
+- `postgresql-backup-pvc.yaml` — Local PVC for backup cache (optional)
+- `../cluster/production-postgresql-cluster.yaml` — Cluster with barmanObjectStore configuration
 
 ## Troubleshooting
-
-### Backup Fails with S3 Access Denied
-
-- Verify AWS credentials are correct
-- Check IAM policy has required S3 permissions
-- Verify S3 bucket exists and is accessible
 
 ### WAL Archiving Not Working
 
 ```bash
 # Check cluster status
-kubectl describe cluster production-postgresql -n postgresql-system
+kubectl cnpg status production-postgresql -n postgresql-system
 
 # Check pod logs
-kubectl logs -n postgresql-system production-postgresql-1 -c postgres
+kubectl logs -n postgresql-system production-postgresql-1 -c postgres | grep archive
 ```
 
-### Restore Fails
+### Backup Fails
 
-- Verify backup exists in S3
-- Check AWS credentials are valid
-- Ensure PostgreSQL version matches (17.5)
-- Check disk space on target system
-
-## Files
-
-- `aws-credentials-secret.yaml`: AWS S3 credentials (DO NOT COMMIT WITH REAL VALUES)
-- `postgresql-backup-pvc.yaml`: Local PVC for backup cache (optional)
-- `scheduled-backup.yaml`: Daily backup schedule configuration
-- `../cluster/production-postgresql-cluster.yaml`: Cluster with backup configuration
-
-## Security Notes
-
-1. **Never commit AWS credentials** to git
-2. Use **AWS Secrets Manager** or **External Secrets Operator** for production
-3. Enable **S3 bucket encryption** at rest
-4. Use **S3 bucket versioning** for additional protection
-5. Implement **S3 lifecycle policies** to manage backup retention
-6. Consider **cross-region replication** for disaster recovery
+- Verify `ceph-s3-credentials` secret exists in `postgresql-system`
+- Verify bucket exists: `devbox run -- mc ls ceph-rgw/postgresql-backups/`
+- Check Ceph RGW service is reachable from postgresql pods
 
 ## References
 
 - [CloudNativePG Backup Documentation](https://cloudnative-pg.io/documentation/current/backup/)
-- [Barman Documentation](https://pgbarman.org/)
-- [AWS S3 Documentation](https://docs.aws.amazon.com/s3/)
+- [Rook/Ceph Object Storage](../../rook-ceph/object-storage/)
