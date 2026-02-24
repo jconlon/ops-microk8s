@@ -28,6 +28,10 @@ For every Claude Code session in this project, follow these startup steps in ord
    - If it is ever unclear where new information belongs, ask:  
      “Should this be remembered globally (across all projects) or for this project only?”
 
+5. **Scripts Reference**
+   - Read `scripts/README.md` to load the current list of available scripts, their purpose, and usage.
+   - When asked about available scripts or how to run an operation, consult `scripts/README.md` first.
+
 Please follow these memory protocols at the beginning of each Claude Code session or chat in this repository. Refer to the [Memory Integration Protocol](#memory-integration-protocol), [Memories](#memories), and [Global Persistent Memory (via Memory MCP)](#global-persistent-memory-via-memory-mcp) sections below for operational details.
 
 ## Repository Overview
@@ -157,8 +161,14 @@ ops-microk8s/
 ├── README.md                     # Detailed setup documentation
 ├── CLAUDE.md                     # Claude Code instructions and guidance
 ├── devbox.json                   # Development environment (argocd, k9s)
-├── scripts/
-│   └── argocd.nu                 # ArgoCD login script (nushell)
+├── scripts/                      # See scripts/README.md for full details
+│   ├── README.md                 # Scripts index and usage guide
+│   ├── argocd.nu                 # ArgoCD management commands (nushell)
+│   ├── freshrss.nu               # FreshRSS DB access via psql (nushell)
+│   ├── sync-music-to-ceph.sh     # Sync ~/Music to Ceph RGW
+│   ├── sync-pictures-to-ceph.sh  # Sync ~/Pictures to Ceph RGW
+│   ├── systemd/                  # Systemd units for sync jobs
+│   └── restic/                   # Restic backup scripts and systemd units
 ├── argoCD-apps/                  # ArgoCD application definitions
 │   ├── argocd-self-managed.yaml
 │   ├── monitoring-apps.yaml     # App of Apps for monitoring stack
@@ -249,6 +259,8 @@ _Project-specific instructions and facts—use only within this repository:_
   `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
 - ArgoCD username is `admin`
 - For postgresql cli use: `devbox run psql`
+- For available scripts and usage, read `scripts/README.md` at session start.
+- To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
 
 ---
 
