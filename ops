@@ -1,6 +1,7 @@
 #!/usr/bin/env nu
 
 source scripts/argocd.nu
+source scripts/freshrss.nu
 # This script provides various operations related to the ops microk8s environment.
 def main [] {}
 
