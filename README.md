@@ -281,6 +281,53 @@ ops-microk8s/
     └── networking/              # PostgreSQL services
 ```
 
+## Adding a New DNS Name for a Service
+
+When deploying a new service with a MetalLB LoadBalancer IP, follow these steps to expose it at a `verticon.com` hostname.
+
+### 1. Add DNS record in Cloudflare
+
+Add an `A` record in the Cloudflare dashboard:
+
+| Type | Name | Value | Proxy |
+|------|------|-------|-------|
+| A | `<service>.verticon.com` | `192.168.0.2xx` | DNS only (grey cloud) |
+
+### 2. Configure Caddy reverse proxy
+
+```bash
+sudo vi /etc/caddy/Caddyfile
+```
+
+Add a new block:
+
+```
+<service>.verticon.com {
+    reverse_proxy 192.168.0.2xx:80
+}
+```
+
+### 3. Reload Caddy
+
+```bash
+systemctl reload caddy
+```
+
+Caddy handles TLS automatically via Let's Encrypt. No restart required — `reload` is zero-downtime.
+
+### Existing service hostnames
+
+| Service | Hostname | MetalLB IP |
+|---------|----------|------------|
+| Grafana | https://grafana.verticon.com | 192.168.0.201 |
+| Prometheus | https://prometheus.verticon.com | 192.168.0.202 |
+| AlertManager | https://alertmanager.verticon.com | 192.168.0.203 |
+| PostgreSQL (primary) | — | 192.168.0.210 |
+| PostgreSQL (readonly) | — | 192.168.0.211 |
+| pgAdmin | https://pgadmin.verticon.com | 192.168.0.212 |
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
