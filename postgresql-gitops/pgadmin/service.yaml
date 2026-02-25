@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: pgadmin
+    app.kubernetes.io/component: admin-ui
+    app.kubernetes.io/part-of: postgresql
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.212"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: pgadmin

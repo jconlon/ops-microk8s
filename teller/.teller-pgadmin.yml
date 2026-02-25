@@ -1,0 +1,6 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      PGADMIN_DEFAULT_PASSWORD:
+        path: projects/1000827005146/secrets/pgadmin-password/versions/latest
