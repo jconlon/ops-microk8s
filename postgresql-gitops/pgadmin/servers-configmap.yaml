@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-servers
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: pgadmin
+    app.kubernetes.io/component: admin-ui
+    app.kubernetes.io/part-of: postgresql
+data:
+  servers.json: |
+    {
+      "Servers": {
+        "1": {
+          "Name": "production-postgresql",
+          "Group": "Servers",
+          "Host": "production-postgresql-rw.postgresql-system.svc.cluster.local",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "postgres",
+          "SSLMode": "prefer"
+        }
+      }
+    }
