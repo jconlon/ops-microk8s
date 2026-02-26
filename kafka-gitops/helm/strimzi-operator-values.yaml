@@ -1,0 +1,17 @@
+# Strimzi Kafka Operator Helm Values
+
+# Watch only the kafka-system namespace
+watchNamespaces:
+  - kafka-system
+
+# Resource limits for the operator
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# Enable Prometheus monitoring
+dashboards:
+  enabled: true
