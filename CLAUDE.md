@@ -267,6 +267,7 @@ _Project-specific instructions and facts—use only within this repository:_
 - For available scripts and usage, read `scripts/README.md` at session start.
 - To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
 - Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory.
+- NEVER run `helm repo add` or `helm repo update` locally. Helm charts are managed entirely by ArgoCD using `repoURL` and `chart` fields in ArgoCD Application manifests. There is no need to add repos to the local Helm installation.
 
 ---
 
