@@ -19,6 +19,7 @@ spec:
         app.kubernetes.io/component: schema-registry
         app.kubernetes.io/part-of: kafka
     spec:
+      enableServiceLinks: false
       containers:
         - name: schema-registry
           image: confluentinc/cp-schema-registry:latest
