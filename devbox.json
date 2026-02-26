@@ -6,7 +6,8 @@
     "k9s@latest",
     "postgresql@latest",
     "barman@latest",
-    "teller@1.5.6"
+    "teller@1.5.6",
+    "kafkactl@latest"
   ],
   "shell": {
     "init_hook": [
