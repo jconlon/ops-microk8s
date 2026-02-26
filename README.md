@@ -158,6 +158,55 @@ helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-sta
 kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
 
+## Kafka
+
+Apache Kafka deployed via the Strimzi operator in KRaft mode (no ZooKeeper), managed by ArgoCD. 3 dual-role broker/controller nodes with `rook-ceph-block` persistent storage.
+
+### Addresses
+
+| Listener | Address | Use |
+|----------|---------|-----|
+| External (MetalLB) | `192.168.0.213:9094` | kafkactl from workstation |
+| Internal (cluster) | `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092` | in-cluster clients (e.g. Schema Registry) |
+
+> Use the IP directly rather than the DNS name. Kafka clients connect to the bootstrap address first, then reconnect to individual broker IPs (`.206`, `.207`, `.208`) — DNS only covers the bootstrap hop.
+
+### kafkactl setup (one-time)
+
+```bash
+mkdir -p ~/.config/kafkactl
+cat > ~/.config/kafkactl/config.yml <<'YAML'
+contexts:
+  default:
+    brokers:
+      - 192.168.0.213:9094
+current-context: default
+YAML
+```
+
+### Common commands
+
+```bash
+# List topics
+devbox run -- kafkactl get topics
+
+# Describe a topic
+devbox run -- kafkactl describe topic <topic-name>
+
+# Create a topic
+devbox run -- kafkactl create topic <topic-name> --partitions 3 --replication-factor 3
+
+# Produce a message
+devbox run -- kafkactl produce <topic-name> --value "hello"
+
+# Consume messages
+devbox run -- kafkactl consume <topic-name> --from-beginning
+```
+
+Or enter `devbox shell` once and drop the `devbox run --` prefix.
+
+---
+
 ## Restic Backups
 
 Automated incremental backups of `/home/jconlon` to Ceph RGW object storage using [Restic](https://restic.readthedocs.io/). Implemented in [issue #18](https://github.com/jconlon/ops-microk8s/issues/18).
