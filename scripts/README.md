@@ -60,7 +60,14 @@ ops argocd login --server argocd.verticon.com --username admin
 
 ### freshrss.nu
 
-Connect to the FreshRSS PostgreSQL database from a local terminal. Starts a `kubectl port-forward` as a background job, fetches credentials from the `freshrss-role-password` Kubernetes secret, opens a `psql` session, and stops the port-forward on exit.
+FreshRSS database commands. Each command starts a `kubectl port-forward` as a background job, fetches credentials from the `freshrss-role-password` Kubernetes secret, and cleans up on exit.
+
+| Command | Description |
+|---|---|
+| `ops freshrss psql` | Open an interactive `psql` session against the FreshRSS database |
+| `ops freshrss publish-links` | Query entries tagged `publish` and print a markdown link list |
+
+#### freshrss psql
 
 ```bash
 devbox run -- freshrss-psql
@@ -70,6 +77,27 @@ ops freshrss psql
 
 # Custom local port (default: 5433)
 ops freshrss psql --port 5434
+```
+
+#### freshrss publish-links
+
+Queries the FreshRSS database for all entries tagged `publish` and outputs a markdown list of links with their tags.
+
+```bash
+# From ops-microk8s directory
+devbox run -- freshrss-publish-links
+
+# From any directory
+devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-publish-links
+
+# Or from within devbox shell
+ops freshrss publish-links
+```
+
+Example output:
+
+```markdown
+- [Article Title](https://example.com/article) — publish, review
 ```
 
 **Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster.
