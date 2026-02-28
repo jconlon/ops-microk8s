@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: wallabag
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: wallabag
+    app.kubernetes.io/component: database
+spec:
+  name: wallabag
+  owner: wallabag
+  cluster:
+    name: production-postgresql
+  databaseReclaimPolicy: retain

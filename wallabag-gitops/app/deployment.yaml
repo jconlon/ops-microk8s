@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallabag
+  namespace: wallabag
+  labels:
+    app.kubernetes.io/name: wallabag
+    app.kubernetes.io/component: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wallabag
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wallabag
+        app.kubernetes.io/component: app
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: wallabag
+          image: wallabag/wallabag:latest
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: SYMFONY__ENV__DATABASE_DRIVER
+              value: "pdo_pgsql"
+            - name: SYMFONY__ENV__DATABASE_HOST
+              value: "production-postgresql-rw.postgresql-system.svc.cluster.local"
+            - name: SYMFONY__ENV__DATABASE_PORT
+              value: "5432"
+            - name: SYMFONY__ENV__DATABASE_NAME
+              value: "wallabag"
+            - name: SYMFONY__ENV__DATABASE_USER
+              value: "wallabag"
+            - name: SYMFONY__ENV__DOMAIN_NAME
+              value: "https://wallabag.verticon.com"
+            - name: SYMFONY__ENV__FOSUSER_REGISTRATION
+              value: "false"
+            - name: POPULATE_DATABASE
+              value: "true"
+            - name: SYMFONY__ENV__DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: wallabag-credentials
+                  key: WALLABAG_DB_PASSWORD
+            - name: SYMFONY__ENV__SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: wallabag-credentials
+                  key: WALLABAG_SECRET_KEY
+          volumeMounts:
+            - name: wallabag-images
+              mountPath: /var/www/wallabag/web/assets/images
+      volumes:
+        - name: wallabag-images
+          persistentVolumeClaim:
+            claimName: wallabag-images

@@ -71,6 +71,11 @@ spec:
         login: true
         passwordSecret:
           name: freshrss-role-password
+      - name: wallabag
+        ensure: present
+        login: true
+        passwordSecret:
+          name: wallabag-role-password
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:
