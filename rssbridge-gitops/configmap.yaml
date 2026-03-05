@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/name: rssbridge
 data:
   config.ini.php: |
-    <?php if(!defined('RSSBRIDGE_VERSION')) die('Bad configuration!'); ?>
     [System]
     timezone = "America/New_York"
     enable_maintenance_mode = false
