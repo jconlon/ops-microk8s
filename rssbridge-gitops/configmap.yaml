@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rssbridge-config
+  namespace: rssbridge
+  labels:
+    app.kubernetes.io/name: rssbridge
+data:
+  config.ini.php: |
+    <?php if(!defined('RSSBRIDGE_VERSION')) die('Bad configuration!'); ?>
+    [System]
+    timezone = "America/New_York"
+    enable_maintenance_mode = false
+
+    [FileCache]
+    path = "/var/cache/rssbridge"
+    enable_purge = true
+    purge_mincount = 64

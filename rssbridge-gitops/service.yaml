@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rssbridge
+  namespace: rssbridge
+  labels:
+    app.kubernetes.io/name: rssbridge
+    app.kubernetes.io/component: app
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rssbridge
