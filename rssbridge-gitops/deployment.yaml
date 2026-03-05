@@ -20,7 +20,7 @@ spec:
       enableServiceLinks: false
       containers:
         - name: rssbridge
-          image: rssbridge/rssbridge:latest
+          image: ghcr.io/rss-bridge/rss-bridge:latest
           ports:
             - containerPort: 80
               name: http
