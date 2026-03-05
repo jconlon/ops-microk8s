@@ -20,6 +20,8 @@ spec:
         app.kubernetes.io/component: app
     spec:
       enableServiceLinks: false
+      securityContext:
+        fsGroup: 33
       containers:
         - name: rssbridge
           image: rssbridge/rss-bridge:latest
