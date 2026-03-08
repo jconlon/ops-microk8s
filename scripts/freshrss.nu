@@ -47,14 +47,15 @@ def "main freshrss publish-links" [
         | str trim
     )
 
-    let sql = "SELECT e.title, e.link, string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) AS tags
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name)
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
 JOIN public.freshrss_admin_entrytag AS et_all ON et_all.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_all ON t_all.id = et_all.id_tag
+WHERE e.link IS NOT NULL AND e.link != ''
 GROUP BY e.title, e.link
-ORDER BY e.title;"
+ORDER BY btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', ''));"
 
     let markdown = (
         with-env { PGPASSWORD: $password } {
@@ -63,8 +64,8 @@ ORDER BY e.title;"
         | lines
         | filter { |l| ($l | str trim) != "" }
         | each { |l|
-            let parts = ($l | split row "|")
-            let title = ($parts | get 0)
+            let parts = ($l | split row "\t")
+            let title = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
             let link  = ($parts | get 1)
             let tags  = ($parts | get 2)
             $"- [($title)]\(($link)\) — ($tags)"
