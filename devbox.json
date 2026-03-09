@@ -18,6 +18,7 @@
       "argocd-login": ["./ops argocd login"],
       "freshrss-psql": ["./ops freshrss psql"],
       "freshrss-publish-links": ["./ops freshrss publish-links"],
+      "freshrss-update-news": ["./ops freshrss update-news"],
       "test": [
         "echo \"Error: no test specified\" && exit 1"
       ]
