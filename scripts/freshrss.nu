@@ -48,7 +48,7 @@ def "main freshrss update-news" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY HH24:MI') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
@@ -139,7 +139,7 @@ def "main freshrss publish-links" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY HH24:MI') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
