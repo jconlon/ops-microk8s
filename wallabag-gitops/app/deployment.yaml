@@ -54,7 +54,14 @@ spec:
           volumeMounts:
             - name: wallabag-images
               mountPath: /var/www/wallabag/web/assets/images
+            - name: graby-youtube-config
+              mountPath: /var/www/wallabag/vendor/j0k3r/graby-site-config/youtube.com.txt
+              subPath: youtube.com.txt
+              readOnly: true
       volumes:
         - name: wallabag-images
           persistentVolumeClaim:
             claimName: wallabag-images
+        - name: graby-youtube-config
+          configMap:
+            name: wallabag-graby-youtube

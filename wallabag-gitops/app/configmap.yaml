@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wallabag-graby-youtube
+  namespace: wallabag
+  labels:
+    app.kubernetes.io/name: wallabag
+    app.kubernetes.io/component: app
+data:
+  youtube.com.txt: |
+    # Wallabag custom override for YouTube (replaces vendor/j0k3r/graby-site-config/youtube.com.txt)
+    #
+    # The upstream siteconfig contains:
+    #   single_page_link: //link[@type='text/xml+oembed']
+    # This causes graby to follow YouTube's oEmbed XML endpoint, resulting in the oEmbed URL
+    # being stored as the entry URL instead of the real watch URL.
+    # This override removes that directive.
+    http_header(User-Agent): Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+
+    title: //meta[@property='og:title']/@content
+    body: //meta[@property='og:description']/@content
+
+    prune: no
+    tidy: no
+
+    test_url: https://www.youtube.com/watch?v=GjENnyQupow
