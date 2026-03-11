@@ -10,8 +10,8 @@ configuration:
   # Standard Ubuntu reboot sentinel file (written by unattended-upgrades)
   rebootSentinel: /var/run/reboot-required
 
-  # Grace period and drain timeout (generous for Ceph workloads)
-  drainGracePeriod: 30m
+  # Grace period in seconds and drain timeout (generous for Ceph workloads)
+  drainGracePeriod: 1800
   drainTimeout: 30m
 
   # Annotate nodes being rebooted for visibility
