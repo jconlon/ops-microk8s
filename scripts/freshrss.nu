@@ -48,7 +48,7 @@ def "main freshrss update-news" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name)
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
@@ -56,7 +56,7 @@ JOIN public.freshrss_admin_entrytag AS et_all ON et_all.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_all ON t_all.id = et_all.id_tag
 WHERE e.link IS NOT NULL AND e.link != ''
 GROUP BY e.title, e.link
-ORDER BY btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', ''));"
+ORDER BY MAX(e.date) DESC;"
 
     let link_lines = (
         with-env { PGPASSWORD: $password } {
@@ -66,10 +66,12 @@ ORDER BY btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • Fr
         | filter { |l| ($l | str trim) != "" }
         | each { |l|
             let parts = ($l | split row "\t")
-            let title = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
-            let link  = ($parts | get 1)
-            let tags  = ($parts | get 2)
-            $"- [($title)]\(($link)\) — ($tags)"
+            let title  = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+            let link   = ($parts | get 1)
+            let tags   = ($parts | get 2)
+            let date   = ($parts | get 3)
+            let domain = ($parts | get 4)
+            $"- [($title)]\(($link)\) — ($date) — ($domain) — ($tags)"
         }
     )
 
@@ -137,7 +139,7 @@ def "main freshrss publish-links" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name)
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
@@ -145,7 +147,7 @@ JOIN public.freshrss_admin_entrytag AS et_all ON et_all.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_all ON t_all.id = et_all.id_tag
 WHERE e.link IS NOT NULL AND e.link != ''
 GROUP BY e.title, e.link
-ORDER BY btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', ''));"
+ORDER BY MAX(e.date) DESC;"
 
     let markdown = (
         with-env { PGPASSWORD: $password } {
@@ -154,11 +156,13 @@ ORDER BY btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • Fr
         | lines
         | filter { |l| ($l | str trim) != "" }
         | each { |l|
-            let parts = ($l | split row "\t")
-            let title = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
-            let link  = ($parts | get 1)
-            let tags  = ($parts | get 2)
-            $"- [($title)]\(($link)\) — ($tags)"
+            let parts  = ($l | split row "\t")
+            let title  = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+            let link   = ($parts | get 1)
+            let tags   = ($parts | get 2)
+            let date   = ($parts | get 3)
+            let domain = ($parts | get 4)
+            $"- [($title)]\(($link)\) — ($date) — ($domain) — ($tags)"
         }
         | str join "\n"
     )
