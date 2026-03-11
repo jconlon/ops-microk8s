@@ -1,0 +1,24 @@
+configuration:
+  # Check for reboot-required every hour
+  period: 1h
+
+  # Reboot window: 02:00–06:00 Eastern
+  startTime: "02:00"
+  endTime: "06:00"
+  timeZone: "America/New_York"
+
+  # Standard Ubuntu reboot sentinel file (written by unattended-upgrades)
+  rebootSentinel: /var/run/reboot-required
+
+  # Grace period and drain timeout (generous for Ceph workloads)
+  drainGracePeriod: 30m
+  drainTimeout: 30m
+
+  # Annotate nodes being rebooted for visibility
+  annotateNodes: true
+
+# Run on all nodes including control plane
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
