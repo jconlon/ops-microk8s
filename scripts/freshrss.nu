@@ -105,8 +105,12 @@ ORDER BY MAX(e.date) DESC;"
 
     let new_content = ($before | append $link_lines | append "" | append $after | str join "\n") + "\n"
 
-    $new_content | save --force $news_file
-    print $"Updated ($news_file) with ($link_lines | length) links."
+    let byline_date = (date now | format date "%b %d %H:%M")
+    let new_byline = $"**Information Perspectives For ($byline_date)**"
+    let final_content = ($new_content | str replace --regex '\*\*Information Perspectives For [^*]+\*\*' $new_byline)
+
+    $final_content | save --force $news_file
+    print $"Updated ($news_file) with ($link_lines | length) links and by-line: ($new_byline)."
 }
 
 # Query FreshRSS entries tagged 'publish' and output a markdown link list
