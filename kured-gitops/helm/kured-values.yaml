@@ -10,9 +10,10 @@ configuration:
   # Standard Ubuntu reboot sentinel file (written by unattended-upgrades)
   rebootSentinel: /var/run/reboot-required
 
-  # Grace period in seconds and drain timeout (generous for Ceph workloads)
-  drainGracePeriod: 1800
-  drainTimeout: 30m
+  # Grace period per pod in seconds (5 min is generous for Ceph OSD shutdown).
+  # drainTimeout must be >> drainGracePeriod * number of pods to evict.
+  drainGracePeriod: 300
+  drainTimeout: 2h
 
   # Annotate nodes being rebooted for visibility
   annotateNodes: true
