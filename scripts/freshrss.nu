@@ -48,15 +48,14 @@ def "main freshrss update-news" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY HH24:MI') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || to_char(to_timestamp(e.date), 'Mon DD YYYY') || chr(9) || f.name || chr(9) || COALESCE(c.name, '') || chr(9) || COALESCE(ltrim(e.author, ';'), '') || chr(9) || COALESCE(NULLIF(btrim(replace(replace(NULLIF(e.attributes, '')::json->'enclosures'->0->>'description', chr(13), ''), chr(10), '|||')), ''), NULLIF(btrim(replace(replace(regexp_replace(COALESCE(e.content, ''), '<[^>]+>', '', 'g'), chr(13), ''), chr(10), '|||')), ''), '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
-JOIN public.freshrss_admin_entrytag AS et_all ON et_all.id_entry = e.id
-JOIN public.freshrss_admin_tag AS t_all ON t_all.id = et_all.id_tag
+JOIN public.freshrss_admin_feed AS f ON f.id = e.id_feed
+LEFT JOIN public.freshrss_admin_category AS c ON c.id = f.category
 WHERE e.link IS NOT NULL AND e.link != ''
-GROUP BY e.title, e.link
-ORDER BY MAX(e.date) DESC;"
+ORDER BY e.date DESC;"
 
     let link_lines = (
         with-env { PGPASSWORD: $password } {
@@ -65,13 +64,35 @@ ORDER BY MAX(e.date) DESC;"
         | lines
         | filter { |l| ($l | str trim) != "" }
         | each { |l|
-            let parts = ($l | split row "\t")
-            let title  = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
-            let link   = ($parts | get 1)
-            let tags   = ($parts | get 2)
-            let date   = ($parts | get 3)
-            let domain = ($parts | get 4)
-            $"- [($title)]\(($link)\) — ($date) — ($domain) — ($tags)"
+            let parts    = ($l | split row "\t")
+            let title    = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+            let link     = ($parts | get 1)
+            let date     = ($parts | get 2)
+            let feed     = ($parts | get 3)
+            let cat      = ($parts | get 4)
+            let author   = ($parts | get 5)
+            let raw_snip  = (if ($parts | length) > 6 { $parts | get 6 } else { "" })
+            let snip_lines = if ($raw_snip | str trim) != "" {
+                ($raw_snip
+                    | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+                    | split row "|||"
+                    | filter { |line|
+                        let t = ($line | str trim)
+                        ($t | str length) > 15 and not ($t | str ends-with ":") and not ($t =~ '(?i)^(#|http|\*\*|Full video:|Follow |Via:|Support |Substack:|Cashapp:|Venmo:|PayPal:|estimated reading time|.*Merch:)') and not ($t =~ 'https?://') and not ($t =~ '\w+\.\w+/')
+                    }
+                    | take 2
+                    | each { |line|
+                        let t = ($line | str trim)
+                        if ($t | str length) > 250 { ($t | str substring 0..249) + "…" } else { $t }
+                    })
+            } else { [] }
+            let author_display = if ($author == $feed) { "" } else { $author }
+            let meta       = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
+            let snip_items = ($snip_lines | each { |s| $"  - ($s)" })
+            let base       = [$"- [($title)]\(($link)\) — ($date)"]
+            let with_meta  = if ($meta | str trim) != "" { $base | append $"  - ($meta)" } else { $base }
+            let with_snip  = ($with_meta | append $snip_items)
+            $with_snip | str join "\n"
         }
     )
 
@@ -143,15 +164,14 @@ def "main freshrss publish-links" [
         | str trim
     )
 
-    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || string_agg(DISTINCT t_all.name, ', ' ORDER BY t_all.name) || chr(9) || to_char(to_timestamp(MAX(e.date)), 'Mon DD YYYY HH24:MI') || chr(9) || regexp_replace(regexp_replace(replace(e.link, '&amp;', '&'), '^https?://([^/]+).*$', '\\1'), '^www\\.', '')
+    let sql = "SELECT btrim(regexp_replace(regexp_replace(e.title, '\\|\\|.*$', ''), ' • From .*$', '')) || chr(9) || replace(e.link, '&amp;', '&') || chr(9) || to_char(to_timestamp(e.date), 'Mon DD YYYY') || chr(9) || f.name || chr(9) || COALESCE(c.name, '') || chr(9) || COALESCE(ltrim(e.author, ';'), '') || chr(9) || COALESCE(NULLIF(btrim(replace(replace(NULLIF(e.attributes, '')::json->'enclosures'->0->>'description', chr(13), ''), chr(10), '|||')), ''), NULLIF(btrim(replace(replace(regexp_replace(COALESCE(e.content, ''), '<[^>]+>', '', 'g'), chr(13), ''), chr(10), '|||')), ''), '')
 FROM public.freshrss_admin_entry AS e
 JOIN public.freshrss_admin_entrytag AS et_publish ON et_publish.id_entry = e.id
 JOIN public.freshrss_admin_tag AS t_publish ON t_publish.id = et_publish.id_tag AND t_publish.name = 'publish'
-JOIN public.freshrss_admin_entrytag AS et_all ON et_all.id_entry = e.id
-JOIN public.freshrss_admin_tag AS t_all ON t_all.id = et_all.id_tag
+JOIN public.freshrss_admin_feed AS f ON f.id = e.id_feed
+LEFT JOIN public.freshrss_admin_category AS c ON c.id = f.category
 WHERE e.link IS NOT NULL AND e.link != ''
-GROUP BY e.title, e.link
-ORDER BY MAX(e.date) DESC;"
+ORDER BY e.date DESC;"
 
     let markdown = (
         with-env { PGPASSWORD: $password } {
@@ -160,13 +180,35 @@ ORDER BY MAX(e.date) DESC;"
         | lines
         | filter { |l| ($l | str trim) != "" }
         | each { |l|
-            let parts  = ($l | split row "\t")
-            let title  = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
-            let link   = ($parts | get 1)
-            let tags   = ($parts | get 2)
-            let date   = ($parts | get 3)
-            let domain = ($parts | get 4)
-            $"- [($title)]\(($link)\) — ($date) — ($domain) — ($tags)"
+            let parts    = ($l | split row "\t")
+            let title    = ($parts | get 0) | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+            let link     = ($parts | get 1)
+            let date     = ($parts | get 2)
+            let feed     = ($parts | get 3)
+            let cat      = ($parts | get 4)
+            let author   = ($parts | get 5)
+            let raw_snip  = (if ($parts | length) > 6 { $parts | get 6 } else { "" })
+            let snip_lines = if ($raw_snip | str trim) != "" {
+                ($raw_snip
+                    | str replace --all '&amp;' '&' | str replace --all '&lt;' '<' | str replace --all '&gt;' '>'
+                    | split row "|||"
+                    | filter { |line|
+                        let t = ($line | str trim)
+                        ($t | str length) > 15 and not ($t | str ends-with ":") and not ($t =~ '(?i)^(#|http|\*\*|Full video:|Follow |Via:|Support |Substack:|Cashapp:|Venmo:|PayPal:|estimated reading time|.*Merch:)') and not ($t =~ 'https?://') and not ($t =~ '\w+\.\w+/')
+                    }
+                    | take 2
+                    | each { |line|
+                        let t = ($line | str trim)
+                        if ($t | str length) > 250 { ($t | str substring 0..249) + "…" } else { $t }
+                    })
+            } else { [] }
+            let author_display = if ($author == $feed) { "" } else { $author }
+            let meta       = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
+            let snip_items = ($snip_lines | each { |s| $"  - ($s)" })
+            let base       = [$"- [($title)]\(($link)\) — ($date)"]
+            let with_meta  = if ($meta | str trim) != "" { $base | append $"  - ($meta)" } else { $base }
+            let with_snip  = ($with_meta | append $snip_items)
+            $with_snip | str join "\n"
         }
         | str join "\n"
     )
