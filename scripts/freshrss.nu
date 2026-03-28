@@ -88,9 +88,9 @@ ORDER BY e.date DESC;"
             } else { [] }
             let author_display = if ($author == $feed) { "" } else { $author }
             let meta       = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
-            let snip_items = ($snip_lines | each { |s| $"  - ($s)" })
+            let snip_items = ($snip_lines | each { |s| $"    - ($s)" })
             let base       = [$"- [($title)]\(($link)\) — ($date)"]
-            let with_meta  = if ($meta | str trim) != "" { $base | append $"  - ($meta)" } else { $base }
+            let with_meta  = if ($meta | str trim) != "" { $base | append $"    - ($meta)" } else { $base }
             let with_snip  = ($with_meta | append $snip_items)
             $with_snip | str join "\n"
         }
@@ -204,9 +204,9 @@ ORDER BY e.date DESC;"
             } else { [] }
             let author_display = if ($author == $feed) { "" } else { $author }
             let meta       = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
-            let snip_items = ($snip_lines | each { |s| $"  - ($s)" })
+            let snip_items = ($snip_lines | each { |s| $"    - ($s)" })
             let base       = [$"- [($title)]\(($link)\) — ($date)"]
-            let with_meta  = if ($meta | str trim) != "" { $base | append $"  - ($meta)" } else { $base }
+            let with_meta  = if ($meta | str trim) != "" { $base | append $"    - ($meta)" } else { $base }
             let with_snip  = ($with_meta | append $snip_items)
             $with_snip | str join "\n"
         }
