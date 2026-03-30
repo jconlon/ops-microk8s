@@ -26,8 +26,8 @@ data:
       enabled: true
       server:
         listen_addr: "0.0.0.0:5025"
-      # Advertised base URL used in SSE responses (update to match external DNS/IP)
-      base_url: "http://192.168.0.216:5025/mcp"
+        # Advertised base URL used in SSE responses (update to match external DNS/IP)
+        base_url: "http://192.168.0.216:5025/mcp"
       # Used in MCP responses when behind a proxy or load balancer
       router_url: "http://192.168.0.216:3002/graphql"
       storage:
