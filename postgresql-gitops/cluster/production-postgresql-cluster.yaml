@@ -76,6 +76,11 @@ spec:
         login: true
         passwordSecret:
           name: wallabag-role-password
+      - name: hasura
+        ensure: present
+        login: true
+        passwordSecret:
+          name: hasura-role-password
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:

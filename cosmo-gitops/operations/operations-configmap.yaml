@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cosmo-router-operations
+  namespace: cosmo
+  labels:
+    app.kubernetes.io/name: cosmo-router
+    app.kubernetes.io/component: mcp-operations
+  annotations:
+    # Each key in this ConfigMap is mounted as a .graphql file under /operations/.
+    # The filename (key) becomes the MCP tool name exposed to AI agents.
+    # Operations must reference types that exist in the router's federated schema.
+    #
+    # After router.json is configured with the Hasura schema, add operations here.
+    # Example structure:
+    #
+    #   GetRecentFreshRssEntries.graphql: |
+    #     query GetRecentFreshRssEntries($tag: String, $limit: Int = 20) {
+    #       entry(where: {tags: {tag: {name: {_eq: $tag}}}}, limit: $limit, order_by: {date: desc}) {
+    #         id
+    #         title
+    #         link
+    #         date
+    #         feed { name url }
+    #       }
+    #     }
+    #
+    #   GetWallabagArticles.graphql: |
+    #     query GetWallabagArticles($limit: Int = 20) {
+    #       wallabag_entries(limit: $limit, order_by: {created_at: desc}, where: {is_archived: {_eq: false}}) {
+    #         id
+    #         title
+    #         url
+    #         content
+    #         created_at
+    #       }
+    #     }
+data: {}

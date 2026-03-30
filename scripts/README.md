@@ -7,6 +7,7 @@ Operational scripts for the MicroK8s cluster. NuShell scripts are invoked via th
 ```
 scripts/
 ├── argocd.nu                    # ArgoCD management commands (nushell)
+├── cluster.nu                   # Cluster health/status commands (nushell)
 ├── freshrss.nu                  # FreshRSS database access (nushell)
 ├── sync-music-to-ceph.sh        # Sync ~/Music to Ceph RGW
 ├── sync-pictures-to-ceph.sh     # Sync ~/Pictures to Ceph RGW
@@ -37,6 +38,30 @@ scripts/
 ## NuShell Scripts
 
 Sourced by the `ops` wrapper script. Run from the `ops-microk8s` directory.
+
+### cluster.nu
+
+Cluster health and status commands. Queries Prometheus — no SSH required.
+
+| Command | Description |
+|---|---|
+| `ops cluster node-uptime` | Show uptime for all 8 nodes via Prometheus |
+| `ops cluster node-status` | Show uptime + kured reboot-required status for all nodes |
+
+```bash
+devbox run -- node-uptime
+devbox run -- node-status
+
+# From any directory
+devbox run --config /home/jconlon/git/ops-microk8s -- node-uptime
+devbox run --config /home/jconlon/git/ops-microk8s -- node-status
+
+# Or from within devbox shell
+ops cluster node-uptime
+ops cluster node-status
+```
+
+---
 
 ### argocd.nu
 
@@ -177,6 +202,7 @@ Run all teller commands from the `ops-microk8s` root directory within a devbox s
 |---|---|
 | `teller/.teller-freshrss.yml` | FreshRSS K8s secrets (`freshrss-db-credentials`, `freshrss-role-password`) |
 | `teller/.teller-postgresql.yml` | PostgreSQL backup S3 credentials (`ceph-s3-credentials`) |
+| `teller/.teller-hasura.yml` | Hasura K8s secrets (`hasura-role-password`, `hasura-credentials`) |
 
 > **Note:** Machine-local teller configs (restic, gitlab) remain in `~/dotfiles`. Only cluster K8s secret configs belong here.
 
@@ -204,5 +230,25 @@ teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl create sec
   --namespace postgresql-system \
   --from-literal=ACCESS_KEY_ID="$ACCESS_KEY_ID" \
   --from-literal=ACCESS_SECRET_KEY="$ACCESS_SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+```
+
+### Example: Create Hasura secrets
+
+> **Prerequisites:** Add `hasura-role` and `hasura-admin-secret` to Google Secret Manager before running.
+
+```bash
+# Role password (postgresql-system namespace — used by CloudNativePG managed role)
+teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret generic hasura-role-password \
+  --namespace postgresql-system \
+  --from-literal=username=hasura \
+  --from-literal=password="$HASURA_ROLE_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+
+# App credentials (hasura namespace — metadata DB URL + admin secret)
+teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret generic hasura-credentials \
+  --namespace hasura \
+  --from-literal=HASURA_GRAPHQL_METADATA_DATABASE_URL="postgres://hasura:$HASURA_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/hasura" \
+  --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -'
 ```

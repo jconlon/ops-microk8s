@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: hasura
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/name: hasura
+    app.kubernetes.io/component: database
+spec:
+  name: hasura
+  owner: hasura
+  cluster:
+    name: production-postgresql
+  databaseReclaimPolicy: retain

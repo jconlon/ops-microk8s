@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cosmo-router-json
+  namespace: cosmo
+  labels:
+    app.kubernetes.io/name: cosmo-router
+    app.kubernetes.io/component: execution-config
+  annotations:
+    # This is a placeholder execution config. After Hasura is configured with
+    # tracked tables and relationships, regenerate this file:
+    #
+    #   1. Install wgc CLI: npm install -g wgc@latest
+    #   2. Create cosmo-gitops/config/compose.yaml (subgraph definition)
+    #   3. Run: wgc router compose -i cosmo-gitops/config/compose.yaml -o /tmp/router.json
+    #   4. Update this ConfigMap's router.json key with the generated content
+    #   5. Set dev_mode: false in router-config-configmap.yaml
+    #
+    # compose.yaml example:
+    #   version: 1
+    #   subgraphs:
+    #     - name: hasura
+    #       routing_url: http://hasura.hasura.svc.cluster.local/v1/graphql
+    #       schema:
+    #         file: ./hasura-schema.graphql   # exported from Hasura console
+data:
+  router.json: |
+    {
+      "version": "1",
+      "engineConfig": {
+        "defaultFlushInterval": "500",
+        "datasourceConfigurations": [],
+        "fieldConfigurations": [],
+        "graphqlSchema": "",
+        "stringStorage": {}
+      },
+      "subgraphs": []
+    }

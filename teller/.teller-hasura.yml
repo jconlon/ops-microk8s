@@ -1,0 +1,8 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      HASURA_ROLE_PASSWORD:
+        path: projects/1000827005146/secrets/hasura-role/versions/latest
+      HASURA_GRAPHQL_ADMIN_SECRET:
+        path: projects/1000827005146/secrets/hasura-admin-secret/versions/latest

@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cosmo-router-config
+  namespace: cosmo
+  labels:
+    app.kubernetes.io/name: cosmo-router
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+    version: "1"
+
+    # dev_mode allows the router to start with a placeholder execution config
+    # and enables schema introspection. Set to false after router.json is finalized.
+    dev_mode: true
+
+    execution_config:
+      file:
+        path: "/etc/cosmo/router.json"
+        watch: false
+
+    # MCP Gateway: exposes curated GraphQL operations as MCP tools for AI agents.
+    # After Hasura is configured and router.json is generated, add .graphql operation
+    # files to the cosmo-gitops/operations/ ConfigMap to surface them as MCP tools.
+    mcp:
+      enabled: true
+      server:
+        listen_addr: "0.0.0.0:5025"
+      # Advertised base URL used in SSE responses (update to match external DNS/IP)
+      base_url: "http://192.168.0.216:5025/mcp"
+      # Used in MCP responses when behind a proxy or load balancer
+      router_url: "http://192.168.0.216:3002/graphql"
+      storage:
+        provider_id: "mcp-operations"
+      graph_name: "verticon"
+      exclude_mutations: true
+      # Allow arbitrary GraphQL queries from AI agents; restrict after operations are defined
+      enable_arbitrary_operations: true
+      expose_schema: true
+
+    storage_providers:
+      file_system:
+        - id: "mcp-operations"
+          path: "/operations"
