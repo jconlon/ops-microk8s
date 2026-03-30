@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: hasura
     app.kubernetes.io/component: graphql-engine
   annotations:
-    metallb.universe.tf/loadBalancerIPs: "192.168.0.213"
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.217"
 spec:
   type: LoadBalancer
   ports:
