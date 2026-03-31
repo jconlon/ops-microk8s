@@ -19,6 +19,8 @@
       "freshrss-psql": ["./ops freshrss psql"],
       "freshrss-publish-links": ["./ops freshrss publish-links"],
       "freshrss-update-news": ["./ops freshrss update-news"],
+      "node-uptime": ["./ops cluster node-uptime"],
+      "node-status": ["./ops cluster node-status"],
       "test": [
         "echo \"Error: no test specified\" && exit 1"
       ]
