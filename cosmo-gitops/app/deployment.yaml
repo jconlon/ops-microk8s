@@ -31,6 +31,12 @@ spec:
           env:
             - name: CONFIG_PATH
               value: "/etc/cosmo/config.yaml"
+            - name: HASURA_GRAPHQL_ADMIN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hasura-credentials
+                  key: HASURA_GRAPHQL_ADMIN_SECRET
+                  optional: false
           volumeMounts:
             - name: router-config
               mountPath: /etc/cosmo/config.yaml

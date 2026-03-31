@@ -41,6 +41,15 @@ data:
       enable_arbitrary_operations: true
       expose_schema: true
 
+    # Forward Hasura admin secret to the subgraph on every request
+    headers:
+      subgraphs:
+        hasura:
+          request:
+            - op: "set"
+              name: "x-hasura-admin-secret"
+              value: "${HASURA_GRAPHQL_ADMIN_SECRET}"
+
     storage_providers:
       file_system:
         - id: "mcp-operations"
