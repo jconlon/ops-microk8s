@@ -251,4 +251,11 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
   --from-literal=HASURA_GRAPHQL_METADATA_DATABASE_URL="postgres://hasura:$HASURA_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/hasura" \
   --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -'
+
+# App credentials (cosmo namespace — Cosmo Router forwards admin secret to Hasura subgraph)
+teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret generic hasura-credentials \
+  --namespace cosmo \
+  --from-literal=HASURA_GRAPHQL_METADATA_DATABASE_URL="postgres://hasura:$HASURA_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/hasura" \
+  --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
+  --dry-run=client -o yaml | kubectl apply -f -'
 ```
