@@ -10,6 +10,8 @@ data:
   config.yaml: |
     version: "1"
 
+    listen_addr: "0.0.0.0:3002"
+
     # dev_mode allows the router to start with a placeholder execution config
     # and enables schema introspection. Set to false after router.json is finalized.
     dev_mode: true
