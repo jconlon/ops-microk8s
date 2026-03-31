@@ -22,4 +22,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
+  ignoreDifferences:
+    - group: ""
+      kind: ConfigMap
+      name: cosmo-router-json
+      namespace: cosmo
+      jsonPointers:
+        - /data/router.json
