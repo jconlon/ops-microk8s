@@ -1,0 +1,6 @@
+version: 1
+subgraphs:
+  - name: hasura
+    routing_url: http://hasura.hasura.svc.cluster.local/v1/graphql
+    schema:
+      file: /tmp/hasura-schema.graphql
