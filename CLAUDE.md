@@ -111,10 +111,9 @@ kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath=
 
 ### Development Environment
 
-```bash
-# Use devbox for development tools
-devbox shell  # Provides argocd and k9s
+> **Note**: Claude Code sessions always run inside the devbox shell. All devbox tools (`argocd`, `k9s`, `nu`, `psql`, etc.) are available directly without `devbox run --` prefixes.
 
+```bash
 # Monitor cluster with k9s
 k9s
 ```
@@ -245,21 +244,20 @@ _Project-specific instructions and facts—use only within this repository:_
 - Set the timeout for executing Bash commands to 10 minutes.
 - When asked to show or get files, open them in VS Code using `code` command.
 - When asked to get or fetch a command use `xclip` to copy the command to memory.
-- To login to ArgoCD server use the command: `devbox run -- argocd-login`
+- **Claude Code sessions always run inside the devbox shell.** All tools (`argocd`, `psql`, `nu`, `k9s`, etc.) are available directly — never use `devbox run --` prefixes.
+- To login to ArgoCD server use the command: `ops argocd login`
 - Always login to ArgoCD server at the start of all sessions.
-- All argocd commands should be run with this prefix: `devbox run -- argocd`
+- All argocd commands use the `ops argocd` wrapper: e.g. `ops argocd list-app`
 - For troubleshooting, use kubectl krew tools listed in `kubectl_krew_commands.md`. Run `kubectl plugin list` at startup to confirm available plugins.
 - When connecting to verticon.com servers use https not http.
 - To get ArgoCD password:  
   `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
 - ArgoCD username is `admin`
-- For postgresql cli use: `devbox run psql`
-
+- For postgresql cli use: `psql`
 - The `kubectl cnpg` plugin is available for CloudNativePG management. Example: `kubectl cnpg status production-postgresql -n postgresql-system`
 - For available scripts and usage, read `scripts/README.md` at session start.
-- To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
+- To connect to the FreshRSS database use: `ops freshrss psql`
 - Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory.
-- Claude Code sessions are always run from **inside a devbox shell**. Prefer short-form commands (`ops cluster ...`, `ops argocd ...`) over `devbox run --` prefixed forms when suggesting commands.
 - NEVER run `helm repo add` or `helm repo update` locally. Helm charts are managed entirely by ArgoCD using `repoURL` and `chart` fields in ArgoCD Application manifests. There is no need to add repos to the local Helm installation.
 
 ---

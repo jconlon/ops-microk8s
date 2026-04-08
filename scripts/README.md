@@ -37,6 +37,15 @@ scripts/
 
 ## NuShell Scripts
 
+> **Note**: Claude Code sessions always run inside the devbox shell. Use direct commands — `devbox run --` prefixes are not needed.
+>
+> To run a script from **another directory**, use:
+> ```bash
+> devbox run --config /home/jconlon/git/ops-microk8s -- <script-name>
+> # e.g.
+> devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-update-technical
+> ```
+
 Sourced by the `ops` wrapper script. Run from the `ops-microk8s` directory.
 
 ### cluster.nu
@@ -49,14 +58,6 @@ Cluster health and status commands. Queries Prometheus — no SSH required.
 | `ops cluster node-status` | Show uptime + kured reboot-required status for all nodes |
 
 ```bash
-devbox run -- node-uptime
-devbox run -- node-status
-
-# From any directory
-devbox run --config /home/jconlon/git/ops-microk8s -- node-uptime
-devbox run --config /home/jconlon/git/ops-microk8s -- node-status
-
-# Or from within devbox shell
 ops cluster node-uptime
 ops cluster node-status
 ```
@@ -76,9 +77,6 @@ ArgoCD server management commands.
 | `ops argocd list-app` | List configured applications |
 
 ```bash
-devbox run -- argocd-login
-
-# Or from within devbox shell
 ops argocd login
 ops argocd login --server argocd.verticon.com --username admin
 ```
@@ -97,9 +95,6 @@ FreshRSS database commands. Each command starts a `kubectl port-forward` as a ba
 #### freshrss psql
 
 ```bash
-devbox run -- freshrss-psql
-
-# Or from within devbox shell
 ops freshrss psql
 
 # Custom local port (default: 5433)
@@ -111,13 +106,6 @@ ops freshrss psql --port 5434
 Queries the FreshRSS database for all entries tagged `publish` and outputs a markdown list of links with their tags.
 
 ```bash
-# From ops-microk8s directory
-devbox run -- freshrss-publish-links
-
-# From any directory
-devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-publish-links
-
-# Or from within devbox shell
 ops freshrss publish-links
 ```
 
@@ -134,13 +122,6 @@ Example output:
 Runs the same publish-links query and overwrites the `### Latest` section in `/home/jconlon/git/news/docs/index.md` with fresh output. Aborts safely if no links are returned.
 
 ```bash
-# From ops-microk8s directory
-devbox run -- freshrss-update-news
-
-# From any directory
-devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-update-news
-
-# Or from within devbox shell
 ops freshrss update-news
 ```
 
@@ -151,13 +132,6 @@ ops freshrss update-news
 Queries FreshRSS for entries tagged `technical` and overwrites the `### Technical` section in `/home/jconlon/git/news/docs/index.md` with fresh output. Aborts safely if no links are returned.
 
 ```bash
-# From ops-microk8s directory
-devbox run -- freshrss-update-technical
-
-# From any directory
-devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-update-technical
-
-# Or from within devbox shell
 ops freshrss update-technical
 ```
 
