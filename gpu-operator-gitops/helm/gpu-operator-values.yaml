@@ -25,5 +25,3 @@ toolkit:
 operator:
   defaultRuntime: containerd
 
-validator:
-  plugin: {}

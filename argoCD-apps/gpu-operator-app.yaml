@@ -9,7 +9,7 @@ spec:
   sources:
     - chart: gpu-operator
       repoURL: https://helm.ngc.nvidia.com/nvidia
-      targetRevision: v25.3.3
+      targetRevision: v24.9.2
       helm:
         valueFiles:
           - $values/gpu-operator-gitops/helm/gpu-operator-values.yaml
