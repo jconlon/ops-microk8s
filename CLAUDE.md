@@ -74,11 +74,9 @@ microk8s enable metallb:192.168.0.200-192.168.0.220
 
 ### ArgoCD Deployment
 
-```bash
-# Initial ArgoCD installation
-helm repo add argo https://argoproj.github.io/argo-helm
-helm install argocd argo/argo-cd -n argocd --create-namespace
+> **Note**: All Helm deployments are managed by ArgoCD. Never run `helm` directly.
 
+```bash
 # Get admin password
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 
@@ -104,17 +102,11 @@ kubectl get pods -n rook-ceph -l app=rook-ceph-osd
 
 ### Monitoring Stack
 
-```bash
-# Install Prometheus stack
-helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
-  --namespace monitoring \
-  --values monitoring/helm/prometheus-values.yaml \
-  --create-namespace \
-  --timeout 15m
+> **Note**: Monitoring stack is deployed via ArgoCD. See `argoCD-apps/monitoring-apps.yaml`.
 
+```bash
 # Get Grafana admin password
 kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
-
 ```
 
 ### Development Environment
@@ -267,6 +259,7 @@ _Project-specific instructions and facts—use only within this repository:_
 - For available scripts and usage, read `scripts/README.md` at session start.
 - To connect to the FreshRSS database use: `devbox run -- freshrss-psql`
 - Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory.
+- Claude Code sessions are always run from **inside a devbox shell**. Prefer short-form commands (`ops cluster ...`, `ops argocd ...`) over `devbox run --` prefixed forms when suggesting commands.
 - NEVER run `helm repo add` or `helm repo update` locally. Helm charts are managed entirely by ArgoCD using `repoURL` and `chart` fields in ArgoCD Application manifests. There is no need to add repos to the local Helm installation.
 
 ---

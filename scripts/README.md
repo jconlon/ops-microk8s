@@ -92,6 +92,7 @@ FreshRSS database commands. Each command starts a `kubectl port-forward` as a ba
 | `ops freshrss psql` | Open an interactive `psql` session against the FreshRSS database |
 | `ops freshrss publish-links` | Query entries tagged `publish` and print a markdown link list |
 | `ops freshrss update-news` | Query entries tagged `publish` and overwrite the `### Latest` section in `news/docs/index.md` |
+| `ops freshrss update-technical` | Query entries tagged `technical` and overwrite the `### Technical` section in `news/docs/index.md` |
 
 #### freshrss psql
 
@@ -144,6 +145,23 @@ ops freshrss update-news
 ```
 
 **Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster. `/home/jconlon/git/news/docs/index.md` must exist and contain a `### Latest` heading.
+
+#### freshrss update-technical
+
+Queries FreshRSS for entries tagged `technical` and overwrites the `### Technical` section in `/home/jconlon/git/news/docs/index.md` with fresh output. Aborts safely if no links are returned.
+
+```bash
+# From ops-microk8s directory
+devbox run -- freshrss-update-technical
+
+# From any directory
+devbox run --config /home/jconlon/git/ops-microk8s -- freshrss-update-technical
+
+# Or from within devbox shell
+ops freshrss update-technical
+```
+
+**Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster. `/home/jconlon/git/news/docs/index.md` must exist and contain a `### Technical` heading.
 
 ---
 

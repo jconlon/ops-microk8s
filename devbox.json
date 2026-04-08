@@ -19,6 +19,7 @@
       "freshrss-psql": ["./ops freshrss psql"],
       "freshrss-publish-links": ["./ops freshrss publish-links"],
       "freshrss-update-news": ["./ops freshrss update-news"],
+      "freshrss-update-technical": ["./ops freshrss update-technical"],
       "node-uptime": ["./ops cluster node-uptime"],
       "node-status": ["./ops cluster node-status"],
       "test": [
