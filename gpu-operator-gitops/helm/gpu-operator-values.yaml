@@ -1,0 +1,26 @@
+# NVIDIA GPU Operator Helm values for MicroK8s
+#
+# NVIDIA drivers (535) are pre-installed on whale — driver component disabled.
+# The toolkit DaemonSet installs nvidia-container-toolkit on the node and
+# configures MicroK8s containerd at the paths below.
+#
+# After first sync, restart MicroK8s containerd on whale:
+#   sudo snap restart microk8s
+
+driver:
+  enabled: false
+
+toolkit:
+  enabled: true
+  env:
+    - name: CONTAINERD_CONFIG
+      value: /var/snap/microk8s/current/args/containerd-template.toml
+    - name: CONTAINERD_SOCKET
+      value: /var/snap/microk8s/common/run/containerd.sock
+    - name: CONTAINERD_RUNTIME_CLASS
+      value: nvidia
+    - name: CONTAINERD_SET_AS_DEFAULT
+      value: "true"
+
+operator:
+  defaultRuntime: containerd

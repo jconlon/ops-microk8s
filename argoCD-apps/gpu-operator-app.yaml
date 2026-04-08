@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gpu-operator
+  namespace: argocd
+spec:
+  project: default
+
+  sources:
+    - chart: gpu-operator
+      repoURL: https://helm.ngc.nvidia.com/nvidia
+      targetRevision: v25.3.3
+      helm:
+        valueFiles:
+          - $values/gpu-operator-gitops/helm/gpu-operator-values.yaml
+
+    - repoURL: https://github.com/jconlon/ops-microk8s
+      targetRevision: HEAD
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
