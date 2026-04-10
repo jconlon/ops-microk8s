@@ -248,6 +248,15 @@ _Project-specific instructions and facts—use only within this repository:_
 - To login to ArgoCD server use the command: `ops argocd login`
 - Always login to ArgoCD server at the start of all sessions.
 - All argocd commands use the `ops argocd` wrapper: e.g. `ops argocd list-app`
+- **For checking cluster state, prefer `just` recipes and chainsaw tests over raw kubectl:**
+  - `just test` — run all e2e health checks (nodes, ceph, gpu, postgresql, argocd)
+  - `just test-suite <suite>` — run a single suite: `cluster`, `storage`, `gpu`, `postgresql`, `argocd`
+  - `just node-status` — node uptime + reboot-required
+  - `just ceph-status` — Ceph cluster health
+  - `just pg-status` — CloudNativePG cluster status
+  - `just gpu-status` — GPU allocatable resources on whale
+  - `just pods-unhealthy` — all non-running pods cluster-wide
+  - Use raw `kubectl` only for queries not covered by the above.
 - For troubleshooting, use kubectl krew tools listed in `kubectl_krew_commands.md`. Run `kubectl plugin list` at startup to confirm available plugins.
 - When connecting to verticon.com servers use https not http.
 - To get ArgoCD password:  
