@@ -1,0 +1,76 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: cluster-nodes-ready
+spec:
+  description: All 8 cluster nodes are Ready
+  concurrent: false
+  timeouts:
+    assert: 1m
+  steps:
+  - name: all-nodes-ready
+    try:
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: mullet
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: trout
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: tuna
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: whale
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: gold
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: squid
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: puffer
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: carp
+          status:
+            (conditions[?type=='Ready'].status | [0]): "True"

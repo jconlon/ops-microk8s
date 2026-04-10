@@ -1,0 +1,52 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: gpu-node-ready
+spec:
+  description: whale node has nvidia.com/gpu allocatable and GPU operator pods are running
+  concurrent: false
+  timeouts:
+    assert: 2m
+  steps:
+  - name: whale-has-gpu-resource
+    try:
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: whale
+          status:
+            (allocatable."nvidia.com/gpu"): "1"
+  - name: whale-labeled-gpu-class
+    try:
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: whale
+            labels:
+              gpu-class: rtx2000-ada
+  - name: gpu-operator-running
+    try:
+    - assert:
+        resource:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: gpu-operator
+            namespace: gpu-operator
+          status:
+            readyReplicas: 1
+  - name: device-plugin-running
+    try:
+    - assert:
+        resource:
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: nvidia-device-plugin-daemonset
+            namespace: gpu-operator
+          status:
+            numberReady: 1

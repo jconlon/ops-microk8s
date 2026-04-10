@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: postgresql-healthy
+spec:
+  description: CloudNativePG cluster is healthy with 3 ready instances
+  concurrent: false
+  timeouts:
+    assert: 2m
+  steps:
+  - name: cluster-ready
+    try:
+    - assert:
+        resource:
+          apiVersion: postgresql.cnpg.io/v1
+          kind: Cluster
+          metadata:
+            name: production-postgresql
+            namespace: postgresql-system
+          status:
+            phase: Cluster in healthy state
+            readyInstances: 3
+            instances: 3
+  - name: wal-archiving-ok
+    try:
+    - assert:
+        resource:
+          apiVersion: postgresql.cnpg.io/v1
+          kind: Cluster
+          metadata:
+            name: production-postgresql
+            namespace: postgresql-system
+          status:
+            (lastSuccessfulBackup != null): true

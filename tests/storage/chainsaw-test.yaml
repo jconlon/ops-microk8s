@@ -1,0 +1,31 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ceph-health
+spec:
+  description: Rook/Ceph cluster is healthy and storage class exists
+  concurrent: false
+  timeouts:
+    assert: 2m
+  steps:
+  - name: ceph-cluster-ready
+    try:
+    - assert:
+        resource:
+          apiVersion: ceph.rook.io/v1
+          kind: CephCluster
+          metadata:
+            name: rook-ceph
+            namespace: rook-ceph
+          status:
+            phase: Ready
+            ceph:
+              health: HEALTH_OK
+  - name: storage-class-exists
+    try:
+    - assert:
+        resource:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: rook-ceph-block

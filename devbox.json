@@ -7,7 +7,9 @@
     "postgresql@latest",
     "barman@latest",
     "teller@1.5.6",
-    "kafkactl@latest"
+    "kafkactl@latest",
+    "kyverno-chainsaw@0.1.9",
+    "just@latest"
   ],
   "shell": {
     "init_hook": [

@@ -1,0 +1,46 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: argocd-apps-healthy
+spec:
+  description: Key ArgoCD applications are Synced and Healthy
+  concurrent: false
+  timeouts:
+    assert: 2m
+  steps:
+  - name: gpu-operator-synced
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: gpu-operator
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: postgresql-synced
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: postgresql-cluster
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: rook-ceph-operator-synced
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: rook-ceph-operator
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
