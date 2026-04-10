@@ -3,43 +3,115 @@ kind: Test
 metadata:
   name: argocd-apps-healthy
 spec:
-  description: Key ArgoCD applications are Synced and Healthy
+  description: ArgoCD App-of-Apps are Synced and Healthy
   concurrent: false
   timeouts:
     assert: 2m
   steps:
-  - name: gpu-operator-synced
+  - name: argocd-healthy
     try:
     - assert:
         resource:
           apiVersion: argoproj.io/v1alpha1
           kind: Application
           metadata:
-            name: gpu-operator
+            name: argocd
             namespace: argocd
           status:
             health:
               status: Healthy
-  - name: postgresql-synced
+  - name: monitoring-apps-healthy
     try:
     - assert:
         resource:
           apiVersion: argoproj.io/v1alpha1
           kind: Application
           metadata:
-            name: postgresql-cluster
+            name: monitoring-apps
             namespace: argocd
           status:
             health:
               status: Healthy
-  - name: rook-ceph-operator-synced
+  - name: rook-ceph-root-healthy
     try:
     - assert:
         resource:
           apiVersion: argoproj.io/v1alpha1
           kind: Application
           metadata:
-            name: rook-ceph-operator
+            name: rook-ceph-root
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: postgresql-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: postgresql-apps
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: freshrss-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: freshrss-apps
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: hasura-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: hasura-apps
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: kafka-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: kafka-apps
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: wallabag-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: wallabag-apps
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
+  - name: cosmo-apps-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: cosmo-apps
             namespace: argocd
           status:
             health:
