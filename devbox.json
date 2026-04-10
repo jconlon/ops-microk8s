@@ -14,7 +14,8 @@
   "shell": {
     "init_hook": [
       "chmod +x ops",
-      "export PATH=$PATH:$PWD"
+      "export PATH=$PATH:$PWD",
+      "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\""
     ],
     "scripts": {
       "argocd-login": ["./ops argocd login"],
