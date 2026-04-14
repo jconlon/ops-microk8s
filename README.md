@@ -53,6 +53,7 @@ whale    Ready    <none>   22d   v1.32.3
 - **PostgreSQL**: CloudNativePG operator managing PostgreSQL clusters
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
+    sudo vi /etc/caddy/Caddyfile
 
 ### Service Access
 
@@ -164,9 +165,9 @@ Apache Kafka deployed via the Strimzi operator in KRaft mode (no ZooKeeper), man
 
 ### Addresses
 
-| Listener | Address | Use |
-|----------|---------|-----|
-| External (MetalLB) | `192.168.0.213:9094` | kafkactl from workstation |
+| Listener           | Address                                                     | Use                                       |
+| ------------------ | ----------------------------------------------------------- | ----------------------------------------- |
+| External (MetalLB) | `192.168.0.213:9094`                                        | kafkactl from workstation                 |
 | Internal (cluster) | `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092` | in-cluster clients (e.g. Schema Registry) |
 
 > Use the IP directly rather than the DNS name. Kafka clients connect to the bootstrap address first, then reconnect to individual broker IPs (`.206`, `.207`, `.208`) — DNS only covers the bootstrap hop.
@@ -336,15 +337,18 @@ When deploying a new service with a MetalLB LoadBalancer IP, follow these steps 
 
 ### 1. Add DNS record in Cloudflare
 
-Add an `A` record in the Cloudflare dashboard:
+[Cloudflare Console](https://dash.cloudflare.com/login)
 
-| Type | Name | Value | Proxy |
-|------|------|-------|-------|
-| A | `<service>.verticon.com` | `192.168.0.2xx` | DNS only (grey cloud) |
+Add an `A` record in the Cloudflare dashboard to point to mullet's IP:
+
+| Type | Name        | Content         | Proxy Status           |
+| ---- | ----------- | --------------- | ---------------------- |
+| A    | `<service>` | `192.168.0.101` | DNS only - reserved IP |
 
 ### 2. Configure Caddy reverse proxy
 
 ```bash
+# on mullet
 sudo vi /etc/caddy/Caddyfile
 ```
 
@@ -353,7 +357,11 @@ Add a new block:
 ```
 <service>.verticon.com {
     reverse_proxy 192.168.0.2xx:80
+    tls {
+        resolvers 1.1.1.1 1.0.0.1
+    }
 }
+
 ```
 
 ### 3. Reload Caddy
@@ -366,14 +374,14 @@ Caddy handles TLS automatically via Let's Encrypt. No restart required — `relo
 
 ### Existing service hostnames
 
-| Service | Hostname | MetalLB IP |
-|---------|----------|------------|
-| Grafana | https://grafana.verticon.com | 192.168.0.201 |
-| Prometheus | https://prometheus.verticon.com | 192.168.0.202 |
-| AlertManager | https://alertmanager.verticon.com | 192.168.0.203 |
-| PostgreSQL (primary) | — | 192.168.0.210 |
-| PostgreSQL (readonly) | — | 192.168.0.211 |
-| pgAdmin | https://pgadmin.verticon.com | 192.168.0.212 |
+| Service               | Hostname                          | MetalLB IP    |
+| --------------------- | --------------------------------- | ------------- |
+| Grafana               | https://grafana.verticon.com      | 192.168.0.201 |
+| Prometheus            | https://prometheus.verticon.com   | 192.168.0.202 |
+| AlertManager          | https://alertmanager.verticon.com | 192.168.0.203 |
+| PostgreSQL (primary)  | —                                 | 192.168.0.210 |
+| PostgreSQL (readonly) | —                                 | 192.168.0.211 |
+| pgAdmin               | https://pgadmin.verticon.com      | 192.168.0.212 |
 
 ---
 
