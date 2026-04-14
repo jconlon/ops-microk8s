@@ -85,6 +85,14 @@ ops argocd login --server argocd.verticon.com --username admin
 
 FreshRSS database commands. Each command connects directly to `postgresql.verticon.com:5432` (the readonly replica exposed via MetalLB), fetches credentials from the `freshrss-role-password` Kubernetes secret.
 
+All query commands use the `v_freshrss_entries` view (see [`scripts/sql/v_freshrss_entries.sql`](sql/v_freshrss_entries.sql)), which joins all FreshRSS tables and exposes every entry column at its raw, untrimmed value. To recreate the view (requires primary — port-forward or run inside the cluster):
+
+```bash
+password=$(kubectl get secret freshrss-role-password -n postgresql-system -o jsonpath="{.data.password}" | base64 -d)
+kubectl port-forward -n postgresql-system svc/production-postgresql-rw 5434:5432 &
+PGPASSWORD="$password" psql -h localhost -p 5434 -U freshrss -d freshrss -f scripts/sql/v_freshrss_entries.sql
+```
+
 | Command | Description |
 |---|---|
 | `ops freshrss psql` | Open an interactive `psql` session against the FreshRSS database |
