@@ -2,46 +2,24 @@
 
 # Connect to the FreshRSS PostgreSQL database via psql
 #
-# Starts a kubectl port-forward in the background, connects via psql
-# using credentials from the cluster secret, and cleans up when done.
+# Connects directly to the external PostgreSQL readonly replica at
+# postgresql.verticon.com using credentials from the cluster secret.
 #
 # Usage:
-#   ops freshrss psql
-#   ops freshrss psql --port 5434
-#
-# Parameters:
-#   --port (-p): int (optional)
-#     Local port for the port-forward.
-#     Default: 5433 (avoids conflict with any local PostgreSQL on 5432)
-#
-# Example:
 #   ops freshrss psql
 #
 # Query FreshRSS entries tagged 'publish' and output a markdown link list
 #
-# Starts a kubectl port-forward in the background, runs the publish query,
+# Connects directly to postgresql.verticon.com, runs the publish query,
 # and prints results as a markdown list of links with tags.
 #
 # Usage:
 #   ops freshrss publish-links
-#   ops freshrss publish-links --port 5434
-#
-# Parameters:
-#   --port (-p): int (optional)
-#     Local port for the port-forward. Default: 5433
 #
 def "main freshrss update-technical" [
-    --port (-p): int = 5433
+    --host (-H): string = "postgresql.verticon.com"
     --news-file: string = "/home/jconlon/git/news/docs/index.md"
 ] {
-    print $"Starting port-forward to production-postgresql-rw on localhost:($port)..."
-
-    let pf_id = job spawn {
-        ^kubectl port-forward -n postgresql-system svc/production-postgresql-rw $"($port):5432"
-    }
-
-    sleep 3sec
-
     let password = (
         ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
         | ^base64 -d
@@ -59,7 +37,7 @@ ORDER BY e.date DESC;"
 
     let link_lines = (
         with-env { PGPASSWORD: $password } {
-            ^psql -h localhost -p $port -U freshrss -d freshrss -t -A -c $sql
+            ^psql -h $host -p 5432 -U freshrss -d freshrss -t -A -c $sql
         }
         | lines
         | filter { |l| ($l | str trim) != "" }
@@ -95,8 +73,6 @@ ORDER BY e.date DESC;"
             $with_snip | str join "\n"
         }
     )
-
-    job kill $pf_id
 
     if ($link_lines | is-empty) {
         error make { msg: "No links returned from database — aborting to protect the news file." }
@@ -131,17 +107,9 @@ ORDER BY e.date DESC;"
 }
 
 def "main freshrss update-news" [
-    --port (-p): int = 5433
+    --host (-H): string = "postgresql.verticon.com"
     --news-file: string = "/home/jconlon/git/news/docs/index.md"
 ] {
-    print $"Starting port-forward to production-postgresql-rw on localhost:($port)..."
-
-    let pf_id = job spawn {
-        ^kubectl port-forward -n postgresql-system svc/production-postgresql-rw $"($port):5432"
-    }
-
-    sleep 3sec
-
     let password = (
         ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
         | ^base64 -d
@@ -159,7 +127,7 @@ ORDER BY e.date DESC;"
 
     let link_lines = (
         with-env { PGPASSWORD: $password } {
-            ^psql -h localhost -p $port -U freshrss -d freshrss -t -A -c $sql
+            ^psql -h $host -p 5432 -U freshrss -d freshrss -t -A -c $sql
         }
         | lines
         | filter { |l| ($l | str trim) != "" }
@@ -195,8 +163,6 @@ ORDER BY e.date DESC;"
             $with_snip | str join "\n"
         }
     )
-
-    job kill $pf_id
 
     if ($link_lines | is-empty) {
         error make { msg: "No links returned from database — aborting to protect the news file." }
@@ -236,28 +202,15 @@ ORDER BY e.date DESC;"
 
 # Query FreshRSS entries tagged 'publish' and output a markdown link list
 #
-# Starts a kubectl port-forward in the background, runs the publish query,
+# Connects directly to postgresql.verticon.com, runs the publish query,
 # and prints results as a markdown list of links with tags.
 #
 # Usage:
 #   ops freshrss publish-links
-#   ops freshrss publish-links --port 5434
-#
-# Parameters:
-#   --port (-p): int (optional)
-#     Local port for the port-forward. Default: 5433
 #
 def "main freshrss publish-links" [
-    --port (-p): int = 5433
+    --host (-H): string = "postgresql.verticon.com"
 ] {
-    print $"Starting port-forward to production-postgresql-rw on localhost:($port)..."
-
-    let pf_id = job spawn {
-        ^kubectl port-forward -n postgresql-system svc/production-postgresql-rw $"($port):5432"
-    }
-
-    sleep 2sec
-
     let password = (
         ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
         | ^base64 -d
@@ -275,7 +228,7 @@ ORDER BY e.date DESC;"
 
     let markdown = (
         with-env { PGPASSWORD: $password } {
-            ^psql -h localhost -p $port -U freshrss -d freshrss -t -A -c $sql
+            ^psql -h $host -p 5432 -U freshrss -d freshrss -t -A -c $sql
         }
         | lines
         | filter { |l| ($l | str trim) != "" }
@@ -313,40 +266,23 @@ ORDER BY e.date DESC;"
         | str join "\n"
     )
 
-    job kill $pf_id
-    print "Port-forward stopped.\n"
-
     print $markdown
 }
 
 # Connect to the FreshRSS PostgreSQL database via psql
 #
-# Starts a kubectl port-forward in the background, connects via psql
-# using credentials from the cluster secret, and cleans up when done.
+# Connects directly to the external PostgreSQL readonly replica at
+# postgresql.verticon.com using credentials from the cluster secret.
 #
 # Usage:
 #   ops freshrss psql
-#   ops freshrss psql --port 5434
-#
-# Parameters:
-#   --port (-p): int (optional)
-#     Local port for the port-forward.
-#     Default: 5433 (avoids conflict with any local PostgreSQL on 5432)
 #
 # Example:
 #   ops freshrss psql
 #
 def "main freshrss psql" [
-    --port (-p): int = 5433
+    --host (-H): string = "postgresql.verticon.com"
 ] {
-    print $"Starting port-forward to production-postgresql-rw on localhost:($port)..."
-
-    let pf_id = job spawn {
-        ^kubectl port-forward -n postgresql-system svc/production-postgresql-rw $"($port):5432"
-    }
-
-    sleep 2sec
-
     let password = (
         ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
         | ^base64 -d
@@ -356,9 +292,6 @@ def "main freshrss psql" [
     print "Connecting to freshrss database..."
 
     with-env { PGPASSWORD: $password } {
-        ^psql -h localhost -p $port -U freshrss -d freshrss
+        ^psql -h $host -p 5432 -U freshrss -d freshrss
     }
-
-    job kill $pf_id
-    print "Port-forward stopped."
 }

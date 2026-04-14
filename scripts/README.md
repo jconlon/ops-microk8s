@@ -83,7 +83,7 @@ ops argocd login --server argocd.verticon.com --username admin
 
 ### freshrss.nu
 
-FreshRSS database commands. Each command starts a `kubectl port-forward` as a background job, fetches credentials from the `freshrss-role-password` Kubernetes secret, and cleans up on exit.
+FreshRSS database commands. Each command connects directly to `postgresql.verticon.com:5432` (the readonly replica exposed via MetalLB), fetches credentials from the `freshrss-role-password` Kubernetes secret.
 
 | Command | Description |
 |---|---|
@@ -97,8 +97,8 @@ FreshRSS database commands. Each command starts a `kubectl port-forward` as a ba
 ```bash
 ops freshrss psql
 
-# Custom local port (default: 5433)
-ops freshrss psql --port 5434
+# Override host (default: postgresql.verticon.com)
+ops freshrss psql --host 192.168.0.211
 ```
 
 #### freshrss publish-links
