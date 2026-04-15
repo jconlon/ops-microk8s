@@ -1,0 +1,92 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: vllm-healthy
+spec:
+  description: vLLM ArgoCD app is Synced/Healthy, pod running on whale, OpenAI API responds
+  concurrent: false
+  timeouts:
+    assert: 15m
+    exec: 3m
+
+  steps:
+
+  - name: argocd-app-synced-and-healthy
+    description: ArgoCD Application is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: vllm
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: vllm-pod-running-on-whale
+    description: vLLM serving pod is Running and scheduled on whale
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n vllm --no-headers \
+            -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,STATUS:.status.phase' \
+            | grep whale | grep Running | awk '{print $1}')
+          if [ -z "$POD" ]; then
+            echo "No vLLM pod Running on whale"
+            exit 1
+          fi
+          echo "vLLM pod running on whale: $POD"
+
+  - name: vllm-health-endpoint
+    description: vLLM /health endpoint returns 200
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n vllm --no-headers \
+            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
+            | grep Running | awk '{print $1}' | head -1)
+          if [ -z "$POD" ]; then
+            echo "No running vLLM pod found"
+            exit 1
+          fi
+          kubectl exec -n vllm "$POD" -- curl -sf http://localhost:8000/health
+          echo "Health check passed"
+
+  - name: vllm-models-endpoint
+    description: vLLM /v1/models lists the deployed model
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n vllm --no-headers \
+            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
+            | grep Running | awk '{print $1}' | head -1)
+          RESPONSE=$(kubectl exec -n vllm "$POD" -- \
+            curl -sf http://localhost:8000/v1/models)
+          echo "$RESPONSE"
+          echo "$RESPONSE" | grep -q '"object":"list"' || { echo "Unexpected /v1/models response"; exit 1; }
+          echo "Models endpoint OK"
+
+  - name: vllm-openai-chat-completion
+    description: OpenAI-compatible chat completion returns a valid response
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n vllm --no-headers \
+            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
+            | grep Running | awk '{print $1}' | head -1)
+          RESPONSE=$(kubectl exec -n vllm "$POD" -- \
+            curl -sf http://localhost:8000/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "Qwen/Qwen2.5-7B-Instruct",
+              "messages": [{"role": "user", "content": "Reply with exactly one word: OK"}],
+              "max_tokens": 10,
+              "temperature": 0
+            }')
+          echo "$RESPONSE"
+          echo "$RESPONSE" | grep -q '"choices"' || { echo "No choices in response"; exit 1; }
+          echo "Chat completion OK"

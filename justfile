@@ -66,3 +66,13 @@ gpu-status:
 # Show GPU operator pod status
 gpu-pods:
     kubectl get pods -n gpu-operator
+
+# ── vLLM ──────────────────────────────────────────────────────────────────────
+
+# Show vLLM pod status and node placement
+vllm-status:
+    kubectl get pods -n vllm -o wide
+
+# Run vLLM chainsaw tests
+test-vllm:
+    chainsaw test tests/vllm

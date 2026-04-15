@@ -116,3 +116,15 @@ spec:
           status:
             health:
               status: Healthy
+  - name: vllm-healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: vllm
+            namespace: argocd
+          status:
+            health:
+              status: Healthy
