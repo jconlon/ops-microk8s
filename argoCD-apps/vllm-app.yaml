@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vllm
+  namespace: argocd
+spec:
+  project: default
+
+  sources:
+    - chart: vllm-stack
+      repoURL: https://vllm-project.github.io/production-stack
+      targetRevision: "*"
+      helm:
+        valueFiles:
+          - $values/vllm-gitops/helm/vllm-values.yaml
+
+    - repoURL: https://github.com/jconlon/ops-microk8s
+      targetRevision: HEAD
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vllm
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

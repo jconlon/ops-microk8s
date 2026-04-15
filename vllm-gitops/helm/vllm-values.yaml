@@ -1,0 +1,39 @@
+servingEngineSpec:
+  runtimeClassName: "nvidia"
+
+  modelSpec:
+    - name: "qwen25-7b"
+      repository: "vllm/vllm-openai"
+      tag: "latest"
+      modelURL: "Qwen/Qwen2.5-7B-Instruct"
+      replicaCount: 1
+
+      requestCPU: 4
+      requestMemory: "16Gi"
+      requestGPU: 1
+
+      pvcStorage: "50Gi"
+
+      vllmConfig:
+        enableChunkedPrefill: false
+        enablePrefixCaching: false
+        maxModelLen: 8192
+        dtype: "float16"
+        extraArgs:
+          - "--gpu-memory-utilization"
+          - "0.85"
+          - "--trust-remote-code"
+          - "--disable-log-requests"
+
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: "gpu-class"
+              operator: "In"
+              values:
+                - "rtx2000-ada"
+
+      # To switch to a gated model (e.g. meta-llama/Meta-Llama-3.1-8B-Instruct):
+      #   1. Add HF_TOKEN to Google Secret Manager as 'huggingface-token'
+      #   2. Run: teller run --config teller/.teller-vllm.yml -- <kubectl create secret command>
+      #   3. Set hf_token here or reference the existing secret
+      #   4. Update modelURL above
