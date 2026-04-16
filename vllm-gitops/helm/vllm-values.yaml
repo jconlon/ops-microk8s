@@ -1,5 +1,7 @@
 servingEngineSpec:
   runtimeClassName: "nvidia"
+  strategy:
+    type: Recreate
 
   modelSpec:
     - name: "qwen25-7b"
