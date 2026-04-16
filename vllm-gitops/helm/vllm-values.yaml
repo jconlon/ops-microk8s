@@ -9,7 +9,7 @@ servingEngineSpec:
       replicaCount: 1
 
       requestCPU: 4
-      requestMemory: "16Gi"
+      requestMemory: "8Gi"
       requestGPU: 1
 
       pvcStorage: "50Gi"
