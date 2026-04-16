@@ -27,33 +27,29 @@ spec:
             health:
               status: Healthy
 
-  - name: vllm-pod-running-on-whale
-    description: vLLM serving pod is Running and scheduled on whale
+  - name: serving-pod-running-on-whale
+    description: vLLM serving-engine pod is Running and scheduled on whale
     try:
-    - script:
-        content: |
-          POD=$(kubectl get pod -n vllm --no-headers \
-            -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,STATUS:.status.phase' \
-            | grep whale | grep Running | awk '{print $1}')
-          if [ -z "$POD" ]; then
-            echo "No vLLM pod Running on whale"
-            exit 1
-          fi
-          echo "vLLM pod running on whale: $POD"
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            namespace: vllm
+            labels:
+              app.kubernetes.io/component: serving-engine
+          spec:
+            nodeName: whale
+          status:
+            phase: Running
 
   - name: vllm-health-endpoint
-    description: vLLM /health endpoint returns 200
+    description: vLLM /health endpoint returns 200 via engine service ClusterIP
     try:
     - script:
         content: |
-          POD=$(kubectl get pod -n vllm --no-headers \
-            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
-            | grep Running | awk '{print $1}' | head -1)
-          if [ -z "$POD" ]; then
-            echo "No running vLLM pod found"
-            exit 1
-          fi
-          kubectl exec -n vllm "$POD" -- curl -sf http://localhost:8000/health
+          SVC=$(kubectl get svc vllm-qwen25-7b-engine-service -n vllm -o jsonpath='{.spec.clusterIP}')
+          curl -sf http://$SVC/health
           echo "Health check passed"
 
   - name: vllm-models-endpoint
@@ -61,11 +57,8 @@ spec:
     try:
     - script:
         content: |
-          POD=$(kubectl get pod -n vllm --no-headers \
-            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
-            | grep Running | awk '{print $1}' | head -1)
-          RESPONSE=$(kubectl exec -n vllm "$POD" -- \
-            curl -sf http://localhost:8000/v1/models)
+          SVC=$(kubectl get svc vllm-qwen25-7b-engine-service -n vllm -o jsonpath='{.spec.clusterIP}')
+          RESPONSE=$(curl -sf http://$SVC/v1/models)
           echo "$RESPONSE"
           echo "$RESPONSE" | grep -q '"object":"list"' || { echo "Unexpected /v1/models response"; exit 1; }
           echo "Models endpoint OK"
@@ -75,11 +68,8 @@ spec:
     try:
     - script:
         content: |
-          POD=$(kubectl get pod -n vllm --no-headers \
-            -o custom-columns='NAME:.metadata.name,STATUS:.status.phase' \
-            | grep Running | awk '{print $1}' | head -1)
-          RESPONSE=$(kubectl exec -n vllm "$POD" -- \
-            curl -sf http://localhost:8000/v1/chat/completions \
+          SVC=$(kubectl get svc vllm-qwen25-7b-engine-service -n vllm -o jsonpath='{.spec.clusterIP}')
+          RESPONSE=$(curl -sf http://$SVC/v1/chat/completions \
             -H "Content-Type: application/json" \
             -d '{
               "model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
