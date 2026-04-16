@@ -7,7 +7,7 @@ servingEngineSpec:
     - name: "qwen25-7b"
       repository: "vllm/vllm-openai"
       tag: "latest"
-      modelURL: "Qwen/Qwen2.5-7B-Instruct"
+      modelURL: "Qwen/Qwen2.5-7B-Instruct-AWQ"
       replicaCount: 1
 
       requestCPU: 4
@@ -26,6 +26,8 @@ servingEngineSpec:
           - "--gpu-memory-utilization"
           - "0.85"
           - "--trust-remote-code"
+          - "--quantization"
+          - "awq"
 
       nodeSelectorTerms:
         - matchExpressions:
