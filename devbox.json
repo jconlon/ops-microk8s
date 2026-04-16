@@ -23,6 +23,7 @@
       "freshrss-publish-links": ["./ops freshrss publish-links"],
       "freshrss-update-news": ["./ops freshrss update-news"],
       "freshrss-update-technical": ["./ops freshrss update-technical"],
+      "freshrss-update-feed": ["./ops freshrss update-feed"],
       "node-uptime": ["./ops cluster node-uptime"],
       "node-status": ["./ops cluster node-status"],
       "test": [

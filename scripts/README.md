@@ -99,6 +99,7 @@ PGPASSWORD="$password" psql -h localhost -p 5434 -U freshrss -d freshrss -f scri
 | `ops freshrss publish-links` | Query entries tagged `publish` and print a markdown link list |
 | `ops freshrss update-news` | Query entries tagged `publish` and overwrite the `### Latest` section in `news/docs/index.md` |
 | `ops freshrss update-technical` | Query entries tagged `technical` and overwrite the `### Technical` section in `news/docs/index.md` |
+| `ops freshrss update-feed` | Generate RSS 2.0 feed from `publish`-tagged entries and write to `news/docs/feed.xml` |
 
 #### freshrss psql
 
@@ -144,6 +145,18 @@ ops freshrss update-technical
 ```
 
 **Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster. `/home/jconlon/git/news/docs/index.md` must exist and contain a `### Technical` heading.
+
+#### freshrss update-feed
+
+Generates an RSS 2.0 feed from FreshRSS entries tagged `publish` and writes it to `/home/jconlon/git/news/docs/feed.xml`. The feed is deployed automatically as part of `just publish-news` and `just publish-news-tech` in the news repo, and will be served at `https://verticon.com/news/feed.xml`.
+
+The feed includes the 50 most recent published entries with title, link, publication date, source feed name, and a description snippet. Each HTML page on the news site includes a `<link rel="alternate">` autodiscovery tag pointing to the feed.
+
+```bash
+ops freshrss update-feed
+```
+
+**Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster. `/home/jconlon/git/news/docs/` must exist.
 
 ---
 
