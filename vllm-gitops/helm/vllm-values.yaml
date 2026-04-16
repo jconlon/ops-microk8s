@@ -13,6 +13,7 @@ servingEngineSpec:
       requestGPU: 1
 
       pvcStorage: "50Gi"
+      storageClass: "rook-ceph-block"
 
       vllmConfig:
         enableChunkedPrefill: false
