@@ -51,6 +51,7 @@ whale    Ready    <none>   22d   v1.32.3
 - **Rook/Ceph**: Distributed storage system with 3-way replication
 - **Monitoring**: Prometheus stack with Grafana dashboards
 - **PostgreSQL**: CloudNativePG operator managing PostgreSQL clusters
+- **vLLM**: Self-hosted LLM inference on whale's RTX 2000 Ada GPU — OpenAI-compatible API at `192.168.0.218`
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
     sudo vi /etc/caddy/Caddyfile
@@ -205,6 +206,87 @@ devbox run -- kafkactl consume <topic-name> --from-beginning
 ```
 
 Or enter `devbox shell` once and drop the `devbox run --` prefix.
+
+---
+
+## vLLM — Self-Hosted LLM Inference
+
+vLLM deployed via the [production-stack](https://github.com/vllm-project/production-stack) Helm chart, managed by ArgoCD. Runs `Qwen/Qwen2.5-7B-Instruct-AWQ` (INT4 quantized, ~4 GiB VRAM) on whale's RTX 2000 Ada GPU (16 GB VRAM).
+
+### Model
+
+| Field         | Value                             |
+| ------------- | --------------------------------- |
+| Model         | `Qwen/Qwen2.5-7B-Instruct-AWQ`    |
+| Quantization  | AWQ INT4                          |
+| Max context   | 8192 tokens                       |
+| GPU           | RTX 2000 Ada (16 GB) on `whale`   |
+| VRAM usage    | ~4 GiB model + ~9 GiB KV cache    |
+
+### Addresses
+
+| Access          | Address                                                  | Use                              |
+| --------------- | -------------------------------------------------------- | -------------------------------- |
+| External (MetalLB) | `http://192.168.0.218/v1`                             | API calls from workstation       |
+| Internal (cluster) | `http://vllm-router-service.vllm.svc.cluster.local/v1` | in-cluster clients             |
+
+### API Access
+
+The API is OpenAI-compatible. Use `192.168.0.218` as the base URL — no API key required on the local network.
+
+```bash
+# List available models
+curl http://192.168.0.218/v1/models | jq .
+
+# Health check
+curl http://192.168.0.218/health
+
+# Chat completion
+curl http://192.168.0.218/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}],
+    "max_tokens": 100,
+    "temperature": 0.7
+  }' | jq .choices[0].message.content
+```
+
+**Python (OpenAI SDK):**
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://192.168.0.218/v1",
+    api_key="none",  # no auth required
+)
+
+response = client.chat.completions.create(
+    model="Qwen/Qwen2.5-7B-Instruct-AWQ",
+    messages=[{"role": "user", "content": "What is the capital of France?"}],
+    max_tokens=100,
+    temperature=0.7,
+)
+print(response.choices[0].message.content)
+```
+
+### Status commands
+
+```bash
+# Show vLLM pod placement and status
+just vllm-status
+
+# Run vLLM chainsaw tests (ArgoCD health, pod, /health, /v1/models, chat)
+just test-vllm
+```
+
+### ArgoCD app
+
+- **App**: `vllm` in ArgoCD
+- **Chart**: `vllm-stack` from `https://vllm-project.github.io/production-stack`
+- **Values**: `vllm-gitops/helm/vllm-values.yaml`
+- **Namespace**: `vllm`
 
 ---
 
@@ -382,6 +464,7 @@ Caddy handles TLS automatically via Let's Encrypt. No restart required — `relo
 | PostgreSQL (primary)  | —                                 | 192.168.0.210 |
 | PostgreSQL (readonly) | —                                 | 192.168.0.211 |
 | pgAdmin               | https://pgadmin.verticon.com      | 192.168.0.212 |
+| vLLM (OpenAI API)     | —                                 | 192.168.0.218 |
 
 ---
 
