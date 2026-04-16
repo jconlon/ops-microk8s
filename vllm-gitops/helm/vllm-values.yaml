@@ -24,7 +24,6 @@ servingEngineSpec:
           - "--gpu-memory-utilization"
           - "0.85"
           - "--trust-remote-code"
-          - "--disable-log-requests"
 
       nodeSelectorTerms:
         - matchExpressions:
