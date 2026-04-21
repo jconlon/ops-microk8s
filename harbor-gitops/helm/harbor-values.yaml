@@ -46,6 +46,9 @@ persistence:
     redis:
       storageClass: rook-ceph-block
       size: 1Gi
+    trivy:
+      storageClass: rook-ceph-block
+      size: 5Gi
   imageChartStorage:
     # Ceph RGW does not support redirect — required for S3-compatible backends
     disableredirect: true
@@ -62,9 +65,6 @@ persistence:
 # Trivy vulnerability scanner
 trivy:
   enabled: true
-  persistence:
-    storageClass: rook-ceph-block
-    size: 5Gi
 
 # Jobservice uses in-memory log to avoid PVC
 jobservice:
