@@ -52,6 +52,7 @@ whale    Ready    <none>   22d   v1.32.3
 - **Monitoring**: Prometheus stack with Grafana dashboards
 - **PostgreSQL**: CloudNativePG operator managing PostgreSQL clusters
 - **vLLM**: Self-hosted LLM inference on whale's RTX 2000 Ada GPU — OpenAI-compatible API at `192.168.0.218`
+- **Harbor**: CNCF graduated container registry at `https://registry.verticon.com` (192.168.0.219) — Ceph S3-backed image storage, Trivy vulnerability scanning, RBAC
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
     sudo vi /etc/caddy/Caddyfile
@@ -206,6 +207,100 @@ devbox run -- kafkactl consume <topic-name> --from-beginning
 ```
 
 Or enter `devbox shell` once and drop the `devbox run --` prefix.
+
+---
+
+## Harbor — Container Registry
+
+[Harbor](https://goharbor.io) is the CNCF graduated container registry deployed in the cluster. It extends Docker Distribution with RBAC, vulnerability scanning (Trivy), image signing, audit logging, and a web UI. Image data is stored in Ceph RGW (S3-compatible), metadata in CloudNativePG.
+
+### Addresses
+
+| Access | Address | Use |
+|---|---|---|
+| Web UI | https://registry.verticon.com | Browser — projects, users, scanning |
+| Docker CLI | `registry.verticon.com` | `docker login / push / pull` |
+| Internal (cluster) | `192.168.0.219:80` | In-cluster image pulls |
+
+### Web UI
+
+Open https://registry.verticon.com in a browser. Default admin credentials are set via the `harbor-credentials` K8s secret (created at deploy time via teller from Google Secret Manager).
+
+```bash
+# Retrieve admin password
+kubectl get secret harbor-credentials -n harbor -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d
+```
+
+Key UI features:
+- **Projects** — create projects to namespace image repositories (default `library` project is public)
+- **Repositories** — browse pushed images and tags
+- **Vulnerabilities** — Trivy scan results per image
+- **Users / Robot accounts** — create robot accounts for CI/CD pipeline access
+- **Replication** — mirror to/from external registries
+
+### Pushing and Pulling Images
+
+```bash
+# Login
+docker login registry.verticon.com
+
+# Tag and push
+docker tag myapp:latest registry.verticon.com/library/myapp:latest
+docker push registry.verticon.com/library/myapp:latest
+
+# Pull
+docker pull registry.verticon.com/library/myapp:latest
+```
+
+For CI/CD pipelines, create a robot account in the Harbor UI (Administration → Robot Accounts) with push/pull permissions on the target project, then use the robot credentials:
+
+```bash
+docker login registry.verticon.com -u 'robot$ci-user' -p <robot-token>
+```
+
+### Status commands
+
+```bash
+# Show Harbor pod status
+just harbor-status
+
+# Run Harbor chainsaw health tests
+just test-harbor
+```
+
+### ArgoCD app
+
+- **App-of-apps**: `harbor-apps` in ArgoCD
+- **Child apps**: `harbor-storage` (wave 1), `harbor-database` (wave 2), `harbor` (wave 3)
+- **Chart**: `harbor` `1.15.1` from `https://helm.goharbor.io`
+- **Values**: `harbor-gitops/helm/harbor-values.yaml`
+- **Namespace**: `harbor`
+
+### Storage
+
+| Component | Backend | Details |
+|---|---|---|
+| Image data | Ceph RGW S3 | Bucket `harbor-registry`, user `harbor-registry-user` |
+| Metadata DB | CloudNativePG | Database `harbor`, role `harbor` on `production-postgresql` |
+| Redis cache | Rook/Ceph block | PVC `data-harbor-redis-0`, 1Gi |
+| Trivy DB | Rook/Ceph block | PVC `data-harbor-trivy-0`, 5Gi |
+
+### Secrets bootstrap (one-time, on fresh deploy)
+
+See `scripts/README.md` — Harbor secrets section. Requires `harbor-role`, `harbor-admin`, and `harbor-secret-key` (exactly 16 chars) in Google Secret Manager before running teller.
+
+The Ceph S3 credentials (`harbor-s3-credentials`) must be copied manually from the Rook-generated secret after the `CephObjectStoreUser` reconciles:
+
+```bash
+CEPH_SECRET="rook-ceph-object-user-rook-ceph-rgw-harbor-registry-user"
+ACCESS_KEY=$(kubectl get secret $CEPH_SECRET -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d)
+SECRET_KEY=$(kubectl get secret $CEPH_SECRET -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d)
+kubectl create secret generic harbor-s3-credentials \
+  --namespace harbor \
+  --from-literal=REGISTRY_STORAGE_S3_ACCESSKEY="$ACCESS_KEY" \
+  --from-literal=REGISTRY_STORAGE_S3_SECRETKEY="$SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
 
 ---
 
@@ -464,6 +559,7 @@ Caddy handles TLS automatically via Let's Encrypt. No restart required — `relo
 | PostgreSQL (primary)  | —                                 | 192.168.0.210 |
 | PostgreSQL (readonly) | —                                 | 192.168.0.211 |
 | pgAdmin               | https://pgadmin.verticon.com      | 192.168.0.212 |
+| Harbor (registry)     | https://registry.verticon.com     | 192.168.0.219 |
 | vLLM (OpenAI API)     | —                                 | 192.168.0.218 |
 
 ---
