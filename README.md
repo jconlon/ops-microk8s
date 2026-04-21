@@ -463,56 +463,118 @@ See [`scripts/restic/systemd/README-restic.md`](scripts/restic/systemd/README-re
 
 ```
 ops-microk8s/
-├── README.md                     # This documentation
-├── CLAUDE.md                     # Claude Code instructions and guidance
-├── devbox.json                   # Development environment (argocd, k9s)
-├── scripts/
-│   ├── argocd.nu                 # ArgoCD management commands (nushell)
-│   ├── freshrss.nu               # FreshRSS psql access (nushell)
-│   ├── sync-music-to-ceph.sh     # Sync ~/Music to Ceph RGW (systemd timer)
-│   ├── sync-pictures-to-ceph.sh  # Sync ~/Pictures to Ceph RGW (systemd timer)
-│   ├── systemd/                  # Music/pictures sync systemd units
-│   └── restic/                   # Restic backup scripts and systemd units
-│       ├── restic-prune.sh       # Retention policy enforcement
-│       ├── restic-verify.sh      # Repository integrity verification
-│       └── systemd/              # Backup/prune/verify service+timer units
-├── teller/                       # Teller configs for K8s secret management
-│   ├── .teller-freshrss.yml      # FreshRSS K8s secrets
-│   └── .teller-postgresql.yml    # PostgreSQL Ceph S3 credentials
-├── argoCD-apps/                  # ArgoCD application definitions
+├── README.md                        # This documentation
+├── CLAUDE.md                        # Claude Code instructions and guidance
+├── justfile                         # Task runner (just test, just harbor-status, etc.)
+├── devbox.json                      # Dev environment (argocd, k9s, kafkactl, kcat, chainsaw)
+├── ops                              # Nushell script wrapper (ops argocd / freshrss / kafka / cluster)
+│
+├── scripts/                         # See scripts/README.md for full details
+│   ├── README.md                    # Scripts index and usage guide
+│   ├── argocd.nu                    # ArgoCD management commands
+│   ├── cluster.nu                   # Cluster health/uptime via Prometheus
+│   ├── freshrss.nu                  # FreshRSS DB access and feed generation
+│   ├── kafka.nu                     # Kafka Schema Registry commands
+│   ├── sync-music-to-ceph.sh        # Sync ~/Music to Ceph RGW
+│   ├── sync-pictures-to-ceph.sh     # Sync ~/Pictures to Ceph RGW
+│   ├── systemd/                     # Systemd units for sync jobs
+│   └── restic/                      # Restic backup scripts and systemd units
+│
+├── teller/                          # Teller configs — pull secrets from GSM → K8s
+│   ├── .teller-freshrss.yml
+│   ├── .teller-harbor.yml
+│   ├── .teller-hasura.yml
+│   ├── .teller-pgadmin.yml
+│   ├── .teller-postgresql.yml
+│   ├── .teller-vllm.yml
+│   └── .teller-wallabag.yml
+│
+├── tests/                           # Chainsaw e2e tests (run via: just test)
+│   ├── argocd/
+│   ├── cluster/
+│   ├── gpu/
+│   ├── harbor/
+│   ├── postgresql/
+│   ├── storage/
+│   └── vllm/
+│
+├── argoCD-apps/                     # ArgoCD application definitions
 │   ├── argocd-self-managed.yaml
-│   ├── monitoring-apps.yaml     # App of Apps for monitoring stack
-│   ├── monitoring/              # Child applications for monitoring
-│   │   ├── prometheus-app.yaml
-│   │   ├── grafana-app.yaml
-│   │   └── alertmanager-app.yaml
-│   ├── rook-ceph-apps/          # App of Apps for Rook/Ceph
-│   │   ├── rook-ceph-root.yaml
-│   │   ├── rook-operator-app.yaml
-│   │   ├── ceph-cluster-app.yaml
-│   │   ├── ceph-storageclasses-app.yaml
-│   │   └── ceph-monitoring-app.yaml
-│   └── postgresql/              # PostgreSQL ArgoCD apps
-│       ├── postgresql-operator.yaml
-│       ├── postgresql-cluster.yaml
-│       ├── postgresql-monitoring.yaml
-│       ├── postgresql-networking.yaml
-│       └── postgresql-backup.yaml
-├── monitoring/                   # Split monitoring stack configurations
+│   ├── cosmo-apps.yaml
+│   ├── freshrss-apps.yaml
+│   ├── gpu-operator-app.yaml
+│   ├── harbor-apps.yaml
+│   ├── hasura-apps.yaml
+│   ├── kafka-apps.yaml
+│   ├── kured-app.yaml
+│   ├── monitoring-apps.yaml
+│   ├── postgresql-apps.yaml
+│   ├── rssbridge-app.yaml
+│   ├── vllm-app.yaml
+│   ├── wallabag-apps.yaml
+│   ├── cosmo/
+│   ├── freshrss/
+│   ├── harbor/                      # harbor-storage, harbor-db, harbor (sync-waves 1-3)
+│   ├── hasura/
+│   ├── kafka/
+│   ├── monitoring/
+│   ├── postgresql/
+│   ├── rook-ceph-apps/
+│   └── wallabag/
+│
+├── harbor-gitops/                   # Harbor container registry
+│   ├── helm/harbor-values.yaml      # Helm values (Ceph S3, external PG, MetalLB)
+│   ├── database/harbor-database.yaml
+│   └── storage/harbor-registry-user.yaml  # CephObjectStoreUser
+│
+├── kafka-gitops/                    # Strimzi Kafka
+│   ├── helm/                        # Strimzi operator Helm values
+│   ├── cluster/                     # KafkaNodePool + Kafka cluster manifests
+│   └── schema-registry/             # Schema Registry Helm values
+│
+├── cosmo-gitops/                    # Cosmo GraphQL router
+│   ├── app/
+│   └── config/
+│
+├── hasura-gitops/                   # Hasura GraphQL engine
+│   ├── app/
+│   └── database/
+│
+├── freshrss/                        # FreshRSS RSS reader
+│   ├── helm/
+│   └── database/
+│
+├── vllm-gitops/                     # vLLM inference server
+│   └── helm/vllm-values.yaml
+│
+├── gpu-operator-gitops/             # NVIDIA GPU operator
+│
+├── kured-gitops/                    # Kured automated node reboots
+│   ├── helm/
+│   └── node-setup/
+│
+├── rssbridge-gitops/                # RSS-Bridge
+│
+├── wallabag-gitops/                 # Wallabag read-later
+│
+├── monitoring/                      # Prometheus/Grafana/AlertManager Helm values
 │   └── helm/
-│       ├── prometheus-only-values.yaml    # Prometheus + operator + exporters
-│       ├── grafana-only-values.yaml       # Grafana standalone config
-│       └── alertmanager-only-values.yaml  # AlertManager standalone config
-├── rook-ceph/                   # Rook/Ceph storage configurations
-│   ├── cluster/                 # Ceph cluster and toolbox
-│   ├── helm/                    # Rook operator Helm values
-│   ├── monitoring/              # Ceph monitoring (Grafana, Prometheus, ServiceMonitor)
-│   └── storageclasses/          # Storage class and block pool definitions
-└── postgresql-gitops/           # PostgreSQL configurations
-    ├── cluster/                 # PostgreSQL cluster definitions
-    ├── backup/                  # ScheduledBackup to Ceph S3 (barman)
-    ├── monitoring/              # PostgreSQL monitoring
-    └── networking/              # PostgreSQL services
+│       ├── prometheus-only-values.yaml
+│       ├── grafana-only-values.yaml
+│       └── alertmanager-only-values.yaml
+│
+├── rook-ceph/                       # Rook/Ceph storage
+│   ├── cluster/                     # CephCluster + toolbox
+│   ├── helm/                        # Rook operator Helm values
+│   ├── monitoring/
+│   ├── object-storage/              # CephObjectStore + CephObjectStoreUsers
+│   └── storageclasses/
+│
+└── postgresql-gitops/               # CloudNativePG
+    ├── cluster/                     # Cluster definition + managed roles
+    ├── backup/                      # ScheduledBackup to Ceph S3
+    ├── monitoring/
+    └── networking/                  # LoadBalancer services (primary + readonly)
 ```
 
 ## Adding a New DNS Name for a Service
