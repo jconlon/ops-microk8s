@@ -35,6 +35,17 @@ redis:
 persistence:
   enabled: true
   resourcePolicy: keep
+  persistentVolumeClaim:
+    registry:
+      storageClass: rook-ceph-block
+      size: 5Gi
+    jobservice:
+      jobLog:
+        storageClass: rook-ceph-block
+        size: 1Gi
+    redis:
+      storageClass: rook-ceph-block
+      size: 1Gi
   imageChartStorage:
     # Ceph RGW does not support redirect — required for S3-compatible backends
     disableredirect: true
