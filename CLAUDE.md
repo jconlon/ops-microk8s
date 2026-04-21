@@ -55,6 +55,10 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
 - **Rook/Ceph**: Distributed storage system with 3-way replication
 - **Monitoring**: Prometheus stack with Grafana dashboards
 - **PostgreSQL**: CloudNativePG operator managing PostgreSQL clusters
+- **Kafka**: Strimzi operator, 3-broker KRaft cluster (no ZooKeeper), `kafka-system` namespace
+  - External (MetalLB): `192.168.0.213:9094` — use IP, not DNS (broker reconnect requires it)
+  - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
+  - Schema Registry: running in `kafka-system`, backed by PostgreSQL
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
 
@@ -98,6 +102,30 @@ kubectl get storageclass rook-ceph-block
 
 # Monitor Ceph OSDs
 kubectl get pods -n rook-ceph -l app=rook-ceph-osd
+```
+
+### Kafka
+
+```bash
+# List topics
+kafkactl get topics
+
+# Describe a topic
+kafkactl describe topic <topic-name>
+
+# Create a topic (3 partitions, 3-way replication)
+kafkactl create topic <topic-name> --partitions 3 --replication-factor 3
+
+# Produce / consume
+kafkactl produce <topic-name> --value "hello"
+kafkactl consume <topic-name> --from-beginning
+
+# Schema Registry — external: https://192.168.0.214:8081
+curl -s http://192.168.0.214:8081/subjects | jq
+curl -s http://192.168.0.214:8081/subjects/<subject>/versions/latest | jq
+
+# Check Schema Registry pod
+kubectl get pods -n kafka-system -l app=schema-registry
 ```
 
 ### Monitoring Stack

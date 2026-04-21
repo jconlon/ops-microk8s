@@ -8,6 +8,7 @@
     "barman@latest",
     "teller@1.5.6",
     "kafkactl@latest",
+    "kcat@latest",
     "kyverno-chainsaw@0.1.9",
     "just@latest"
   ],
