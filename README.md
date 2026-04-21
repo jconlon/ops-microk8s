@@ -285,6 +285,13 @@ just test-harbor
 | Redis cache | Rook/Ceph block | PVC `data-harbor-redis-0`, 1Gi |
 | Trivy DB | Rook/Ceph block | PVC `data-harbor-trivy-0`, 5Gi |
 
+### Documentation
+
+- **Official docs**: https://goharbor.io/docs/2.11.0/
+- [Working with Projects](https://goharbor.io/docs/2.11.0/working-with-projects/) — create projects, push/pull, robot accounts
+- [Administration](https://goharbor.io/docs/2.11.0/administration/) — users, LDAP, webhooks, replication
+- [Vulnerability Scanning](https://goharbor.io/docs/2.11.0/administration/vulnerability-scanning/) — Trivy config
+
 ### Secrets bootstrap (one-time, on fresh deploy)
 
 See `scripts/README.md` — Harbor secrets section. Requires `harbor-role`, `harbor-admin`, and `harbor-secret-key` (exactly 16 chars) in Google Secret Manager before running teller.
