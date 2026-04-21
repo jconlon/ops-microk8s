@@ -246,6 +246,43 @@ teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl create sec
   --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
+### Example: Create Harbor secrets
+
+> **Prerequisites:** Add `harbor-role`, `harbor-admin`, and `harbor-secret-key` (16 chars) to Google Secret Manager before running.
+
+```bash
+# Role password (postgresql-system namespace — used by CloudNativePG managed role)
+teller run --config teller/.teller-harbor.yml -- bash -c 'kubectl create secret generic harbor-role-password \
+  --namespace postgresql-system \
+  --from-literal=username=harbor \
+  --from-literal=password="$HARBOR_ROLE_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+
+# DB credentials (harbor namespace — Harbor connects to CloudNativePG)
+teller run --config teller/.teller-harbor.yml -- bash -c 'kubectl create secret generic harbor-db-credentials \
+  --namespace harbor \
+  --from-literal=password="$HARBOR_ROLE_PASSWORD" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+
+# Harbor credentials (harbor namespace — admin password + encryption key)
+teller run --config teller/.teller-harbor.yml -- bash -c 'kubectl create secret generic harbor-credentials \
+  --namespace harbor \
+  --from-literal=HARBOR_ADMIN_PASSWORD="$HARBOR_ADMIN_PASSWORD" \
+  --from-literal=secretKey="$HARBOR_SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -'
+
+# S3 credentials (harbor namespace — copy from Ceph user secret created by Rook)
+ACCESS_KEY=$(kubectl get secret harbor-registry-user -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d)
+SECRET_KEY=$(kubectl get secret harbor-registry-user -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d)
+kubectl create secret generic harbor-s3-credentials \
+  --namespace harbor \
+  --from-literal=REGISTRY_STORAGE_S3_ACCESSKEY="$ACCESS_KEY" \
+  --from-literal=REGISTRY_STORAGE_S3_SECRETKEY="$SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+---
+
 ### Example: Create Hasura secrets
 
 > **Prerequisites:** Add `hasura-role` and `hasura-admin-secret` to Google Secret Manager before running.

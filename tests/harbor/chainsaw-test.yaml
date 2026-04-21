@@ -1,0 +1,64 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: harbor-healthy
+spec:
+  description: Harbor container registry is healthy and accessible
+  concurrent: false
+  timeouts:
+    assert: 5m
+  steps:
+    - name: harbor-core-running
+      description: Harbor core pod is running
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: harbor-core
+                namespace: harbor
+              status:
+                (readyReplicas): 1
+
+    - name: harbor-registry-running
+      description: Harbor registry pod is running
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: harbor-registry
+                namespace: harbor
+              status:
+                (readyReplicas): 1
+
+    - name: harbor-portal-running
+      description: Harbor portal (UI) pod is running
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: harbor-portal
+                namespace: harbor
+              status:
+                (readyReplicas): 1
+
+    - name: harbor-service-has-ip
+      description: Harbor LoadBalancer service has MetalLB IP assigned
+      try:
+        - script:
+            content: |
+              IP=$(kubectl get svc harbor -n harbor -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+              [ "$IP" = "192.168.0.219" ] || { echo "Expected 192.168.0.219, got: $IP"; exit 1; }
+
+    - name: harbor-api-healthy
+      description: Harbor API health endpoint responds
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              curl -sk https://192.168.0.219/api/v2.0/ping | grep -q "Pong" || { echo "Health check failed"; exit 1; }

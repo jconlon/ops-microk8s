@@ -1,0 +1,18 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: harbor-registry-user
+  namespace: rook-ceph
+  labels:
+    app: harbor
+spec:
+  store: rook-ceph-rgw
+  displayName: "Harbor Container Registry"
+  quotas:
+    maxBuckets: 5
+    maxSize: "2Ti"
+    maxObjects: 1000000
+
+# Credentials auto-created in rook-ceph namespace:
+# kubectl get secret harbor-registry-user -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d
+# kubectl get secret harbor-registry-user -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d

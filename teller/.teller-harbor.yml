@@ -1,0 +1,11 @@
+project: dot
+
+providers:
+  google_secretmanager:
+    env:
+      HARBOR_ROLE_PASSWORD:
+        path: projects/1000827005146/secrets/harbor-role/versions/latest
+      HARBOR_ADMIN_PASSWORD:
+        path: projects/1000827005146/secrets/harbor-admin/versions/latest
+      HARBOR_SECRET_KEY:
+        path: projects/1000827005146/secrets/harbor-secret-key/versions/latest

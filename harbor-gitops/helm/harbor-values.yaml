@@ -1,0 +1,78 @@
+expose:
+  type: loadBalancer
+  loadBalancer:
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.219"
+    ports:
+      httpPort: 80
+      httpsPort: 443
+  tls:
+    enabled: true
+    certSource: auto
+    auto:
+      commonName: "registry.verticon.com"
+
+externalURL: https://registry.verticon.com
+
+# Admin password and secret key sourced from harbor-credentials secret (created via teller)
+existingSecretAdminPassword: harbor-credentials
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-credentials
+
+database:
+  type: external
+  external:
+    host: production-postgresql-rw.postgresql-system.svc.cluster.local
+    port: "5432"
+    username: harbor
+    coreDatabase: harbor
+    existingSecret: harbor-db-credentials
+    existingSecretKey: password
+
+redis:
+  type: internal
+
+persistence:
+  enabled: true
+  resourcePolicy: keep
+  imageChartStorage:
+    # Ceph RGW does not support redirect — required for S3-compatible backends
+    disableredirect: true
+    type: s3
+    s3:
+      region: us-east-1
+      bucket: harbor-registry
+      regionendpoint: http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80
+      existingSecret: harbor-s3-credentials
+      secure: false
+      v4auth: true
+      skipverify: false
+
+# Trivy vulnerability scanner
+trivy:
+  enabled: true
+  persistence:
+    storageClass: rook-ceph-block
+    size: 5Gi
+
+# Jobservice uses in-memory log to avoid PVC
+jobservice:
+  jobLoggers:
+    - database
+
+# Single replica — scale up after validating storage
+portal:
+  replicas: 1
+core:
+  replicas: 1
+jobservice:
+  replicas: 1
+registry:
+  replicas: 1
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus-stack

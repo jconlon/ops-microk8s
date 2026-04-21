@@ -81,6 +81,11 @@ spec:
         login: true
         passwordSecret:
           name: hasura-role-password
+      - name: harbor
+        ensure: present
+        login: true
+        passwordSecret:
+          name: harbor-role-password
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:

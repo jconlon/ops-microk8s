@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: harbor
+  namespace: postgresql-system
+spec:
+  name: harbor
+  owner: harbor
+  cluster:
+    name: production-postgresql
+  databaseReclaimPolicy: retain

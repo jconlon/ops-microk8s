@@ -67,6 +67,16 @@ gpu-status:
 gpu-pods:
     kubectl get pods -n gpu-operator
 
+# ── Harbor ────────────────────────────────────────────────────────────────────
+
+# Show Harbor pod status
+harbor-status:
+    kubectl get pods -n harbor -o wide
+
+# Run Harbor chainsaw tests
+test-harbor:
+    chainsaw test tests/harbor
+
 # ── vLLM ──────────────────────────────────────────────────────────────────────
 
 # Show vLLM pod status and node placement
