@@ -139,12 +139,19 @@ kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath=
 
 ### Development Environment
 
-> **Note**: Claude Code sessions always run inside the devbox shell. All devbox tools (`argocd`, `k9s`, `nu`, `psql`, etc.) are available directly without `devbox run --` prefixes.
+> **Note**: Claude Code sessions always run inside the devbox shell. All devbox tools (`argocd`, `k9s`, `nu`, `psql`, `python`, `uv`, etc.) are available directly without `devbox run --` prefixes.
 
 ```bash
 # Monitor cluster with k9s
 k9s
+
+# Python environment (uv-managed venv, auto-activated by devbox init_hook)
+uv venv          # create .venv on first use
+uv pip install   # install packages into .venv
+python           # Python from devbox, venv active
 ```
+
+> **Python venv**: `VENV_DIR` is set to `.venv` in the repo root. The devbox `init_hook` activates it automatically if it exists. The `.venv/` directory is gitignored.
 
 ## Important Configuration Details
 
@@ -179,7 +186,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 ops-microk8s/
 ├── README.md                     # Detailed setup documentation
 ├── CLAUDE.md                     # Claude Code instructions and guidance
-├── devbox.json                   # Development environment (argocd, k9s)
+├── devbox.json                   # Development environment (argocd, k9s, python, uv)
 ├── scripts/                      # See scripts/README.md for full details
 │   ├── README.md                 # Scripts index and usage guide
 │   ├── argocd.nu                 # ArgoCD management commands (nushell)

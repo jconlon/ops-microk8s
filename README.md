@@ -110,13 +110,18 @@ kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 
 ```bash
 # Use devbox for development tools
-devbox shell  # Provides argocd and k9s
+devbox shell  # Provides argocd, k9s, python, uv, and all cluster tools
 
 # Login to ArgoCD server
 devbox run -- argocd-login
 
 # Monitor cluster with k9s
 k9s
+
+# Python environment (uv-managed, venv auto-activated)
+uv venv          # create .venv on first use (gitignored)
+uv pip install <package>
+python script.py
 ```
 
 ## Rook/Ceph Storage
@@ -466,7 +471,7 @@ ops-microk8s/
 ├── README.md                        # This documentation
 ├── CLAUDE.md                        # Claude Code instructions and guidance
 ├── justfile                         # Task runner (just test, just harbor-status, etc.)
-├── devbox.json                      # Dev environment (argocd, k9s, kafkactl, kcat, chainsaw)
+├── devbox.json                      # Dev environment (argocd, k9s, kafkactl, kcat, chainsaw, python, uv)
 ├── ops                              # Nushell script wrapper (ops argocd / freshrss / kafka / cluster)
 │
 ├── scripts/                         # See scripts/README.md for full details
@@ -689,4 +694,10 @@ devbox shell
 # - argocd: ArgoCD CLI
 # - k9s: Kubernetes cluster management
 # - kubectl: Kubernetes CLI
+# - python / uv: Python runtime + package manager (venv auto-activated)
+# - nu: Nushell for ops scripts
+# - psql / barman: PostgreSQL CLI tools
+# - teller: Secret injection from Google Secret Manager
+# - kafkactl / kcat: Kafka CLI tools
+# - chainsaw: Kyverno e2e test runner
 ```

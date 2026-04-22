@@ -1,3 +1,6 @@
 devbox.lock
 .devboxpostgresql-gitops/backup/aws-credentials-secret.yaml
 freshrss/exportedFeeds/
+.venv/
+__pycache__/
+*.pyc
