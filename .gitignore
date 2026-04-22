@@ -4,3 +4,4 @@ freshrss/exportedFeeds/
 .venv/
 __pycache__/
 *.pyc
+.worktrees/
