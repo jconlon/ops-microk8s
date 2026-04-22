@@ -145,6 +145,12 @@ git commit -m "feat: add CephObjectStoreUser for Loki log storage"
 
 Loki 3.x (chart `6.28.0`) uses a single `loki` key at the top of `values.yaml`. The monolithic deployment type is set via `deploymentMode: SingleBinary`. S3 storage is configured under `loki.storage`.
 
+**Critical structure notes for Loki 6.x chart:**
+- `loki.storage.bucketNames` is at the `storage` level — NOT nested under `s3`. It is a map with keys `chunks`, `ruler`, `admin`.
+- `loki.storage.s3` contains only connection config: `endpoint`, `region`, `s3ForcePathStyle`, `insecure`.
+- S3 credentials are injected via `singleBinary.extraEnvFrom` referencing the `loki-s3-credentials` secret (keys: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Loki's S3 client reads these env vars automatically. Do NOT put credentials in the values file.
+- The `monitoring:` key appears once; both `selfMonitoring` and `serviceMonitor` are nested under it.
+
 Create `loki-gitops/helm/loki-values.yaml`:
 
 ```yaml
@@ -152,6 +158,8 @@ Create `loki-gitops/helm/loki-values.yaml`:
 # Ceph RGW S3 backend for log chunks and TSDB index
 # MetalLB LoadBalancer at 192.168.0.220
 # Accessible at http://192.168.0.220 (Caddy terminates TLS externally as loki.verticon.com)
+# S3 credentials injected via loki-s3-credentials secret (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+# Create secret before applying: see scripts/README.md "Loki S3 credentials bootstrap"
 
 deploymentMode: SingleBinary
 
@@ -163,16 +171,16 @@ loki:
 
   storage:
     type: s3
+    # bucketNames is at storage level, NOT inside s3 block
+    bucketNames:
+      chunks: loki-logs
+      ruler: loki-logs
+      admin: loki-logs
     s3:
       endpoint: http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80
       region: us-east-1
-      bucketnames: loki-logs
       s3ForcePathStyle: true
       insecure: true  # no TLS to internal Ceph RGW
-
-  # Storage config secret: loki-s3-credentials must exist in loki namespace
-  # Keys: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-  # Created manually by copying from Rook-generated secret in rook-ceph namespace
 
   schemaConfig:
     configs:
@@ -192,19 +200,17 @@ loki:
     retention_delete_delay: 2h
     working_directory: /var/loki/compactor
 
-  rulerConfig:
-    storage:
-      type: local
-      local:
-        directory: /rules
-    rule_path: /rules-temp
-
 singleBinary:
   replicas: 1
   persistence:
     enabled: true
     storageClass: rook-ceph-block
     size: 10Gi
+  # Inject S3 credentials from Kubernetes secret (created via scripts/README.md bootstrap)
+  # Rook generates the secret in rook-ceph ns; copy to loki ns before ArgoCD wave 2 syncs
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-credentials
 
 # Expose Loki via MetalLB LoadBalancer — HTTP only (Caddy terminates TLS)
 gateway:
@@ -215,15 +221,12 @@ gateway:
     annotations:
       metallb.universe.tf/loadBalancerIPs: "192.168.0.220"
 
-# Disable bundled Grafana agent/Promtail — we deploy Promtail separately
+# monitoring: key appears ONCE — both selfMonitoring and serviceMonitor nested under it
 monitoring:
   selfMonitoring:
     enabled: false
     grafanaAgent:
       installOperator: false
-
-# ServiceMonitor for Prometheus scraping
-monitoring:
   serviceMonitor:
     enabled: true
     labels:
@@ -237,22 +240,6 @@ test:
 lokiCanary:
   enabled: false
 ```
-
-**Note on the `monitoring` key duplication:** The Loki Helm chart has a single `monitoring:` section that covers both `selfMonitoring` and `serviceMonitor`. The yaml above must be merged into a single `monitoring:` block:
-
-```yaml
-monitoring:
-  selfMonitoring:
-    enabled: false
-    grafanaAgent:
-      installOperator: false
-  serviceMonitor:
-    enabled: true
-    labels:
-      release: prometheus-stack
-```
-
-The actual file must use a single `monitoring:` key. The implementation agent must write the file with merged content.
 
 - [ ] **Step 2: Commit**
 
@@ -1080,7 +1067,7 @@ git commit -m "docs: add Loki documentation to README, CLAUDE.md, and scripts/RE
 
 ## Task 10: Apply to ArgoCD and run tests
 
-This task is the cutover — it requires the S3 credentials bootstrap step (documented above) and then ArgoCD sync. Because it involves live cluster state, the implementation agent should document the steps but recognize that some steps (like the S3 credentials copy) must be performed by the operator.
+This task is the cutover. The steps MUST be executed in the order below. The S3 credentials secret must exist in the `loki` namespace before ArgoCD deploys wave 2 (the Loki Helm chart). Apply the app-of-apps first only to get wave 1 (CephObjectStoreUser) to run, then create the secret, then allow wave 2 to proceed.
 
 - [ ] **Step 1: Apply the parent app-of-apps**
 
@@ -1088,7 +1075,7 @@ This task is the cutover — it requires the S3 credentials bootstrap step (docu
 kubectl apply -f argoCD-apps/loki-apps.yaml
 ```
 
-This registers `loki-apps` with ArgoCD. ArgoCD then discovers and deploys `loki-storage`, `loki`, and `promtail` in wave order.
+This registers `loki-apps` with ArgoCD. ArgoCD deploys wave 1 (`loki-storage`, the CephObjectStoreUser) immediately. Waves 2 and 3 will follow automatically — but Loki (wave 2) will CrashLoopBackOff without S3 credentials. Complete Steps 2–4 quickly to minimize restarts.
 
 - [ ] **Step 2: Wait for wave 1 — CephObjectStoreUser**
 
@@ -1108,6 +1095,8 @@ Note: Rook generates a secret with a non-obvious name like `rook-ceph-object-use
 
 - [ ] **Step 4: Create `loki` namespace and S3 credentials secret**
 
+The `loki-s3-credentials` secret is referenced in `loki-values.yaml` via `singleBinary.extraEnvFrom`. Loki's S3 client reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` env vars automatically. This secret must exist before Loki pods start.
+
 ```bash
 kubectl create namespace loki --dry-run=client -o yaml | kubectl apply -f -
 
@@ -1124,24 +1113,7 @@ kubectl create secret generic loki-s3-credentials \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-**Note:** Loki Helm chart in monolithic mode reads S3 credentials from environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` OR from the `loki.storage.s3.accessKeyId` / `secretAccessKey` values. We use environment variables via the existing secret to avoid credentials in the values file. The Loki chart has `loki.storage.s3.secretAccessKey` and `loki.storage.s3.accessKeyId` fields, but these go into the values file in plaintext. Instead, we reference the secret via `loki.existingSecretForConfig` — but this requires placing the full config in the secret. The cleanest approach for this cluster's pattern is to use `loki.storage.s3.accessKeyId` and `secretAccessKey` pointing to the `loki-s3-credentials` secret via `extraEnvFrom`:
-
-```yaml
-# In loki-values.yaml, the singleBinary extraEnvFrom section:
-singleBinary:
-  replicas: 1
-  persistence:
-    enabled: true
-    storageClass: rook-ceph-block
-    size: 10Gi
-  extraEnvFrom:
-    - secretRef:
-        name: loki-s3-credentials
-```
-
-This injects `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as environment variables into the Loki pod. Loki's S3 client (an AWS SDK wrapper) automatically reads these env vars. The `loki-values.yaml` must include this `extraEnvFrom` block.
-
-Update `loki-gitops/helm/loki-values.yaml` to add `singleBinary.extraEnvFrom` as shown above. Then recommit.
+If Loki pods are already CrashLoopBackOff at this point, they will self-heal once the secret exists and ArgoCD re-syncs.
 
 - [ ] **Step 5: Watch ArgoCD sync waves**
 
@@ -1207,9 +1179,11 @@ loki.verticon.com {
 
 The Loki chart has undergone significant breaking changes between 5.x and 6.x. Key points for `6.28.0`:
 - `deploymentMode: SingleBinary` replaces the old `singleBinary: {}` top-level toggle
-- `loki.storage.s3.endpoint` is used instead of `loki.storage.bucketNames` at top level
-- The gateway (nginx proxy in front of Loki read/write paths) is enabled by default and exposes port 80 — this is what we expose via MetalLB, not the internal `3100` port
-- The gateway service is named `loki-gateway` (not `loki`) — important for Promtail's `clients.url` and the chainsaw test
+- `loki.storage.bucketNames` is a **separate map at the `storage` level** (not nested under `s3`). It has three keys: `chunks`, `ruler`, `admin`. All three can point to the same bucket (`loki-logs`).
+- `loki.storage.s3` contains only connection config: `endpoint`, `region`, `s3ForcePathStyle`, `insecure`. Bucket names and credentials are NOT under `s3`.
+- S3 credentials come from environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) injected via `singleBinary.extraEnvFrom` — never from plaintext values.
+- The gateway (nginx proxy in front of Loki read/write paths) is enabled by default and exposes port 80 — this is what we expose via MetalLB, not the internal `3100` port.
+- The gateway service is named `loki-gateway` (not `loki`) — important for Promtail's `clients.url` and the chainsaw test.
 
 **Troubleshooting chart version:** If `6.28.0` is not available at sync time (ArtifactHub may have moved), use `6.27.0` or `"*"` (latest). The implementation agent should verify the chart version before committing by checking `https://grafana.github.io/helm-charts` or ArtifactHub.
 
