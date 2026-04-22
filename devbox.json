@@ -10,13 +10,16 @@
     "kafkactl@latest",
     "kcat@latest",
     "kyverno-chainsaw@0.1.9",
-    "just@latest"
+    "just@latest",
+    "python@latest",
+    "uv@latest"
   ],
   "shell": {
     "init_hook": [
       "chmod +x ops",
       "export PATH=$PATH:$PWD",
-      "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\""
+      "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\"",
+      "[ -d \"$VENV_DIR\" ] && . $VENV_DIR/bin/activate"
     ],
     "scripts": {
       "argocd-login": ["./ops argocd login"],
