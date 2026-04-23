@@ -77,6 +77,14 @@ grafana:
           jsonData:
             handleGrafanaManagedAlerts: false
             implementation: prometheus
+        - name: "Loki"
+          type: loki
+          uid: loki
+          url: http://loki-gateway.loki.svc:80
+          access: proxy
+          jsonData:
+            maxLines: 1000
+            timeout: 60
 
   # Sidecar configuration to automatically discover dashboard ConfigMaps
   sidecar:
