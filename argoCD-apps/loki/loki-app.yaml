@@ -15,7 +15,7 @@ spec:
         valueFiles:
           - $values/loki-gitops/helm/loki-values.yaml
     - repoURL: https://github.com/jconlon/ops-microk8s
-      targetRevision: HEAD
+      targetRevision: deploy-loki-promtail
       ref: values
   destination:
     server: https://kubernetes.default.svc

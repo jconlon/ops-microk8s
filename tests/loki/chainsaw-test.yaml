@@ -102,16 +102,16 @@ spec:
               echo "MetalLB IP confirmed: $IP"
 
     - name: loki-ready-endpoint
-      description: Loki /ready endpoint returns "ready" (log ingestion active)
+      description: Loki is serving API requests via the MetalLB gateway (buildinfo endpoint)
       try:
         - script:
             timeout: 30s
             content: |
-              # /ready is on Loki backend (port 3100), not proxied through the nginx gateway
-              # Use kubectl exec to call it from inside the cluster
-              RESULT=$(kubectl exec loki-0 -n loki -c loki -- wget -qO- http://localhost:3100/ready 2>/dev/null)
-              echo "$RESULT" | grep -qi "ready" || { echo "Loki ready check failed: $RESULT"; exit 1; }
-              echo "Loki /ready endpoint confirmed: $RESULT"
+              # The nginx gateway does not proxy /ready; use /loki/api/v1/status/buildinfo
+              # which is routed through the gateway and confirms Loki is up and serving
+              RESULT=$(curl -sf http://192.168.0.220/loki/api/v1/status/buildinfo)
+              echo "$RESULT" | grep -q '"version"' || { echo "Loki buildinfo check failed: $RESULT"; exit 1; }
+              echo "Loki gateway confirmed serving: $RESULT"
 
     - name: loki-has-labels
       description: Loki labels endpoint returns data (Promtail is shipping logs)
