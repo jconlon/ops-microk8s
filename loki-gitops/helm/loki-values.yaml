@@ -41,6 +41,7 @@ loki:
 
   compactor:
     retention_enabled: true
+    delete_request_store: s3  # required when retention_enabled: true (Loki 3.x)
     retention_delete_delay: 2h
     working_directory: /var/loki/compactor
 
