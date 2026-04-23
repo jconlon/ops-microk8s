@@ -62,6 +62,7 @@ whale    Ready    <none>   22d   v1.32.3
 - **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
+- **Loki**: http://loki.verticon.com (192.168.0.220:80) — log aggregation
 
 ## Setup Instructions
 
@@ -313,6 +314,60 @@ kubectl create secret generic harbor-s3-credentials \
   --from-literal=REGISTRY_STORAGE_S3_SECRETKEY="$SECRET_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+---
+
+## Loki Log Aggregation
+
+[Grafana Loki](https://grafana.com/oss/loki/) is a horizontally scalable, multi-tenant log aggregation system. It is deployed in monolithic single-binary mode in the `loki` namespace, with Ceph RGW S3 as the log chunk backend.
+
+- **Service URL**: http://loki.verticon.com (Caddy proxies from mullet)
+- **Direct IP**: http://192.168.0.220
+- **Grafana integration**: available in the Explore tab → Loki datasource
+- **Log sources**: all 8 cluster nodes (pod logs + OS syslog + systemd journal), external machines via Promtail systemd service
+
+### LogQL query examples
+
+```
+# All logs from the harbor namespace containing "error"
+{namespace="harbor"} |= "error"
+
+# Logs from the puffer node containing "Power key"
+{node="puffer"} |= "Power key"
+
+# Syslog from gold node containing NVMe events
+{job="syslog", node="gold"} |= "nvme"
+```
+
+### Caddyfile entry (mullet)
+
+Add to `/etc/caddy/Caddyfile` on mullet:
+
+```
+loki.verticon.com {
+    reverse_proxy 192.168.0.220:80
+    request_body {
+        max_size 0
+    }
+    tls {
+        resolvers 1.1.1.1 1.0.0.1
+    }
+}
+```
+
+`max_size 0` disables Caddy's body size limit for log ingestion (Promtail external agents send bulk pushes).
+
+### External Promtail install (mudshark/oyster/minnow)
+
+For non-cluster Ubuntu machines, use the install script to ship syslog and journal to Loki:
+
+```bash
+# Copy scripts/promtail-external/ to the machine, then:
+sudo bash scripts/promtail-external/install.sh <hostname>
+# e.g.:  sudo bash install.sh mudshark
+```
+
+See `scripts/promtail-external/install.sh` for full installation details.
 
 ---
 

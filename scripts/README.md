@@ -246,6 +246,45 @@ teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl create sec
   --dry-run=client -o yaml | kubectl apply -f -'
 ```
 
+### Loki S3 credentials bootstrap
+
+After ArgoCD wave 1 syncs the CephObjectStoreUser, get the Rook-generated secret name and copy credentials to the `loki` namespace. This must be done before wave 2 (Loki Helm chart) deploys:
+
+```bash
+# Get the Rook-generated secret name
+SECRET_NAME=$(kubectl get cephobjectstoreuser loki-logs-user -n rook-ceph \
+  -o jsonpath='{.status.info.secretName}')
+
+# Copy S3 credentials to loki namespace
+ACCESS_KEY=$(kubectl get secret $SECRET_NAME -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d)
+SECRET_KEY=$(kubectl get secret $SECRET_NAME -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d)
+kubectl create namespace loki --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic loki-s3-credentials \
+  --namespace loki \
+  --from-literal=AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+### External Promtail install (mudshark/oyster/minnow)
+
+For non-cluster Ubuntu machines, run Promtail as a systemd service to ship syslog and journal to Loki:
+
+```bash
+# On each external Ubuntu machine:
+# Copy scripts/promtail-external/ to the machine, then:
+sudo bash scripts/promtail-external/install.sh <hostname>
+# e.g.:  sudo bash install.sh mudshark
+```
+
+The install script:
+1. Creates a `promtail` system user
+2. Downloads the Promtail binary from GitHub releases
+3. Installs config to `/etc/promtail/promtail.yaml` (with hostname substituted)
+4. Installs and starts the `promtail.service` systemd unit
+
+Verify with: `systemctl status promtail` and `journalctl -u promtail -f`
+
 ### Example: Create Harbor secrets
 
 > **Prerequisites:** Add `harbor-role`, `harbor-admin`, and `harbor-secret-key` (16 chars) to Google Secret Manager before running.

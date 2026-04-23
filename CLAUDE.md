@@ -59,6 +59,7 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
   - External (MetalLB): `192.168.0.213:9094` — use IP, not DNS (broker reconnect requires it)
   - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
   - Schema Registry: running in `kafka-system`, backed by PostgreSQL
+- **Loki**: Grafana Loki log aggregation at 192.168.0.220 (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
 
@@ -179,6 +180,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
+- **Loki**: http://loki.verticon.com (192.168.0.220:80)
 
 ## File Structure
 
