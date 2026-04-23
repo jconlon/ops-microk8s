@@ -1,0 +1,85 @@
+# Loki — monolithic single-binary mode
+# Ceph RGW S3 backend for log chunks and TSDB index
+# MetalLB LoadBalancer at 192.168.0.220
+# Accessible at http://192.168.0.220 (Caddy terminates TLS externally as loki.verticon.com)
+# S3 credentials injected via loki-s3-credentials secret (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+# Create secret before applying: see scripts/README.md "Loki S3 credentials bootstrap"
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false  # single-tenant; no multi-tenant token required
+
+  commonConfig:
+    replication_factor: 1  # monolithic single instance — no replication needed
+
+  storage:
+    type: s3
+    # bucketNames is at storage level, NOT inside s3 block
+    bucketNames:
+      chunks: loki-logs
+      ruler: loki-logs
+      admin: loki-logs
+    s3:
+      endpoint: http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80
+      region: us-east-1
+      s3ForcePathStyle: true
+      insecure: true  # no TLS to internal Ceph RGW
+
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: s3
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+  limits_config:
+    retention_period: 720h  # 30 days
+
+  compactor:
+    retention_enabled: true
+    retention_delete_delay: 2h
+    working_directory: /var/loki/compactor
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClass: rook-ceph-block
+    size: 10Gi
+  # Inject S3 credentials from Kubernetes secret (created via scripts/README.md bootstrap)
+  # Rook generates the secret in rook-ceph ns; copy to loki ns before ArgoCD wave 2 syncs
+  extraEnvFrom:
+    - secretRef:
+        name: loki-s3-credentials
+
+# Expose Loki via MetalLB LoadBalancer — HTTP only (Caddy terminates TLS)
+gateway:
+  enabled: true
+  service:
+    type: LoadBalancer
+    port: 80
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.220"
+
+# monitoring: key appears ONCE — both selfMonitoring and serviceMonitor nested under it
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus-stack
+
+# Disable built-in tests (they require kubectl exec access we don't need)
+test:
+  enabled: false
+
+# Disable Loki canary (not needed for single-cluster)
+lokiCanary:
+  enabled: false
