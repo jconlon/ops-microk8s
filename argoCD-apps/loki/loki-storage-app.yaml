@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: HEAD
+    targetRevision: deploy-loki-promtail
     path: loki-gitops/storage
   destination:
     server: https://kubernetes.default.svc
