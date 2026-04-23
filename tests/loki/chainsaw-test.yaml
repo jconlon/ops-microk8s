@@ -170,8 +170,13 @@ spec:
                 -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
               [ -n "$GRAFANA_IP" ] || { echo "Could not find Grafana LoadBalancer IP"; exit 1; }
               # Try authenticated API access first (admin credentials)
-              GRAFANA_PASSWORD=$(kubectl get secret -n monitoring prometheus-stack-grafana \
-                -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+              # Secret name varies by deployment (prometheus-stack-grafana or grafana)
+              GRAFANA_SECRET=$(kubectl get secret -n monitoring -o name 2>/dev/null | grep grafana | head -1)
+              GRAFANA_PASSWORD=""
+              if [ -n "$GRAFANA_SECRET" ]; then
+                GRAFANA_PASSWORD=$(kubectl get "$GRAFANA_SECRET" -n monitoring \
+                  -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+              fi
               if [ -n "$GRAFANA_PASSWORD" ]; then
                 DATASOURCES=$(curl -sf "http://$GRAFANA_IP/api/datasources" \
                   -u "admin:$GRAFANA_PASSWORD" 2>/dev/null || echo "")
