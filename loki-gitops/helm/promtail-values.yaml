@@ -71,6 +71,37 @@ config:
           - source_labels: [__journal_priority_keyword]
             target_label: severity
 
+      # === iDRAC Syslog (UDP 1514) — Dell R320 nodes: gold, squid, puffer, carp ===
+      - job_name: idrac-syslog
+        syslog:
+          listen_address: 0.0.0.0:1514
+          listen_protocol: udp
+          idle_timeout: 60s
+          label_structured_data: true
+          labels:
+            job: idrac
+        relabel_configs:
+          - source_labels: [__syslog_connection_ip_address]
+            target_label: host
+          - source_labels: [__syslog_message_hostname]
+            target_label: node
+          - source_labels: [__syslog_message_severity]
+            target_label: severity
+          - source_labels: [__syslog_message_facility]
+            target_label: facility
+          - source_labels: [__syslog_message_app_name]
+            target_label: app
+
+# Expose UDP 1514 for iDRAC syslog ingestion
+extraPorts:
+  syslog:
+    name: syslog-udp
+    containerPort: 1514
+    protocol: UDP
+    service:
+      port: 1514
+      type: ClusterIP
+
 # DaemonSet resource limits
 resources:
   requests:

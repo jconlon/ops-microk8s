@@ -181,6 +181,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
 - **Loki**: http://loki.verticon.com (192.168.0.220:80)
+- **iDRAC Syslog**: 192.168.0.209:1514/UDP — MetalLB LoadBalancer for iDRAC syslog from Dell R320 nodes (gold, squid, puffer, carp) into Loki (`job="idrac"`)
 
 ## File Structure
 

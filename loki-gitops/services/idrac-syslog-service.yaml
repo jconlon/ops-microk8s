@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: promtail-idrac-syslog
+  namespace: loki
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.0.209
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: promtail
+  ports:
+    - name: syslog-udp
+      protocol: UDP
+      port: 1514
+      targetPort: 1514
