@@ -1,0 +1,131 @@
+# Promtail — DaemonSet on all 8 cluster nodes
+# Ships K8s pod logs + OS syslog/kern/auth to Loki
+# Loki endpoint: internal ClusterDNS (no MetalLB hop needed)
+
+config:
+  logLevel: warn
+  serverPort: 3101
+
+  clients:
+    - url: http://loki-gateway.loki.svc:80/loki/api/v1/push
+
+  snippets:
+    # K8s pod logs — auto-detected from container runtime
+    pipelineStages:
+      - cri: {}
+
+    scrapeConfigs: |
+      # === Kubernetes Pod Logs ===
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            target_label: app
+          - replacement: /var/log/pods/*$1/*.log
+            separator: /
+            source_labels:
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+            target_label: __path__
+          - action: replace
+            regex: true/(.*)
+            replacement: /var/log/pods/*$1/*.log
+            separator: /
+            source_labels:
+              - __meta_kubernetes_pod_annotationpresent_kubectl_kubernetes_io_last_applied_configuration
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+            target_label: __path__
+
+      # === OS Syslog / Kernel / Auth logs ===
+      - job_name: node-syslog
+        static_configs:
+          - targets: [localhost]
+            labels:
+              job: syslog
+              __path__: /var/log/{syslog,kern.log,auth.log}
+        relabel_configs:
+          - target_label: node
+            replacement: ${NODE_NAME}
+
+      # === systemd journal ===
+      - job_name: systemd-journal
+        journal:
+          max_age: 12h
+          labels:
+            job: systemd-journal
+        relabel_configs:
+          - source_labels: [__journal__hostname]
+            target_label: node
+          - source_labels: [__journal__systemd_unit]
+            target_label: unit
+          - source_labels: [__journal_priority_keyword]
+            target_label: severity
+
+# DaemonSet resource limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Volume mounts — OS logs + pod logs
+defaultVolumes:
+  - name: containers
+    hostPath:
+      path: /var/log/containers
+  - name: pods
+    hostPath:
+      path: /var/log/pods
+  - name: syslog
+    hostPath:
+      path: /var/log
+  - name: journal
+    hostPath:
+      path: /var/log/journal
+
+defaultVolumeMounts:
+  - name: containers
+    mountPath: /var/log/containers
+    readOnly: true
+  - name: pods
+    mountPath: /var/log/pods
+    readOnly: true
+  - name: syslog
+    mountPath: /var/log
+    readOnly: true
+  - name: journal
+    mountPath: /var/log/journal
+    readOnly: true
+
+# Tolerations — run on all nodes including control plane
+tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+# NODE_NAME env var for syslog relabeling
+extraEnv:
+  - name: NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus-stack
