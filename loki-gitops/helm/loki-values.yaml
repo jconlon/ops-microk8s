@@ -44,6 +44,15 @@ loki:
     retention_delete_delay: 2h
     working_directory: /var/loki/compactor
 
+# Disable simple-scalable components (required when deploymentMode: SingleBinary)
+# The chart validates that read/write/backend replicas are 0 in SingleBinary mode
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
 singleBinary:
   replicas: 1
   persistence:
