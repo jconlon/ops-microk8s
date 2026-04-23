@@ -102,13 +102,16 @@ spec:
               echo "MetalLB IP confirmed: $IP"
 
     - name: loki-ready-endpoint
-      description: Loki /ready endpoint returns 200 (log ingestion active)
+      description: Loki /ready endpoint returns "ready" (log ingestion active)
       try:
         - script:
             timeout: 30s
             content: |
-              curl -sf http://192.168.0.220/ready | grep -qi "ready" || { echo "Loki ready check failed"; exit 1; }
-              echo "Loki /ready endpoint confirmed"
+              # /ready is on Loki backend (port 3100), not proxied through the nginx gateway
+              # Use kubectl exec to call it from inside the cluster
+              RESULT=$(kubectl exec loki-0 -n loki -c loki -- wget -qO- http://localhost:3100/ready 2>/dev/null)
+              echo "$RESULT" | grep -qi "ready" || { echo "Loki ready check failed: $RESULT"; exit 1; }
+              echo "Loki /ready endpoint confirmed: $RESULT"
 
     - name: loki-has-labels
       description: Loki labels endpoint returns data (Promtail is shipping logs)
@@ -145,14 +148,16 @@ spec:
               echo "Log ingestion confirmed: $STREAM_COUNT stream(s) found"
 
     - name: loki-retention-configured
-      description: Loki compactor is running and 30-day retention (720h) is configured
+      description: Loki compactor is running and 30-day retention is configured
       try:
         - script:
             timeout: 30s
             content: |
+              # /config is proxied through the nginx gateway
               CONFIG=$(curl -sf http://192.168.0.220/config)
               echo "$CONFIG" | grep -q "retention_period" || { echo "retention_period not found in Loki config"; exit 1; }
-              echo "$CONFIG" | grep -q "720h" || { echo "30-day retention (720h) not configured"; exit 1; }
+              # Loki 3.x renders 720h as 30d in the config output; accept either format
+              echo "$CONFIG" | grep -qE "720h|30d" || { echo "30-day retention not configured (expected 720h or 30d)"; exit 1; }
               echo "30-day retention confirmed"
 
     - name: grafana-loki-datasource-registered
