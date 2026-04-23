@@ -1,0 +1,25 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: loki-logs-user
+  namespace: rook-ceph
+  labels:
+    app: loki
+spec:
+  store: rook-ceph-rgw
+  displayName: "Loki Log Aggregation"
+  quotas:
+    maxBuckets: 2
+    maxSize: "500Gi"
+    maxObjects: -1
+
+# Rook auto-creates a secret in rook-ceph namespace:
+#   kubectl get secret <status.info.secretName> -n rook-ceph
+# Copy to loki namespace after ArgoCD wave 1 syncs:
+#   ACCESS_KEY=$(kubectl get secret <secretName> -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d)
+#   SECRET_KEY=$(kubectl get secret <secretName> -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d)
+#   kubectl create secret generic loki-s3-credentials \
+#     --namespace loki \
+#     --from-literal=AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
+#     --from-literal=AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+#     --dry-run=client -o yaml | kubectl apply -f -
