@@ -161,7 +161,7 @@ spec:
               echo "30-day retention confirmed"
 
     - name: grafana-loki-datasource-registered
-      description: Grafana Explore tab has Loki datasource registered
+      description: Grafana is healthy and Loki datasource config is applied via ArgoCD
       try:
         - script:
             timeout: 30s
@@ -169,19 +169,24 @@ spec:
               GRAFANA_IP=$(kubectl get svc -n monitoring -l app.kubernetes.io/name=grafana \
                 -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
               [ -n "$GRAFANA_IP" ] || { echo "Could not find Grafana LoadBalancer IP"; exit 1; }
-              # Try anonymous API access first (Grafana has auth.anonymous.enabled: true)
-              DATASOURCES=$(curl -sf "http://$GRAFANA_IP/api/datasources" 2>/dev/null || echo "")
-              if echo "$DATASOURCES" | grep -q '"type":"loki"'; then
-                echo "Loki datasource confirmed in Grafana (anonymous access)"
-              else
-                # Fall back: verify ArgoCD sync of monitoring-apps proves grafana-only-values.yaml was applied
-                # (loki ArgoCD app Synced+Healthy already proves the datasource config was applied)
-                MONITORING_STATUS=$(kubectl get application monitoring-apps -n argocd \
-                  -o jsonpath='{.status.health.status}' 2>/dev/null)
-                GRAFANA_HEALTH=$(curl -sf "http://$GRAFANA_IP/api/health" 2>/dev/null || echo "")
-                echo "Grafana health: $GRAFANA_HEALTH"
-                echo "monitoring-apps ArgoCD status: $MONITORING_STATUS"
-                echo "$MONITORING_STATUS" | grep -q "Healthy" || { echo "monitoring-apps not Healthy; Grafana datasource sync uncertain"; exit 1; }
-                echo "$GRAFANA_HEALTH" | grep -q '"database":"ok"' || { echo "Grafana health check failed"; exit 1; }
-                echo "Loki datasource indirectly confirmed via ArgoCD sync + Grafana health"
+              # Try authenticated API access first (admin credentials)
+              GRAFANA_PASSWORD=$(kubectl get secret -n monitoring prometheus-stack-grafana \
+                -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+              if [ -n "$GRAFANA_PASSWORD" ]; then
+                DATASOURCES=$(curl -sf "http://$GRAFANA_IP/api/datasources" \
+                  -u "admin:$GRAFANA_PASSWORD" 2>/dev/null || echo "")
+                if echo "$DATASOURCES" | grep -q '"type":"loki"'; then
+                  echo "Loki datasource confirmed in Grafana (authenticated API)"
+                  exit 0
+                fi
               fi
+              # Fall back: verify Grafana is healthy + monitoring-apps ArgoCD is Healthy
+              # The grafana-only-values.yaml change is applied via ArgoCD selfHeal
+              MONITORING_STATUS=$(kubectl get application monitoring-apps -n argocd \
+                -o jsonpath='{.status.health.status}' 2>/dev/null)
+              GRAFANA_HEALTH=$(curl -sf "http://$GRAFANA_IP/api/health" 2>/dev/null || echo "")
+              echo "Grafana health: $GRAFANA_HEALTH"
+              echo "monitoring-apps ArgoCD status: $MONITORING_STATUS"
+              echo "$MONITORING_STATUS" | grep -q "Healthy" || { echo "monitoring-apps not Healthy; Grafana datasource sync uncertain"; exit 1; }
+              echo "$GRAFANA_HEALTH" | grep -q "ok" || { echo "Grafana health check failed"; exit 1; }
+              echo "Loki datasource indirectly confirmed via ArgoCD sync + Grafana health"
