@@ -1,0 +1,17 @@
+[Unit]
+Description=Promtail log shipper (Loki agent)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=promtail
+ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/promtail.yaml -config.expand-env=true
+Restart=on-failure
+RestartSec=5s
+
+# Allow reading system logs
+SupplementaryGroups=adm systemd-journal
+
+[Install]
+WantedBy=multi-user.target
