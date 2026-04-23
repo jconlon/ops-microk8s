@@ -13,7 +13,7 @@ spec:
         valueFiles:
           - $values/monitoring/helm/grafana-only-values.yaml
     - repoURL: https://github.com/jconlon/ops-microk8s
-      targetRevision: deploy-loki-promtail
+      targetRevision: HEAD
       ref: values
   destination:
     server: https://kubernetes.default.svc
