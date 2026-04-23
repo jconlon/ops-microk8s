@@ -86,3 +86,13 @@ vllm-status:
 # Run vLLM chainsaw tests
 test-vllm:
     chainsaw test tests/vllm
+
+# ── Loki ──────────────────────────────────────────────────────────────────────
+
+# Show Loki + Promtail pod status
+loki-status:
+    kubectl get pods -n loki -o wide
+
+# Run Loki chainsaw tests
+test-loki:
+    chainsaw test tests/loki
