@@ -19,7 +19,8 @@
       "chmod +x ops",
       "export PATH=$PATH:$PWD",
       "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\"",
-      "[ -d \"$VENV_DIR\" ] && . $VENV_DIR/bin/activate"
+      "[ -d \"$VENV_DIR\" ] && . $VENV_DIR/bin/activate",
+      "export LOKI_ADDR=http://192.168.0.220"
     ],
     "scripts": {
       "argocd-login": ["./ops argocd login"],
