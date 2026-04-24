@@ -1,0 +1,15 @@
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: argo-artifact-user
+  namespace: rook-ceph
+spec:
+  store: rook-ceph-rgw
+  displayName: "Argo Workflows Artifact Storage"
+  quotas:
+    maxBuckets: 10
+    maxSize: "500Gi"
+    maxObjects: 10000000
+
+# After this syncs, bootstrap S3 credentials and bucket:
+#   see scripts/README.md "Argo Workflows bootstrap"

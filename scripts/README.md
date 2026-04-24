@@ -257,6 +257,7 @@ Run all teller commands from the `ops-microk8s` root directory within a devbox s
 |---|---|
 | `teller/.teller-freshrss.yml` | FreshRSS K8s secrets (`freshrss-db-credentials`, `freshrss-role-password`) |
 | `teller/.teller-postgresql.yml` | PostgreSQL backup S3 credentials (`ceph-s3-credentials`) |
+| `teller/.teller-argo-workflows.yml` | Argo Workflows Harbor robot account credentials |
 | `teller/.teller-hasura.yml` | Hasura K8s secrets (`hasura-role-password`, `hasura-credentials`) |
 
 > **Note:** Machine-local teller configs (restic, gitlab) remain in `~/dotfiles`. Only cluster K8s secret configs belong here.
@@ -389,4 +390,56 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
   --from-literal=HASURA_GRAPHQL_METADATA_DATABASE_URL="postgres://hasura:$HASURA_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/hasura" \
   --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -'
+```
+
+---
+
+### Argo Workflows bootstrap
+
+After the `argo-workflows-storage` ArgoCD app syncs (CephObjectStoreUser becomes Ready), run once to create S3 credentials and bucket:
+
+```bash
+# Copy Rook-generated S3 credentials to argo-workflows namespace
+SECRET_NAME=$(kubectl get cephobjectstoreuser argo-artifact-user -n rook-ceph \
+  -o jsonpath='{.status.info.secretName}')
+ACCESS_KEY=$(kubectl get secret "$SECRET_NAME" -n rook-ceph -o jsonpath='{.data.AccessKey}' | base64 -d)
+SECRET_KEY=$(kubectl get secret "$SECRET_NAME" -n rook-ceph -o jsonpath='{.data.SecretKey}' | base64 -d)
+kubectl create namespace argo-workflows --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic argo-workflows-s3-credentials \
+  --namespace argo-workflows \
+  --from-literal=AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Create the artifact bucket via Ceph toolbox
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- \
+  radosgw-admin bucket create --bucket=argo-artifacts \
+  --uid=argo-artifact-user
+```
+
+After deploying, add DNS and Caddy proxy entry on mullet:
+
+```
+workflows.verticon.com {
+    reverse_proxy 192.168.0.209:2746
+}
+```
+
+#### Harbor robot account (for image push/pull in workflows)
+
+1. Create robot account in Harbor: `https://registry.verticon.com → Administration → Robot Accounts → New Robot Account`
+   - Name: `argo-workflows`
+   - Permissions: push/pull on relevant projects
+2. Add the secret to Google Secret Manager as `harbor-argo-robot`
+3. Run:
+
+```bash
+teller run --config teller/.teller-argo-workflows.yml -- bash -c '
+  kubectl create secret docker-registry harbor-credentials \
+    --namespace argo-workflows \
+    --docker-server=registry.verticon.com \
+    --docker-username="robot\$argo-workflows" \
+    --docker-password="$HARBOR_ARGO_ROBOT_SECRET" \
+    --dry-run=client -o yaml | kubectl apply -f -
+'
 ```

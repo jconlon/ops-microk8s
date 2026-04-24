@@ -177,6 +177,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 
 ### Service Access
 
+- **Argo Workflows**: https://workflows.verticon.com (192.168.0.209:2746) — CI pipeline UI
 - **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)

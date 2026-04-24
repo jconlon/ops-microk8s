@@ -1,0 +1,47 @@
+# Argo Workflows — cluster-native CI pipeline engine
+# UI at https://workflows.verticon.com (Caddy → 192.168.0.209:2746)
+# Artifact storage: Ceph RGW S3 (bucket: argo-artifacts)
+# Auth: server mode (LAN-internal, no token required)
+
+crds:
+  install: true
+  keep: true
+
+controller:
+  workflowNamespaces:
+    - argo-workflows
+
+workflow:
+  serviceAccount:
+    create: true
+    name: argo-workflow
+  rbac:
+    create: true
+
+server:
+  enabled: true
+  authModes:
+    - server
+  extraArgs:
+    - --auth-mode=server
+  service:
+    type: LoadBalancer
+    port: 2746
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: 192.168.0.209
+
+useStaticCredentials: true
+artifactRepository:
+  archiveLogs: true
+  s3:
+    bucket: argo-artifacts
+    endpoint: rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80
+    region: us-east-1
+    insecure: true
+    useSDKCreds: false
+    accessKeySecret:
+      name: argo-workflows-s3-credentials
+      key: AWS_ACCESS_KEY_ID
+    secretKeySecret:
+      name: argo-workflows-s3-credentials
+      key: AWS_SECRET_ACCESS_KEY

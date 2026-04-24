@@ -84,6 +84,16 @@ gpu-status:
 gpu-pods:
     kubectl get pods -n gpu-operator
 
+# ── Argo Workflows ────────────────────────────────────────────────────────────
+
+# Show Argo Workflows pod status
+argo-status:
+    kubectl get pods -n argo-workflows -o wide
+
+# Run Argo Workflows chainsaw tests
+test-argo-workflows:
+    chainsaw test tests/argo-workflows
+
 # ── Harbor ────────────────────────────────────────────────────────────────────
 
 # Show Harbor pod status

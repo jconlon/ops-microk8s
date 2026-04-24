@@ -1,0 +1,111 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: argo-workflows-healthy
+spec:
+  description: Argo Workflows CI engine is healthy and accessible
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 60s
+
+  steps:
+    - name: argo-workflows-argocd-app-synced
+      description: Argo Workflows ArgoCD application is Synced and Healthy
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: argo-workflows
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+                health:
+                  status: Healthy
+
+    - name: argo-workflows-storage-synced
+      description: Argo Workflows CephObjectStoreUser is Synced
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: argo-workflows-storage
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+
+    - name: argo-workflows-controller-running
+      description: Argo Workflows controller Deployment is available
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: argo-workflows-workflow-controller
+                namespace: argo-workflows
+              status:
+                (availableReplicas >= `1`): true
+
+    - name: argo-workflows-server-running
+      description: Argo Workflows server Deployment is available
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: argo-workflows-server
+                namespace: argo-workflows
+              status:
+                (availableReplicas >= `1`): true
+
+    - name: argo-workflows-service-has-ip
+      description: Argo Workflows server LoadBalancer service has MetalLB IP 192.168.0.209
+      try:
+        - script:
+            content: |
+              IP=$(kubectl get svc argo-workflows-server -n argo-workflows \
+                -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+              [ "$IP" = "192.168.0.209" ] || { echo "Expected 192.168.0.209, got: $IP"; exit 1; }
+              echo "MetalLB IP confirmed: $IP"
+
+    - name: argo-workflows-s3-credentials-exist
+      description: argo-workflows-s3-credentials secret exists with non-empty access key
+      try:
+        - script:
+            content: |
+              kubectl get secret argo-workflows-s3-credentials -n argo-workflows \
+                -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d | grep -qE '.{10,}' \
+                || { echo "argo-workflows-s3-credentials secret missing or empty"; exit 1; }
+              echo "S3 credentials secret present"
+
+    - name: argo-workflows-ceph-user-ready
+      description: Argo Workflows Ceph object store user is Ready
+      try:
+        - assert:
+            resource:
+              apiVersion: ceph.rook.io/v1
+              kind: CephObjectStoreUser
+              metadata:
+                name: argo-artifact-user
+                namespace: rook-ceph
+              status:
+                phase: Ready
+
+    - name: argo-workflows-api-responsive
+      description: Argo Workflows API responds at the MetalLB IP
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              RESULT=$(curl -sf http://192.168.0.209:2746/api/v1/version 2>/dev/null)
+              echo "$RESULT" | grep -q '"version"' \
+                || { echo "Argo Workflows API not responding: $RESULT"; exit 1; }
+              echo "Argo Workflows API confirmed: $RESULT"

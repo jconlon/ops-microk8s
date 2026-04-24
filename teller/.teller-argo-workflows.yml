@@ -1,0 +1,24 @@
+# Teller config for Argo Workflows — Harbor robot account credentials
+# Prerequisites: add harbor-argo-robot secret to Google Secret Manager
+#
+# Usage:
+#   teller run --config teller/.teller-argo-workflows.yml -- bash -c '...'
+
+project: ops-microk8s
+
+providers:
+  google_secretmanager:
+    env_sync:
+      HARBOR_ARGO_ROBOT_SECRET:
+        path: harbor-argo-robot
+
+# Create Harbor pull/push secret in argo-workflows namespace:
+#
+# teller run --config teller/.teller-argo-workflows.yml -- bash -c '
+#   kubectl create secret docker-registry harbor-credentials \
+#     --namespace argo-workflows \
+#     --docker-server=registry.verticon.com \
+#     --docker-username=robot$argo-workflows \
+#     --docker-password="$HARBOR_ARGO_ROBOT_SECRET" \
+#     --dry-run=client -o yaml | kubectl apply -f -
+# '
