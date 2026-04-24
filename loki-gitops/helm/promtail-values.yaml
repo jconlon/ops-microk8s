@@ -92,11 +92,13 @@ config:
           - source_labels: [__syslog_message_app_name]
             target_label: app
 
-# Expose UDP 1514 for iDRAC syslog ingestion
+# hostPort 1514 — bypasses kube-proxy; containerd wires host NIC directly to pod.
+# Each iDRAC sends to its own node's LAN IP:1514 (intra-host, no DNAT needed).
 extraPorts:
   syslog:
     name: syslog-udp
     containerPort: 1514
+    hostPort: 1514
     protocol: UDP
     service:
       port: 1514
