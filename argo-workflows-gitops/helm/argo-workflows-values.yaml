@@ -24,11 +24,10 @@ server:
     - server
   extraArgs:
     - --auth-mode=server
-  service:
-    type: LoadBalancer
-    port: 2746
-    annotations:
-      metallb.universe.tf/loadBalancerIPs: 192.168.0.209
+  serviceType: LoadBalancer
+  servicePort: 2746
+  serviceAnnotations:
+    metallb.universe.tf/loadBalancerIPs: 192.168.0.209
 
 useStaticCredentials: true
 artifactRepository:
