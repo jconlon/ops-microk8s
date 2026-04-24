@@ -96,3 +96,27 @@ loki-status:
 # Run Loki chainsaw tests
 test-loki:
     chainsaw test tests/loki
+
+# Check syslog is flowing from all 8 nodes into Loki (last 15 minutes)
+loki-node-logs:
+    #!/usr/bin/env bash
+    LOKI="http://192.168.0.220"
+    START=$(date -u -d '15 minutes ago' +%s)000000000
+    END=$(date -u +%s)000000000
+    FAILED=0
+    for node in mullet trout tuna whale gold squid puffer carp; do
+      COUNT=$(curl -sfG \
+        --data-urlencode "query={filename=\"/var/log/syslog\"} |= \" ${node} \"" \
+        --data-urlencode "start=$START" \
+        --data-urlencode "end=$END" \
+        --data-urlencode "limit=1" \
+        "$LOKI/loki/api/v1/query_range" | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(len(s.get('values',[])) for s in d.get('data',{}).get('result',[])))")
+      if [ "$COUNT" -gt 0 ]; then
+        echo "PASS  $node"
+      else
+        echo "FAIL  $node — no syslog in last 15 min"
+        FAILED=1
+      fi
+    done
+    exit $FAILED
