@@ -74,3 +74,31 @@ spec:
             name: carp
           status:
             (conditions[?type=='Ready'].status | [0]): "True"
+
+  - name: puffer-powerkey-mitigations-applied
+    description: puffer has ACPI power button suppressions in place (issue #59)
+    try:
+      - script:
+          timeout: 60s
+          content: |
+            # Use kubectl debug node to inspect puffer's host filesystem.
+            # Host is mounted at /host inside the debug container.
+            RESULT=$(kubectl debug node/puffer \
+              --image=alpine:latest \
+              --quiet \
+              --rm \
+              -- sh -c '
+                FAIL=0
+                grep -q "HandlePowerKey=ignore" /host/etc/systemd/logind.conf \
+                  && echo "PASS HandlePowerKey=ignore" \
+                  || { echo "FAIL HandlePowerKey=ignore missing"; FAIL=1; }
+                grep -q "HandlePowerKeyLongPress=ignore" /host/etc/systemd/logind.conf \
+                  && echo "PASS HandlePowerKeyLongPress=ignore" \
+                  || { echo "FAIL HandlePowerKeyLongPress=ignore missing"; FAIL=1; }
+                test -f /host/etc/udev/rules.d/99-ignore-power-button.udev \
+                  && echo "PASS udev power button suppression rule present" \
+                  || { echo "FAIL udev rule missing"; FAIL=1; }
+                exit $FAIL
+              ' 2>/dev/null)
+            echo "$RESULT"
+            echo "$RESULT" | grep -q "^FAIL" && exit 1 || exit 0

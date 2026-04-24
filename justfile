@@ -21,6 +21,23 @@ test-verbose:
 
 # ── Cluster ───────────────────────────────────────────────────────────────────
 
+# Verify puffer ACPI power key mitigations are in place (issue #59)
+puffer-powerkey-status:
+    #!/usr/bin/env bash
+    echo "Checking puffer power key mitigations..."
+    kubectl debug node/puffer --image=alpine:latest --quiet --rm \
+      -- sh -c '
+        grep -q "HandlePowerKey=ignore" /host/etc/systemd/logind.conf \
+          && echo "PASS  HandlePowerKey=ignore" \
+          || echo "FAIL  HandlePowerKey=ignore missing"
+        grep -q "HandlePowerKeyLongPress=ignore" /host/etc/systemd/logind.conf \
+          && echo "PASS  HandlePowerKeyLongPress=ignore" \
+          || echo "FAIL  HandlePowerKeyLongPress=ignore missing"
+        test -f /host/etc/udev/rules.d/99-ignore-power-button.udev \
+          && echo "PASS  udev power button suppression rule" \
+          || echo "FAIL  udev rule missing"
+      ' 2>/dev/null
+
 # Show node uptime and reboot-required status
 node-status:
     ops cluster node-status
