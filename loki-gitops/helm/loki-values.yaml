@@ -38,6 +38,8 @@ loki:
 
   limits_config:
     retention_period: 720h  # 30 days
+    ingestion_rate_mb: 32
+    ingestion_burst_size_mb: 64
 
   compactor:
     retention_enabled: true

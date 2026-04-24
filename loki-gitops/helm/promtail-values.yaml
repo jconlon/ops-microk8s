@@ -87,8 +87,11 @@ resources:
     cpu: 200m
     memory: 256Mi
 
-# Volume mounts — OS logs + pod logs
+# Volume mounts — OS logs + pod logs + positions tracking
 defaultVolumes:
+  - name: run
+    hostPath:
+      path: /run/promtail
   - name: containers
     hostPath:
       path: /var/log/containers
@@ -103,6 +106,8 @@ defaultVolumes:
       path: /var/log/journal
 
 defaultVolumeMounts:
+  - name: run
+    mountPath: /run/promtail
   - name: containers
     mountPath: /var/log/containers
     readOnly: true
