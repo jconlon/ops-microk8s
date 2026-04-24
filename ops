@@ -4,6 +4,7 @@ source scripts/argocd.nu
 source scripts/cluster.nu
 source scripts/freshrss.nu
 source scripts/kafka.nu
+source scripts/loki.nu
 # This script provides various operations related to the ops microk8s environment.
 def main [] {}
 

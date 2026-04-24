@@ -48,6 +48,48 @@ scripts/
 
 Sourced by the `ops` wrapper script. Run from the `ops-microk8s` directory.
 
+### loki.nu
+
+Loki log analysis commands via logcli. All commands query `http://192.168.0.220` (pre-set in devbox). Useful for investigating node issues, spurious shutdowns, and iDRAC hardware events.
+
+| Command | Description |
+|---|---|
+| `ops loki node-events <node>` | Query syslog for a node (`--since 24h`, `--limit 100`, `--filter ""`) |
+| `ops loki shutdown-events <node>` | Power/shutdown/reboot events + boot markers (`--since 7d`) |
+| `ops loki idrac <node>` | iDRAC hardware events from a Dell R320 node (`--since 7d`) |
+| `ops loki reboot-history` | Boot times + shutdown event count for all nodes (`--since 7d`) |
+| `ops loki tail <node>` | Live tail syslog for a node (`--filter ""`) |
+
+```bash
+# Investigate puffer shutdowns over the last 7 days
+ops loki shutdown-events puffer --since 7d
+
+# Show all node boot times and how many times each shut down
+ops loki reboot-history --since 30d
+
+# Check iDRAC events for all Dell nodes
+ops loki idrac puffer --since 30d
+ops loki idrac carp --since 7d
+
+# Search for a specific term in puffer syslog
+ops loki node-events puffer --filter "ACPI" --since 24h
+
+# Live tail
+ops loki tail puffer
+ops loki tail puffer --filter "iDRAC"
+```
+
+Also available as `just` recipes:
+```bash
+just loki-shutdown-events puffer 7d
+just loki-reboot-history 30d
+just loki-idrac puffer 7d
+just loki-node-events puffer 24h
+just loki-tail puffer
+```
+
+---
+
 ### cluster.nu
 
 Cluster health and status commands. Queries Prometheus — no SSH required.

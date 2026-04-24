@@ -97,6 +97,26 @@ loki-status:
 test-loki:
     chainsaw test tests/loki
 
+# Query syslog events for a node (default: puffer, last 24h)
+loki-node-events node="puffer" since="24h":
+    ops loki node-events {{node}} --since {{since}}
+
+# Query shutdown/power/reboot events for a node (default: puffer, last 7d)
+loki-shutdown-events node="puffer" since="7d":
+    ops loki shutdown-events {{node}} --since {{since}}
+
+# Query iDRAC hardware events for a Dell R320 node (default: puffer, last 7d)
+loki-idrac node="puffer" since="7d":
+    ops loki idrac {{node}} --since {{since}}
+
+# Show last boot time + shutdown event count for all nodes
+loki-reboot-history since="7d":
+    ops loki reboot-history --since {{since}}
+
+# Live tail syslog for a node (Ctrl+C to stop)
+loki-tail node="puffer":
+    ops loki tail {{node}}
+
 # Check syslog is flowing from all 8 nodes into Loki (last 15 minutes)
 loki-node-logs:
     #!/usr/bin/env bash
