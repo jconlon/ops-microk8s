@@ -92,10 +92,6 @@ config:
           - source_labels: [__syslog_message_app_name]
             target_label: app
 
-# hostNetwork binds the syslog listener directly to the host NIC.
-# Each iDRAC sends to its own node's LAN IP:1514 — no kube-proxy DNAT involved.
-hostNetwork: true
-
 extraPorts:
   syslog:
     name: syslog-udp
