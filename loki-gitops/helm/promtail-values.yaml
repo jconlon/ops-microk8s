@@ -71,6 +71,13 @@ config:
           - source_labels: [__journal_priority_keyword]
             target_label: severity
 
+# adm group (GID 4) grants read access to /var/log/syslog, kern.log, auth.log on Ubuntu
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+  supplementalGroups:
+    - 4
+
 # DaemonSet resource limits
 resources:
   requests:
