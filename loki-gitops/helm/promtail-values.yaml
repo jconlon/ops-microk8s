@@ -92,13 +92,14 @@ config:
           - source_labels: [__syslog_message_app_name]
             target_label: app
 
-# hostPort 1514 — bypasses kube-proxy; containerd wires host NIC directly to pod.
-# Each iDRAC sends to its own node's LAN IP:1514 (intra-host, no DNAT needed).
+# hostNetwork binds the syslog listener directly to the host NIC.
+# Each iDRAC sends to its own node's LAN IP:1514 — no kube-proxy DNAT involved.
+hostNetwork: true
+
 extraPorts:
   syslog:
     name: syslog-udp
     containerPort: 1514
-    hostPort: 1514
     protocol: UDP
     service:
       port: 1514
