@@ -57,19 +57,32 @@ config:
           - target_label: node
             replacement: ${NODE_NAME}
 
-      # === systemd journal ===
+      # === systemd journal (warning+ and logind) ===
+      # Captures events that rsyslog misses or rate-limits: logind power key events,
+      # kernel OOM, unit failures, pre-crash window entries (cursor-based recovery).
+      # path: forces sd_journal_open_directory() so the container finds the host
+      # journal regardless of machine-id mismatch.
       - job_name: systemd-journal
         journal:
           max_age: 12h
+          path: /var/log/journal
           labels:
-            job: systemd-journal
+            job: journal
         relabel_configs:
           - source_labels: [__journal__hostname]
             target_label: node
           - source_labels: [__journal__systemd_unit]
             target_label: unit
           - source_labels: [__journal_priority_keyword]
-            target_label: severity
+            target_label: level
+          - source_labels: [__journal_syslog_identifier]
+            target_label: syslog_identifier
+          # Drop info/debug (priority 5-7) unless the source is systemd-logind.
+          # Combined label value is "syslog_identifier;priority" (default separator=;).
+          # Regex matches entries to DROP: NOT logind AND priority 5, 6, or 7.
+          - source_labels: [__journal_syslog_identifier, __journal_priority]
+            regex: '(?!systemd-logind;)[^;]*;[5-7]'
+            action: drop
 
 # adm group (GID 4) grants read access to /var/log/syslog, kern.log, auth.log on Ubuntu
 podSecurityContext:
