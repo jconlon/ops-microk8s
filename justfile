@@ -144,6 +144,30 @@ loki-reboot-history since="7d":
 loki-tail node="puffer":
     ops loki tail {{node}}
 
+# Query systemd journal stream for a node and filter term — first-line check
+# before escalating to kubectl debug when investigating anomalies (issue #64).
+# The journal stream captures logind, kernel errors, unit failures that rsyslog misses.
+# Examples:
+#   just loki-journal-check puffer "Power key" 24h
+#   just loki-journal-check gold "OOM" 48h
+#   just loki-journal-check whale "entered failed state" 7d
+loki-journal-check node="puffer" filter="Power key" since="24h":
+    #!/usr/bin/env bash
+    echo "=== journal stream: node={{node}} filter='{{filter}}' since={{since}} ==="
+    logcli --addr=http://192.168.0.220 \
+      query "{job=\"journal\", node=\"{{node}}\"} |= \"{{filter}}\"" \
+      --since={{since}} --limit=100 --timezone=Local
+    echo ""
+    echo "=== journal stream flowing? (last 5 min) ==="
+    COUNT=$(logcli --addr=http://192.168.0.220 \
+      query "{job=\"journal\", node=\"{{node}}\"}" \
+      --since=5m --limit=1 --quiet 2>/dev/null | wc -l)
+    if [ "$COUNT" -gt 0 ]; then
+      echo "PASS  journal stream active for {{node}}"
+    else
+      echo "WARN  no journal entries in last 5 min — stream may be delayed or node down"
+    fi
+
 # Check syslog is flowing from all 8 nodes into Loki (last 15 minutes)
 loki-node-logs:
     #!/usr/bin/env bash
