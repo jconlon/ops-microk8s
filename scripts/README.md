@@ -396,7 +396,7 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
 
 ### Argo Workflows bootstrap
 
-After the `argo-workflows-storage` ArgoCD app syncs (CephObjectStoreUser becomes Ready), run once to create S3 credentials and bucket:
+After the `argo-workflows-storage` ArgoCD app syncs (CephObjectStoreUser becomes Ready), run once to create S3 credentials and the artifact bucket:
 
 ```bash
 # Copy Rook-generated S3 credentials to argo-workflows namespace
@@ -411,17 +411,25 @@ kubectl create secret generic argo-workflows-s3-credentials \
   --from-literal=AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# Create the artifact bucket via Ceph toolbox
-kubectl exec -n rook-ceph deploy/rook-ceph-tools -- \
-  radosgw-admin bucket create --bucket=argo-artifacts \
-  --uid=argo-artifact-user
+# Create the artifact bucket via mc using s3.verticon.com (issue #65)
+# MC_HOST_ceph is set in the devbox init_hook — credentials from the secret above
+mc alias set ceph https://s3.verticon.com "$ACCESS_KEY" "$SECRET_KEY"
+mc mb ceph/argo-artifacts
 ```
+
+> **Note**: `radosgw-admin bucket create` does not exist — bucket creation must be done
+> via an S3 client (`mc`, `aws`, etc.) against the RGW endpoint. The `argo-artifacts`
+> bucket must be created before any workflows are submitted; without it every workflow
+> will fail with `exit code 64: The specified bucket does not exist` (issue #58).
 
 After deploying, add DNS and Caddy proxy entry on mullet:
 
 ```
 workflows.verticon.com {
     reverse_proxy 192.168.0.209:2746
+    tls {
+        resolvers 1.1.1.1 1.0.0.1
+    }
 }
 ```
 
