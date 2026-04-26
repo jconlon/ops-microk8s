@@ -394,6 +394,35 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
 
 ---
 
+### Harbor bootstrap — create registry S3 bucket
+
+After Harbor is deployed and the `harbor-s3-credentials` secret exists in the `harbor` namespace, create the registry bucket using `mc` via `s3.verticon.com` (issue #65):
+
+```bash
+ACCESS_KEY=$(kubectl get secret harbor-s3-credentials -n harbor \
+  -o jsonpath='{.data.REGISTRY_STORAGE_S3_ACCESSKEY}' | base64 -d)
+SECRET_KEY=$(kubectl get secret harbor-s3-credentials -n harbor \
+  -o jsonpath='{.data.REGISTRY_STORAGE_S3_SECRETKEY}' | base64 -d)
+
+mc alias set ceph-harbor https://s3.verticon.com "$ACCESS_KEY" "$SECRET_KEY"
+mc mb ceph-harbor/harbor-registry
+```
+
+> **Note**: This bucket must be created before any image pushes to `registry.verticon.com`.
+> Without it, pushes fail silently with an S3 error (issue #57).
+
+Verify the registry is working:
+
+```bash
+docker login registry.verticon.com   # admin / Harbor admin password
+docker pull alpine:latest
+docker tag alpine:latest registry.verticon.com/library/alpine:test
+docker push registry.verticon.com/library/alpine:test
+mc ls -r ceph-harbor/harbor-registry   # confirm layers stored in Ceph
+```
+
+---
+
 ### Argo Workflows bootstrap
 
 After the `argo-workflows-storage` ArgoCD app syncs (CephObjectStoreUser becomes Ready), run once to create S3 credentials and the artifact bucket:
