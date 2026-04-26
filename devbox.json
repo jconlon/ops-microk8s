@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.2/.schema/devbox.schema.json",
   "packages": [
     "argocd@latest",
+    "argo@latest",
     "nushell@0.104.0",
     "k9s@latest",
     "postgresql@latest",
@@ -20,7 +21,8 @@
       "export PATH=$PATH:$PWD",
       "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\"",
       "[ -d \"$VENV_DIR\" ] && . $VENV_DIR/bin/activate",
-      "export LOKI_ADDR=http://192.168.0.220"
+      "export LOKI_ADDR=http://192.168.0.220",
+      "export ARGO_NAMESPACE=argo-workflows"
     ],
     "scripts": {
       "argocd-login": ["./ops argocd login"],
