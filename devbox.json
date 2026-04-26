@@ -22,7 +22,8 @@
       "[ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\"",
       "[ -d \"$VENV_DIR\" ] && . $VENV_DIR/bin/activate",
       "export LOKI_ADDR=http://192.168.0.220",
-      "export ARGO_NAMESPACE=argo-workflows"
+      "export ARGO_NAMESPACE=argo-workflows",
+      "export MC_HOST_ceph=https://s3.verticon.com"
     ],
     "scripts": {
       "argocd-login": ["./ops argocd login"],

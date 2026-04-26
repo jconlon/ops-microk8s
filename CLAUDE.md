@@ -182,6 +182,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
 - **Loki**: http://loki.verticon.com (192.168.0.220:80)
+- **Ceph RGW (S3)**: https://s3.verticon.com (192.168.0.204:80) — path-style access; use `MC_HOST_ceph` in devbox shell
 - **iDRAC Syslog**: each iDRAC sends UDP syslog to its own node's LAN IP:514 → rsyslog receives and writes to `/var/log/syslog` → Promtail ships to Loki. Queryable via `{job="syslog", node="puffer"} \|= "iDRAC"`. rsyslog config: `/etc/rsyslog.d/10-idrac.conf` on each Dell R320 node.
 
 ## File Structure
