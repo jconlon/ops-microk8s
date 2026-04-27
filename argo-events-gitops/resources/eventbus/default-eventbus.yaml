@@ -1,0 +1,14 @@
+# EventBus — NATS message broker managed by Argo Events controller.
+# The default EventBus is used by all EventSources and Sensors in the namespace
+# unless overridden by spec.eventBusName.
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  nats:
+    native:
+      # 3 replicas for HA; matches the 3-control-plane topology.
+      replicas: 3
+      auth: none

@@ -1,0 +1,32 @@
+# WebhookEventSource — receives HTTP POST payloads from the post-push git hook.
+# Listens on port 12000 (Argo Events default).
+# Exposed via MetalLB LoadBalancer at 192.168.0.221:12000.
+# Caddy on mullet terminates TLS: events.verticon.com -> 192.168.0.221:12000
+#
+# NOTE: No shared-secret authentication for initial deployment.
+# The events.verticon.com DNS A record points to a LAN IP — not internet-reachable.
+# Add endpoint secret token in a follow-on issue when needed.
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: git-push
+  namespace: argo-events
+spec:
+  # Expose the EventSource pod as a LoadBalancer service.
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000
+    # MetalLB allocates 192.168.0.221 for this service.
+    # This annotation pins the IP so it never changes across redeployments.
+    metadata:
+      annotations:
+        metallb.universe.tf/loadBalancerIPs: "192.168.0.221"
+  webhook:
+    # 'git-push' is the event name. The Sensor references this by name.
+    git-push:
+      # Port the EventSource pod listens on internally.
+      port: "12000"
+      # Path the hook POSTs to. Keep it simple; no secret in path.
+      endpoint: /push
+      method: POST
