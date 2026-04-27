@@ -1,0 +1,17 @@
+# Argo Events — event-driven automation complement to Argo Workflows
+# Controller watches EventBus, EventSource, and Sensor CRDs.
+# UI: none (purely API/CRD-driven; use `kubectl get eventsource,sensor -n argo-events`)
+# Webhook EventSource at https://events.verticon.com (192.168.0.221:12000)
+
+controller:
+  # Match the image tag to Argo Workflows v3.6.0 (Events v1.9.x is compatible)
+  image:
+    tag: v1.9.10
+
+# Install CRDs via Helm (keeps them lifecycle-coupled to the chart)
+crds:
+  install: true
+  keep: true
+
+# No extra RBAC in the Helm chart values — cross-namespace trigger RBAC
+# is applied separately via argo-events-resources-app (wave 2).
