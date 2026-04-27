@@ -60,6 +60,10 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
   - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
   - Schema Registry: running in `kafka-system`, backed by PostgreSQL
 - **Loki**: Grafana Loki log aggregation at 192.168.0.220 (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80
+- **Argo Events**: Event-driven automation companion to Argo Workflows; `argo-events` namespace
+  - WebhookEventSource at `https://events.verticon.com/push` (192.168.0.221:12000)
+  - Triggers `git-push-build` WorkflowTemplate in `argo-workflows` on POST
+  - `kubectl get eventbus,eventsource,sensor -n argo-events` — check resource status
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
 
@@ -178,6 +182,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 ### Service Access
 
 - **Argo Workflows**: https://workflows.verticon.com (192.168.0.209:2746) — CI pipeline UI
+- **Argo Events Webhook**: https://events.verticon.com (192.168.0.221:12000) — CI trigger endpoint
 - **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
 - **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
 - **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
