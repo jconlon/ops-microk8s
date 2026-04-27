@@ -46,7 +46,7 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
 - **Nodes**: 8-node HA cluster (3 control plane nodes: mullet, trout, whale)
   - Original nodes: mullet (Ubuntu 22.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
   - Dell R320 nodes (Ceph storage): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
-- **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.220
+- **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.230
 - **Storage**: Rook/Ceph distributed storage with 3-way replication across Dell R320 nodes (16TB total capacity)
 
 ### Key Components
@@ -74,7 +74,7 @@ kubectl get nodes
 
 # Enable core addons
 microk8s enable dns
-microk8s enable metallb:192.168.0.200-192.168.0.220
+microk8s enable metallb:192.168.0.200-192.168.0.230
 ```
 
 ### ArgoCD Deployment
