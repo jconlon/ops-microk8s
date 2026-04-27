@@ -1,0 +1,158 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: argo-events-healthy
+spec:
+  description: Argo Events is deployed and the webhook EventSource is live
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 60s
+
+  steps:
+    - name: argo-events-argocd-app-synced
+      description: Argo Events ArgoCD application is Synced and Healthy
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: argo-events
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+                health:
+                  status: Healthy
+
+    - name: argo-events-resources-argocd-app-synced
+      description: Argo Events resources ArgoCD application is Synced
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: argo-events-resources
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+
+    - name: argo-events-controller-running
+      description: Argo Events controller Deployment is available
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: argo-events-controller-manager
+                namespace: argo-events
+              status:
+                (availableReplicas >= `1`): true
+
+    - name: argo-events-eventbus-running
+      description: EventBus default is in Running phase
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: EventBus
+              metadata:
+                name: default
+                namespace: argo-events
+              status:
+                phase: running
+
+    - name: argo-events-eventsource-running
+      description: git-push EventSource is in Running phase
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: EventSource
+              metadata:
+                name: git-push
+                namespace: argo-events
+              status:
+                phase: Running
+
+    - name: argo-events-sensor-running
+      description: git-push Sensor is in Running phase
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Sensor
+              metadata:
+                name: git-push
+                namespace: argo-events
+              status:
+                phase: Running
+
+    - name: argo-events-service-has-ip
+      description: git-push EventSource LoadBalancer service has MetalLB IP 192.168.0.221
+      try:
+        - script:
+            content: |
+              IP=$(kubectl get svc -n argo-events \
+                -l eventsource-name=git-push \
+                -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+              [ "$IP" = "192.168.0.221" ] || { echo "Expected 192.168.0.221, got: $IP"; exit 1; }
+              echo "MetalLB IP confirmed: $IP"
+
+    - name: argo-events-webhook-reachable
+      description: Webhook endpoint is reachable at the MetalLB IP (POST returns 200)
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+                -X POST http://192.168.0.221:12000/push \
+                -H 'Content-Type: application/json' \
+                -d '{"repo":"test","commit":"abc123"}' 2>/dev/null)
+              [ "$STATUS" = "200" ] || { echo "Expected 200, got: $STATUS"; exit 1; }
+              echo "Webhook endpoint returned 200"
+
+    - name: argo-events-e2e-trigger
+      description: POST to webhook triggers a git-push-build workflow within 60s
+      try:
+        - script:
+            timeout: 90s
+            content: |
+              # Record existing workflows before triggering.
+              # Use kubectl — the argo CLI is not available in the chainsaw container.
+              BEFORE=$(kubectl get workflow -n argo-workflows \
+                --no-headers 2>/dev/null | grep "^git-push-" | wc -l)
+
+              # POST the webhook payload
+              curl -sf -X POST http://192.168.0.221:12000/push \
+                -H 'Content-Type: application/json' \
+                -d "{\"repo\":\"https://github.com/jconlon/test\",\"commit\":\"$(date +%s)\"}" \
+                > /dev/null 2>&1
+
+              # Poll for a new workflow (up to 60s)
+              for i in $(seq 1 30); do
+                AFTER=$(kubectl get workflow -n argo-workflows \
+                  --no-headers 2>/dev/null | grep "^git-push-" | wc -l)
+                if [ "$AFTER" -gt "$BEFORE" ]; then
+                  echo "New git-push workflow detected (count: $AFTER)"
+                  exit 0
+                fi
+                sleep 2
+              done
+              echo "No new git-push workflow detected within 60s"
+              exit 1
+
+    - name: argo-events-workflowtemplate-exists
+      description: git-push-build WorkflowTemplate exists in argo-workflows
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: WorkflowTemplate
+              metadata:
+                name: git-push-build
+                namespace: argo-workflows

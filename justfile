@@ -94,6 +94,24 @@ argo-status:
 test-argo-workflows:
     chainsaw test tests/argo-workflows
 
+# ── Argo Events ───────────────────────────────────────────────────────────────
+
+# Show Argo Events pod and resource status
+argo-events-status:
+    #!/usr/bin/env bash
+    echo "=== Pods ==="
+    kubectl get pods -n argo-events -o wide
+    echo ""
+    echo "=== EventBus / EventSource / Sensor ==="
+    kubectl get eventbus,eventsource,sensor -n argo-events
+    echo ""
+    echo "=== Service IPs ==="
+    kubectl get svc -n argo-events
+
+# Run Argo Events chainsaw tests
+test-argo-events:
+    chainsaw test tests/argo-events
+
 # ── Harbor ────────────────────────────────────────────────────────────────────
 
 # Show Harbor pod status
