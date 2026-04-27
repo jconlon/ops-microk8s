@@ -501,6 +501,12 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
       # apiVersion/kind as K8s resources, so we keep manifests and Helm values in
       # separate directories.
       path: argo-events-gitops/resources
+      # recurse: true is REQUIRED — resources live in subdirectories
+      # (eventbus/, eventsources/, sensors/). Without this ArgoCD only looks in the
+      # root of the path and finds nothing, resulting in an empty sync (no error,
+      # just zero resources applied). The cosmo app uses the same pattern.
+    directory:
+      recurse: true
     destination:
       server: https://kubernetes.default.svc
       # Most resources are namespaced to argo-events; the ClusterRole/Binding
@@ -523,7 +529,9 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
           maxDuration: 3m
   ```
 
-  **Note on path separation:** The `argo-events-gitops/` tree is split into `helm/` (Helm values, not K8s resources) and `resources/` (K8s resource manifests). ArgoCD requires that every YAML file in the target path be a valid K8s resource with `apiVersion` and `kind`. A Helm values file has neither, so it must live outside the ArgoCD-managed path. This separation (`helm/` vs. `resources/`) is the correct pattern — do not point the resources app at `argo-events-gitops/` directly.
+  **Note on path separation and directory recursion:** The `argo-events-gitops/` tree is split into `helm/` (Helm values, not K8s resources) and `resources/` (K8s resource manifests). ArgoCD requires that every YAML file in the target path be a valid K8s resource with `apiVersion` and `kind`. A Helm values file has neither, so it must live outside the ArgoCD-managed path. This separation (`helm/` vs. `resources/`) is the correct pattern — do not point the resources app at `argo-events-gitops/` directly.
+
+  The `directory.recurse: true` field is **mandatory** because the manifests live in subdirectories (`eventbus/`, `eventsources/`, `sensors/`). Without it, ArgoCD only scans the root of `argo-events-gitops/resources/` — which is empty — and silently syncs zero resources. This is a silent failure mode: the app reports Synced/Healthy with no resources. The cosmo app (`argoCD-apps/cosmo/cosmo-router-app.yaml`) uses the identical pattern.
 
 - [ ] **Step 4: Verify file syntax**
 
@@ -550,6 +558,14 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   - `argo-events-app.yaml` uses `sources:` (multi-source) with `ref: values` (matches `argo-workflows-app.yaml` pattern)
   - Wave annotations: `"1"` on the controller app, `"2"` on the resources app (matches `argo-workflows-storage-app.yaml`/`argo-workflows-app.yaml` pattern)
   - `ServerSideApply: true` on both Helm-using apps (matches cluster pattern)
+  - **`argo-events-resources-app.yaml` has `directory.recurse: true`** — this is mandatory; without it the app syncs zero resources silently
+
+  ```bash
+  grep -A2 "directory:" argoCD-apps/argo-events/argo-events-resources-app.yaml
+  # Expected:
+  #   directory:
+  #     recurse: true
+  ```
 
 - [ ] **Step 6: Commit ArgoCD wiring**
 
@@ -573,18 +589,20 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 **Files:**
 - No GitOps changes (Caddyfile is on mullet, not in this repo)
 
-- [ ] **Step 1: Add Cloudflare DNS A record**
+> **IMPORTANT FOR IMPLEMENTATION AGENT:** Steps 1 and 2 are MANUAL OPERATOR STEPS. Do NOT attempt to execute them. The user performs these via a separate terminal. Skip them — they will be done by the operator. Only execute Steps 3, 4, and 5 after confirming with the user that the DNS and Caddy changes are done.
 
-  In the Cloudflare dashboard:
+**[MANUAL — user performs this, not the agent] Step 1: Add Cloudflare DNS A record**
+
+  The user adds this in the Cloudflare dashboard:
   - Type: A
   - Name: `events`
   - Content: `192.168.0.221`
   - Proxy: DNS only (grey cloud — not proxied)
   - TTL: Auto
 
-- [ ] **Step 2: Add Caddyfile entry on mullet**
+**[MANUAL — user performs this, not the agent] Step 2: Add Caddyfile entry on mullet**
 
-  SSH to mullet and add to `/etc/caddy/Caddyfile`:
+  The user SSHes to mullet and adds to `/etc/caddy/Caddyfile`:
 
   ```
   events.verticon.com {
@@ -595,12 +613,12 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   }
   ```
 
-  Then reload Caddy:
+  Then reloads Caddy:
   ```bash
   sudo caddy reload --config /etc/caddy/Caddyfile
   ```
 
-- [ ] **Step 3: Verify HTTPS endpoint**
+- [ ] **Step 3: Verify HTTPS endpoint (after user confirms DNS and Caddy are done)**
 
   ```bash
   # Should return the Argo Events EventSource welcome/ready response
@@ -944,6 +962,15 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   ```
   Common causes: CRDs not yet established (wave 1 still syncing — wait 30s and retry), or RBAC conflict (ClusterRole already exists — check with `kubectl get clusterrole argo-events-workflow-submit`).
 
+  **Silent-failure check**: Even if the resources app reports Synced/Healthy, verify that actual resources were deployed (the `directory.recurse: true` flag prevents an empty sync, but double-check):
+  ```bash
+  kubectl get eventbus,eventsource,sensor -n argo-events
+  # Expected: all three resources listed (not empty)
+  kubectl get workflowtemplate git-push-build -n argo-workflows
+  # Expected: git-push-build WorkflowTemplate exists
+  ```
+  If resources are missing despite the app being Synced, the `directory.recurse: true` field may be missing from `argo-events-resources-app.yaml`. Check: `kubectl get application argo-events-resources -n argocd -o jsonpath='{.spec.source.directory}'`
+
 - [ ] **Step 9: Run tests to green**
 
   ```bash
@@ -1213,8 +1240,10 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
 ## Tricky Boundaries and Risk Notes
 
-### ArgoCD resources-app path layout
-The `argo-events-resources-app` points to `argo-events-gitops/resources/` — the subdirectory that contains only K8s resource manifests (EventBus, EventSource, Sensor, RBAC, WorkflowTemplate). The Helm values file at `argo-events-gitops/helm/argo-events-values.yaml` is in a separate subtree not referenced by this app. This separation is mandatory: ArgoCD attempts to apply every YAML file in the target path as a K8s resource, and a Helm values file (which has no `apiVersion`/`kind`) will cause a sync error if included. The directory structure in the plan already accounts for this — `resources/` and `helm/` are siblings, not nested.
+### ArgoCD resources-app path layout and directory recursion
+The `argo-events-resources-app` points to `argo-events-gitops/resources/` with `directory.recurse: true`. The manifests are organized in subdirectories (`eventbus/`, `eventsources/`, `sensors/`) to keep them separate. Without `directory.recurse: true`, ArgoCD only scans the root of the path — which is empty — and syncs zero resources. This is a **silent failure mode**: the app reports `Synced/Healthy` but deploys nothing. Always verify with `kubectl get eventbus,eventsource,sensor -n argo-events` after the resources app syncs to confirm resources actually exist.
+
+The Helm values file at `argo-events-gitops/helm/argo-events-values.yaml` is in a separate sibling subtree (`helm/`) not included in the ArgoCD path. This separation is mandatory: ArgoCD attempts to apply every YAML file in the target path as a K8s resource, and a Helm values file (which has no `apiVersion`/`kind`) will cause a sync error if included. The directory structure in the plan already accounts for this — `resources/` and `helm/` are siblings, not nested.
 
 ### EventSource service label selector
 Argo Events creates the EventSource LoadBalancer service with labels `eventsource-name=git-push`. The MetalLB IP annotation `metallb.universe.tf/loadBalancerIPs: "192.168.0.221"` must be on the `EventSource` spec under `spec.service.metadata.annotations`, not on the ArgoCD Application. The chainsaw test uses `-l eventsource-name=git-push` to find the service since the name is Argo Events-generated (not a fixed name we control).
