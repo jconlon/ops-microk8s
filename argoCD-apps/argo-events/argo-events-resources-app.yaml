@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-events-resources
+  namespace: argocd
+  annotations:
+    # Wave 2: CRDs from wave 1 must be established before applying typed resources.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jconlon/ops-microk8s
+    targetRevision: HEAD
+    # Path contains only K8s resource manifests (EventBus, EventSource, Sensor, RBAC,
+    # WorkflowTemplate). Helm values live at argo-events-gitops/helm/ — a separate
+    # subtree not referenced here. ArgoCD cannot apply plain YAML files that lack
+    # apiVersion/kind as K8s resources, so we keep manifests and Helm values in
+    # separate directories.
+    path: argo-events-gitops/resources
+    # recurse: true is REQUIRED — resources live in subdirectories
+    # (eventbus/, eventsources/, sensors/). Without this ArgoCD only looks in the
+    # root of the path and finds nothing, resulting in an empty sync (no error,
+    # just zero resources applied). The cosmo app uses the same pattern.
+  directory:
+    recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    # Most resources are namespaced to argo-events; the ClusterRole/Binding
+    # and WorkflowTemplate are cluster-/argo-workflows-scoped but ArgoCD
+    # applies them regardless (destination namespace is overridden by
+    # metadata.namespace in each manifest).
+    namespace: argo-events
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
