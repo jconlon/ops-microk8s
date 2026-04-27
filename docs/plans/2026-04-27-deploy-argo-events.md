@@ -837,7 +837,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
 - [ ] **Step 4: Extend tests/argocd/chainsaw-test.yaml**
 
-  Add a new step after `argo-workflows-apps-healthy` (or at the end):
+  Add a new step at the end of the `steps:` list (after the final `vllm-healthy` step). Note: the existing test has no `argo-workflows-apps-healthy` step — append at the end of the file's steps list.
 
   ```yaml
       - name: argo-events-apps-healthy
