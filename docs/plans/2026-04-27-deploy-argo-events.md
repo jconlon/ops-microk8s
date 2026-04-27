@@ -551,45 +551,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   - Wave annotations: `"1"` on the controller app, `"2"` on the resources app (matches `argo-workflows-storage-app.yaml`/`argo-workflows-app.yaml` pattern)
   - `ServerSideApply: true` on both Helm-using apps (matches cluster pattern)
 
-- [ ] **Step 6: Bootstrap: apply the parent app to ArgoCD**
-
-  ArgoCD manages itself via GitOps, but the initial `argo-events-apps` parent Application must be applied manually (same pattern as every other app-of-apps in this cluster):
-
-  ```bash
-  # Apply the parent App-of-Apps to ArgoCD (self-managing)
-  kubectl apply -f argoCD-apps/argo-events-apps.yaml
-  ```
-
-  Then wait for ArgoCD to sync the children:
-
-  ```bash
-  # Watch ArgoCD sync progress
-  watch kubectl get application -n argocd | grep argo-events
-  # Expected within 2-3 minutes:
-  #   argo-events-apps      Synced   Healthy
-  #   argo-events           Synced   Healthy
-  #   argo-events-resources Synced   Healthy
-  ```
-
-  Verify Argo Events controller is running:
-  ```bash
-  kubectl get pods -n argo-events
-  # Expected: controller pod Running, EventBus NATS pods Running (3 replicas)
-  ```
-
-  Verify the EventSource LoadBalancer IP:
-  ```bash
-  kubectl get svc -n argo-events
-  # Expected: git-push-eventsource service with EXTERNAL-IP 192.168.0.221
-  ```
-
-  If the ArgoCD resources app fails to sync, check the sync error in the ArgoCD UI or:
-  ```bash
-  kubectl get application argo-events-resources -n argocd -o jsonpath='{.status.conditions}'
-  ```
-  Common causes: CRDs not yet established (wave 1 still syncing — wait 30s and retry), or RBAC conflict (ClusterRole already exists from a prior attempt — check with `kubectl get clusterrole argo-events-workflow-submit`).
-
-- [ ] **Step 7: Commit ArgoCD wiring**
+- [ ] **Step 6: Commit ArgoCD wiring**
 
   ```bash
   git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events add \
@@ -599,6 +561,10 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events \
     commit -m "feat: wire Argo Events App-of-Apps into ArgoCD (issue #66)"
   ```
+
+  > **NOTE**: The bootstrap `kubectl apply` that actually deploys Argo Events to the cluster
+  > is intentionally deferred to Task 5 (after the chainsaw tests are written and confirmed red).
+  > Do NOT apply the parent app here. Commit only.
 
 ---
 
@@ -925,7 +891,60 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   # Expected: argo-events-status and test-argo-events listed
   ```
 
-- [ ] **Step 7: After Argo Events is deployed (Task 3 Step 6 bootstrap complete), run tests to green**
+- [ ] **Step 7: Commit tests and justfile (while still red — before bootstrap)**
+
+  ```bash
+  git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events add \
+    tests/argo-events/chainsaw-test.yaml \
+    tests/argocd/chainsaw-test.yaml \
+    justfile
+  git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events \
+    commit -m "test: add Argo Events chainsaw tests and just recipes (issue #66)"
+  ```
+
+- [ ] **Step 8: Bootstrap — apply the parent app to ArgoCD (green deployment)**
+
+  All manifests are committed and tests are confirmed red. Now bootstrap the deployment:
+
+  ```bash
+  # Push the branch so ArgoCD can pull the committed manifests
+  git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events push
+
+  # Apply the parent App-of-Apps to ArgoCD (same pattern as every other app-of-apps)
+  kubectl apply -f argoCD-apps/argo-events-apps.yaml
+  ```
+
+  Watch ArgoCD sync the child applications:
+
+  ```bash
+  watch kubectl get application -n argocd | grep argo-events
+  # Expected within 2-3 minutes:
+  #   argo-events-apps      Synced   Healthy
+  #   argo-events           Synced   Healthy
+  #   argo-events-resources Synced   Healthy
+  ```
+
+  Verify the controller and EventBus are running:
+
+  ```bash
+  kubectl get pods -n argo-events
+  # Expected: controller pod Running, EventBus NATS pods Running (3 replicas)
+  ```
+
+  Verify the EventSource LoadBalancer IP is assigned:
+
+  ```bash
+  kubectl get svc -n argo-events
+  # Expected: git-push-eventsource service with EXTERNAL-IP 192.168.0.221
+  ```
+
+  If the resources app fails to sync, check:
+  ```bash
+  kubectl get application argo-events-resources -n argocd -o jsonpath='{.status.conditions}'
+  ```
+  Common causes: CRDs not yet established (wave 1 still syncing — wait 30s and retry), or RBAC conflict (ClusterRole already exists — check with `kubectl get clusterrole argo-events-workflow-submit`).
+
+- [ ] **Step 9: Run tests to green**
 
   ```bash
   chainsaw test tests/argo-events/
@@ -936,17 +955,6 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
   chainsaw test tests/argo-workflows/
   # Expected: still PASS (no regression)
-  ```
-
-- [ ] **Step 8: Commit tests and justfile**
-
-  ```bash
-  git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events add \
-    tests/argo-events/chainsaw-test.yaml \
-    tests/argocd/chainsaw-test.yaml \
-    justfile
-  git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events \
-    commit -m "test: add Argo Events chainsaw tests and just recipes (issue #66)"
   ```
 
 ---
