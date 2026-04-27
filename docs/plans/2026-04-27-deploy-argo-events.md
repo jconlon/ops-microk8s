@@ -279,8 +279,11 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
                   dependencyName: git-push-dep
                   dataKey: body.commit
                 dest: spec.arguments.parameters.1.value
-    # Sensor uses this ServiceAccount; must have submit rights in argo-workflows.
-    serviceAccountName: argo-events-sensor-sa
+    # ServiceAccount used by the Sensor pod.
+    # Must be under spec.template.serviceAccountName (not spec.serviceAccountName).
+    # This is confirmed by official Argo Events examples (webhook.yaml, special-workflow-trigger.yaml).
+    template:
+      serviceAccountName: argo-events-sensor-sa
   ---
   # ServiceAccount for the Sensor pod.
   apiVersion: v1
@@ -289,15 +292,18 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
     name: argo-events-sensor-sa
     namespace: argo-events
   ---
-  # ClusterRole: submit workflows in argo-workflows namespace.
+  # ClusterRole: full access to workflows in argo-workflows namespace.
+  # The Argo Events Sensor needs create (to submit), get/list/watch (to track status),
+  # and update/patch (for retries and workflow finalizer management).
+  # Using "*" matches the official Argo Events RBAC example (rbac/sensor-rbac.yaml).
   apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
     name: argo-events-workflow-submit
   rules:
     - apiGroups: ["argoproj.io"]
-      resources: ["workflows", "workflowtemplates"]
-      verbs: ["create", "get", "list", "watch"]
+      resources: ["workflows", "workflowtemplates", "cronworkflows", "clusterworkflowtemplates"]
+      verbs: ["*"]
   ---
   # ClusterRoleBinding: bind the sensor SA to the ClusterRole.
   apiVersion: rbac.authorization.k8s.io/v1
@@ -373,7 +379,8 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   - EventSource service annotation uses `metallb.universe.tf/loadBalancerIPs` (matches cluster pattern)
   - Sensor `dataKey` paths match the JSON structure sent by the post-push hook (`body.repo`, `body.commit`)
   - WorkflowTemplate is in `argo-workflows` namespace (where the Argo Workflows controller watches)
-  - ClusterRole only grants `create`/`get`/`list`/`watch` on `workflows` and `workflowtemplates` — no over-privilege
+  - Sensor uses `spec.template.serviceAccountName` (NOT `spec.serviceAccountName` — confirmed by official Argo Events examples)
+  - ClusterRole uses `verbs: ["*"]` on `workflows`, `workflowtemplates`, `cronworkflows`, `clusterworkflowtemplates` — matches the official `rbac/sensor-rbac.yaml` example and covers post-submit status tracking and retries
 
 - [ ] **Step 6: Commit**
 
@@ -935,7 +942,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   Watch ArgoCD sync the child applications:
 
   ```bash
-  watch kubectl get application -n argocd | grep argo-events
+  kubectl get application -n argocd -w | grep argo-events
   # Expected within 2-3 minutes:
   #   argo-events-apps      Synced   Healthy
   #   argo-events           Synced   Healthy
@@ -1262,6 +1269,18 @@ Use `metallb.universe.tf/loadBalancerIPs` (plural `IPs`). The singular `loadBala
 
 ### WorkflowTemplate in argo-events-resources-app
 The `WorkflowTemplate` (`git-push-build`) is in `argo-workflows` namespace, but the `argo-events-resources-app` has `destination.namespace: argo-events`. ArgoCD applies `metadata.namespace: argo-workflows` from the manifest directly — the destination namespace is the default for resources that don't specify their own. Since the WorkflowTemplate manifest has `namespace: argo-workflows` explicitly, ArgoCD will apply it there. Verify with `kubectl get workflowtemplate -n argo-workflows` after sync.
+
+### Sensor serviceAccountName field path
+
+The Sensor ServiceAccount is specified at `spec.template.serviceAccountName`, **not** `spec.serviceAccountName`. This is confirmed by official Argo Events examples (`webhook.yaml`, `special-workflow-trigger.yaml`, `sensor-rbac.yaml`). Using the wrong path means the Sensor pod runs under the `default` ServiceAccount, which lacks RBAC to submit workflows, causing a `403 Forbidden` error logged by the Sensor on every event.
+
+Verify with:
+```bash
+kubectl get sensor git-push -n argo-events -o jsonpath='{.spec.template.serviceAccountName}'
+# Expected: argo-events-sensor-sa
+```
+
+If the Sensor logs `403` errors after deployment, check this field first before investigating other RBAC issues.
 
 ### Post-push hook never exits non-zero
 The hook explicitly catches curl failures with `|| true` and only warns (does not exit 1) on non-200 responses. A webhook failure must never block a git push. This is a hard requirement documented in the hook itself.
