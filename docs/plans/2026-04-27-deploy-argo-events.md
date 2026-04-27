@@ -22,9 +22,9 @@
 | Path | Purpose |
 |---|---|
 | `argo-events-gitops/helm/argo-events-values.yaml` | Argo Events Helm values (controller, RBAC) |
-| `argo-events-gitops/eventsources/git-push-eventsource.yaml` | WebhookEventSource — receives git push POSTs |
-| `argo-events-gitops/sensors/git-push-sensor.yaml` | Sensor — maps payload to WorkflowTemplate trigger |
-| `argo-events-gitops/eventbus/default-eventbus.yaml` | EventBus (NATS) — message broker for events |
+| `argo-events-gitops/resources/eventsources/git-push-eventsource.yaml` | WebhookEventSource — receives git push POSTs |
+| `argo-events-gitops/resources/sensors/git-push-sensor.yaml` | Sensor — maps payload to WorkflowTemplate trigger |
+| `argo-events-gitops/resources/eventbus/default-eventbus.yaml` | EventBus (NATS) — message broker for events |
 | `argoCD-apps/argo-events-apps.yaml` | App-of-Apps parent pointing to `argoCD-apps/argo-events/` |
 | `argoCD-apps/argo-events/argo-events-app.yaml` | Wave 1 — Argo Events Helm chart (controller + CRDs) |
 | `argoCD-apps/argo-events/argo-events-resources-app.yaml` | Wave 2 — EventBus + EventSource + Sensor manifests |
@@ -152,9 +152,9 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 ## Task 2: EventBus, EventSource, Sensor manifests
 
 **Files:**
-- Create: `argo-events-gitops/eventbus/default-eventbus.yaml`
-- Create: `argo-events-gitops/eventsources/git-push-eventsource.yaml`
-- Create: `argo-events-gitops/sensors/git-push-sensor.yaml`
+- Create: `argo-events-gitops/resources/eventbus/default-eventbus.yaml`
+- Create: `argo-events-gitops/resources/eventsources/git-push-eventsource.yaml`
+- Create: `argo-events-gitops/resources/sensors/git-push-sensor.yaml`
 
 - [ ] **Step 1: Identify the failing check**
 
@@ -172,7 +172,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
 - [ ] **Step 3: Create the manifests**
 
-  **`argo-events-gitops/eventbus/default-eventbus.yaml`:**
+  **`argo-events-gitops/resources/eventbus/default-eventbus.yaml`:**
   ```yaml
   # EventBus — NATS message broker managed by Argo Events controller.
   # The default EventBus is used by all EventSources and Sensors in the namespace
@@ -190,7 +190,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
         auth: none
   ```
 
-  **`argo-events-gitops/eventsources/git-push-eventsource.yaml`:**
+  **`argo-events-gitops/resources/eventsources/git-push-eventsource.yaml`:**
   ```yaml
   # WebhookEventSource — receives HTTP POST payloads from the post-push git hook.
   # Listens on port 12000 (Argo Events default).
@@ -226,7 +226,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
         method: POST
   ```
 
-  **`argo-events-gitops/sensors/git-push-sensor.yaml`:**
+  **`argo-events-gitops/resources/sensors/git-push-sensor.yaml`:**
   ```yaml
   # Sensor — listens to the git-push EventSource and submits an Argo Workflow.
   # Triggers the 'git-push-build' WorkflowTemplate in the 'argo-workflows' namespace.
@@ -351,9 +351,9 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   python3 -c "
   import sys
   for f in [
-    'argo-events-gitops/eventbus/default-eventbus.yaml',
-    'argo-events-gitops/eventsources/git-push-eventsource.yaml',
-    'argo-events-gitops/sensors/git-push-sensor.yaml',
+    'argo-events-gitops/resources/eventbus/default-eventbus.yaml',
+    'argo-events-gitops/resources/eventsources/git-push-eventsource.yaml',
+    'argo-events-gitops/resources/sensors/git-push-sensor.yaml',
   ]:
       try:
           open(f).read()
@@ -363,7 +363,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   " 2>&1 || echo "Check files manually"
   ```
 
-  Run: `cat argo-events-gitops/sensors/git-push-sensor.yaml`
+  Run: `cat argo-events-gitops/resources/sensors/git-push-sensor.yaml`
   Expected: Full YAML output with all five documents separated by `---`.
 
 - [ ] **Step 5: Refactor and verify**
@@ -379,9 +379,9 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
   ```bash
   git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events add \
-    argo-events-gitops/eventbus/default-eventbus.yaml \
-    argo-events-gitops/eventsources/git-push-eventsource.yaml \
-    argo-events-gitops/sensors/git-push-sensor.yaml
+    argo-events-gitops/resources/eventbus/default-eventbus.yaml \
+    argo-events-gitops/resources/eventsources/git-push-eventsource.yaml \
+    argo-events-gitops/resources/sensors/git-push-sensor.yaml
   git -C /home/jconlon/git/ops-microk8s/.worktrees/deploy-argo-events \
     commit -m "feat: add EventBus, WebhookEventSource, and Sensor manifests (issue #66)"
   ```
@@ -495,9 +495,12 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
     source:
       repoURL: https://github.com/jconlon/ops-microk8s
       targetRevision: HEAD
-      # Single path containing EventBus, EventSource, Sensor, RBAC, WorkflowTemplate.
-      # ArgoCD applies all YAML files in the directory.
-      path: argo-events-gitops
+      # Path contains only K8s resource manifests (EventBus, EventSource, Sensor, RBAC,
+      # WorkflowTemplate). Helm values live at argo-events-gitops/helm/ — a separate
+      # subtree not referenced here. ArgoCD cannot apply plain YAML files that lack
+      # apiVersion/kind as K8s resources, so we keep manifests and Helm values in
+      # separate directories.
+      path: argo-events-gitops/resources
     destination:
       server: https://kubernetes.default.svc
       # Most resources are namespaced to argo-events; the ClusterRole/Binding
@@ -520,10 +523,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
           maxDuration: 3m
   ```
 
-  **Critical note on `argo-events-resources-app` path:** The path `argo-events-gitops` is a directory. ArgoCD will recurse and apply all YAML files under it. The `eventbus/`, `eventsources/`, `sensors/`, and `helm/` subdirectories will all be scanned. The `helm/` directory contains only the values file (no CRDs/resources), which ArgoCD will ignore (it applies only recognized K8s objects). If this causes issues, use `argo-events-gitops/resources` as a flat directory and move all non-Helm manifests there. The simpler path is preferred; adjust only if ArgoCD reports errors on the values file.
-
-  **Alternative path layout** (if ArgoCD balks at the Helm values file in the same tree):
-  Move manifests to `argo-events-gitops/resources/` and point `path: argo-events-gitops/resources` instead. Document this in the commit message if the adjustment is needed.
+  **Note on path separation:** The `argo-events-gitops/` tree is split into `helm/` (Helm values, not K8s resources) and `resources/` (K8s resource manifests). ArgoCD requires that every YAML file in the target path be a valid K8s resource with `apiVersion` and `kind`. A Helm values file has neither, so it must live outside the ArgoCD-managed path. This separation (`helm/` vs. `resources/`) is the correct pattern — do not point the resources app at `argo-events-gitops/` directly.
 
 - [ ] **Step 4: Verify file syntax**
 
@@ -583,14 +583,11 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
   # Expected: git-push-eventsource service with EXTERNAL-IP 192.168.0.221
   ```
 
-  If the ArgoCD resources app fails because ArgoCD can't apply the `helm/` values file as a K8s resource:
+  If the ArgoCD resources app fails to sync, check the sync error in the ArgoCD UI or:
   ```bash
-  # Move manifests to a resources subdirectory
-  mkdir -p argo-events-gitops/resources
-  mv argo-events-gitops/eventbus argo-events-gitops/eventsources argo-events-gitops/sensors argo-events-gitops/resources/
-  # Update path in argo-events-resources-app.yaml: path: argo-events-gitops/resources
-  git add -A && git commit -m "fix: move argo-events resources to dedicated subdirectory"
+  kubectl get application argo-events-resources -n argocd -o jsonpath='{.status.conditions}'
   ```
+  Common causes: CRDs not yet established (wave 1 still syncing — wait 30s and retry), or RBAC conflict (ClusterRole already exists from a prior attempt — check with `kubectl get clusterrole argo-events-workflow-submit`).
 
 - [ ] **Step 7: Commit ArgoCD wiring**
 
@@ -829,9 +826,10 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
           - script:
               timeout: 90s
               content: |
-                # Record existing workflows before triggering
-                BEFORE=$(argo list -n argo-workflows --no-headers 2>/dev/null | \
-                  grep git-push | wc -l)
+                # Record existing workflows before triggering.
+                # Use kubectl — the argo CLI is not available in the chainsaw container.
+                BEFORE=$(kubectl get workflow -n argo-workflows \
+                  --no-headers 2>/dev/null | grep "^git-push-" | wc -l)
 
                 # POST the webhook payload
                 curl -sf -X POST http://192.168.0.221:12000/push \
@@ -841,8 +839,8 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 
                 # Poll for a new workflow (up to 60s)
                 for i in $(seq 1 30); do
-                  AFTER=$(argo list -n argo-workflows --no-headers 2>/dev/null | \
-                    grep git-push | wc -l)
+                  AFTER=$(kubectl get workflow -n argo-workflows \
+                    --no-headers 2>/dev/null | grep "^git-push-" | wc -l)
                   if [ "$AFTER" -gt "$BEFORE" ]; then
                     echo "New git-push workflow detected (count: $AFTER)"
                     exit 0
@@ -1208,7 +1206,7 @@ Argo Workflows `0.45.0` chart deploys app version v3.6.0. Argo Events `2.4.21` d
 ## Tricky Boundaries and Risk Notes
 
 ### ArgoCD resources-app path layout
-The `argo-events-resources-app` points to `argo-events-gitops/` which contains both `helm/argo-events-values.yaml` and the CRD instance manifests. ArgoCD treats a values file as a plain YAML file and attempts to apply it as a K8s resource. If ArgoCD errors on the values file, the fix is to move the manifests to `argo-events-gitops/resources/` and update the `path:` field. This is documented in Task 3 Step 3 with the exact commands. **Check ArgoCD sync status carefully after wave 2 bootstraps.**
+The `argo-events-resources-app` points to `argo-events-gitops/resources/` — the subdirectory that contains only K8s resource manifests (EventBus, EventSource, Sensor, RBAC, WorkflowTemplate). The Helm values file at `argo-events-gitops/helm/argo-events-values.yaml` is in a separate subtree not referenced by this app. This separation is mandatory: ArgoCD attempts to apply every YAML file in the target path as a K8s resource, and a Helm values file (which has no `apiVersion`/`kind`) will cause a sync error if included. The directory structure in the plan already accounts for this — `resources/` and `helm/` are siblings, not nested.
 
 ### EventSource service label selector
 Argo Events creates the EventSource LoadBalancer service with labels `eventsource-name=git-push`. The MetalLB IP annotation `metallb.universe.tf/loadBalancerIPs: "192.168.0.221"` must be on the `EventSource` spec under `spec.service.metadata.annotations`, not on the ArgoCD Application. The chainsaw test uses `-l eventsource-name=git-push` to find the service since the name is Argo Events-generated (not a fixed name we control).
