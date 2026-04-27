@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# post-push — fire a CI build webhook after every successful push.
+#
+# Installation (run in your application repository):
+#   cp /path/to/ops-microk8s/scripts/hooks/post-push.tmpl .git/hooks/post-push
+#   chmod +x .git/hooks/post-push
+#
+# The hook reads ARGO_EVENTS_URL from the environment, falling back to the
+# cluster default. Override it in your shell profile if needed:
+#   export ARGO_EVENTS_URL=https://events.verticon.com/push
+#
+# The hook posts JSON: { "repo": "<remote-url>", "commit": "<sha>" }
+# The Argo Events Sensor maps these to the git-push-build WorkflowTemplate.
+
+set -euo pipefail
+
+ARGO_EVENTS_URL="${ARGO_EVENTS_URL:-https://events.verticon.com/push}"
+REPO=$(git remote get-url origin 2>/dev/null || echo "unknown")
+COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+
+echo "[post-push] Triggering CI build for ${REPO} @ ${COMMIT:0:8}"
+
+HTTP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+  --max-time 10 \
+  -X POST "${ARGO_EVENTS_URL}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"repo\":\"${REPO}\",\"commit\":\"${COMMIT}\"}" 2>/dev/null) || true
+
+if [ "${HTTP_STATUS}" = "200" ]; then
+  echo "[post-push] CI build triggered (HTTP 200). Check ${ARGO_EVENTS_URL/push/} for status."
+else
+  echo "[post-push] WARNING: webhook returned HTTP ${HTTP_STATUS:-000} — CI build may not have triggered."
+  echo "            Check Argo Events logs: kubectl logs -n argo-events -l eventsource-name=git-push"
+  # Do NOT exit non-zero — a failed webhook must never block a git push.
+fi
+
+exit 0
