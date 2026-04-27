@@ -480,3 +480,25 @@ teller run --config teller/.teller-argo-workflows.yml -- bash -c '
     --dry-run=client -o yaml | kubectl apply -f -
 '
 ```
+
+---
+
+### Argo Events — events.verticon.com
+
+The Argo Events WebhookEventSource is exposed at https://events.verticon.com (192.168.0.221:12000).
+
+**Caddy entry** (mullet:/etc/caddy/Caddyfile):
+```
+events.verticon.com {
+    tls {
+        resolvers 1.1.1.1 1.0.0.1
+    }
+    reverse_proxy 192.168.0.221:12000
+}
+```
+
+**DNS**: Cloudflare A record: events.verticon.com → 192.168.0.221 (DNS only, not proxied)
+
+**Test**: `curl -X POST https://events.verticon.com/push -d '{"repo":"test","commit":"abc"}' -H 'Content-Type: application/json'`
+
+**Git hook**: See `scripts/hooks/README.md` for instructions on installing the `post-push.tmpl` hook in any application repository to fire CI builds on `git push`.
