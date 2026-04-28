@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: image-build-push
+  namespace: argo-workflows
+spec:
+  entrypoint: build-and-push
+  serviceAccountName: argo-workflow
+  templates:
+    - name: build-and-push
+      inputs:
+        parameters:
+          - name: repo-url
+          - name: revision
+            value: main
+          - name: image
+          - name: context
+            value: .
+          - name: dockerfile
+            value: Dockerfile
+      volumes:
+        - name: harbor-credentials
+          secret:
+            secretName: harbor-credentials
+            items:
+              - key: .dockerconfigjson
+                path: config.json
+      container:
+        image: gcr.io/kaniko-project/executor:latest
+        args:
+          - --dockerfile={{inputs.parameters.dockerfile}}
+          - --context={{inputs.parameters.repo-url}}#{{inputs.parameters.revision}}
+          - --context-sub-path={{inputs.parameters.context}}
+          - --destination={{inputs.parameters.image}}
+          - --cache=true
+          # Requires a 'cache' project to exist in Harbor (registry.verticon.com/cache).
+          - --cache-repo=registry.verticon.com/cache
+        volumeMounts:
+          - name: harbor-credentials
+            mountPath: /kaniko/.docker

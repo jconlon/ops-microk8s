@@ -99,6 +99,16 @@ spec:
               status:
                 phase: Ready
 
+    - name: argo-workflows-harbor-credentials-exist
+      description: harbor-credentials docker-registry secret exists with registry.verticon.com auth
+      try:
+        - script:
+            content: |
+              kubectl get secret harbor-credentials -n argo-workflows \
+                -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | grep -q "registry.verticon.com" \
+                || { echo "harbor-credentials secret missing or does not reference registry.verticon.com"; exit 1; }
+              echo "harbor-credentials secret present"
+
     - name: argo-workflows-api-responsive
       description: Argo Workflows API responds at the MetalLB IP
       try:
