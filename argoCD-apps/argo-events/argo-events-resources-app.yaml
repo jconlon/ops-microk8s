@@ -10,7 +10,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: HEAD
+    targetRevision: deploy-argo-events
     # Path contains only K8s resource manifests (EventBus, EventSource, Sensor, RBAC,
     # WorkflowTemplate). Helm values live at argo-events-gitops/helm/ — a separate
     # subtree not referenced here. ArgoCD cannot apply plain YAML files that lack
