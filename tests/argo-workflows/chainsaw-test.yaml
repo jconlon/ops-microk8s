@@ -40,6 +40,33 @@ spec:
                 sync:
                   status: Synced
 
+    - name: argo-workflows-templates-app-synced
+      description: argo-workflows-templates ArgoCD application is Synced and Healthy
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: argo-workflows-templates
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+                health:
+                  status: Healthy
+
+    - name: argo-workflows-image-build-push-template-exists
+      description: image-build-push WorkflowTemplate exists with required parameters
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: WorkflowTemplate
+              metadata:
+                name: image-build-push
+                namespace: argo-workflows
+
     - name: argo-workflows-controller-running
       description: Argo Workflows controller Deployment is available
       try:
