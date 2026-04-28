@@ -20,6 +20,68 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: harbor
+  ignoreDifferences:
+    # Harbor Helm chart generates random values for these secrets on every render
+    # via randAlphaNum. The values are stable in the cluster once deployed —
+    # ignore them to prevent ArgoCD from rotating secrets on every sync.
+    - group: ""
+      kind: Secret
+      name: harbor-core
+      namespace: harbor
+      jsonPointers:
+        - /data/CSRF_KEY
+        - /data/secret
+        - /data/tls.crt
+        - /data/tls.key
+    - group: ""
+      kind: Secret
+      name: harbor-jobservice
+      namespace: harbor
+      jsonPointers:
+        - /data/JOBSERVICE_SECRET
+    - group: ""
+      kind: Secret
+      name: harbor-registry
+      namespace: harbor
+      jsonPointers:
+        - /data/REGISTRY_HTTP_SECRET
+    - group: ""
+      kind: Secret
+      name: harbor-registry-htpasswd
+      namespace: harbor
+      jsonPointers:
+        - /data/REGISTRY_HTPASSWD
+    # Deployment checksum annotations are derived from the above secrets —
+    # they change on every Helm render and cause cascading OutOfSync.
+    - group: apps
+      kind: Deployment
+      name: harbor-core
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-jobservice
+    - group: apps
+      kind: Deployment
+      name: harbor-jobservice
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-core
+    - group: apps
+      kind: Deployment
+      name: harbor-registry
+      namespace: harbor
+      jsonPointers:
+        - /spec/template/metadata/annotations/checksum~1secret
+        - /spec/template/metadata/annotations/checksum~1secret-core
+        - /spec/template/metadata/annotations/checksum~1secret-jobservice
+    # StatefulSet volumeClaimTemplates are immutable post-creation and get
+    # API-server defaults (e.g. storageClassName) injected, causing phantom diffs.
+    - group: apps
+      kind: StatefulSet
+      namespace: harbor
+      jsonPointers:
+        - /spec/volumeClaimTemplates
   syncPolicy:
     automated:
       prune: true
@@ -27,6 +89,7 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
