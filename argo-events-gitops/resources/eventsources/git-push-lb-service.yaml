@@ -1,0 +1,24 @@
+# Separate LoadBalancer Service for the git-push EventSource.
+# The Argo Events controller creates a ClusterIP service automatically
+# (spec.service in EventSource), but does not support setting service type
+# to LoadBalancer via that field. This explicit Service selects the
+# EventSource pod via the controller-assigned label eventsource-name=git-push
+# and exposes it as a MetalLB LoadBalancer at 192.168.0.221:12000.
+#
+# MetalLB annotation (plural loadBalancerIPs) pins the IP permanently.
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-push-eventsource-lb
+  namespace: argo-events
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.221"
+spec:
+  type: LoadBalancer
+  selector:
+    eventsource-name: git-push
+  ports:
+    - name: webhook
+      port: 12000
+      targetPort: 12000
+      protocol: TCP
