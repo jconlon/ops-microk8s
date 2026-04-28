@@ -53,53 +53,70 @@ spec:
               status:
                 (availableReplicas >= `1`): true
 
-    - name: argo-events-eventbus-running
-      description: EventBus default is in Running phase
-      try:
-        - assert:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: EventBus
-              metadata:
-                name: default
-                namespace: argo-events
-              status:
-                phase: running
-
-    - name: argo-events-eventsource-running
-      description: git-push EventSource is in Running phase
-      try:
-        - assert:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: EventSource
-              metadata:
-                name: git-push
-                namespace: argo-events
-              status:
-                phase: Running
-
-    - name: argo-events-sensor-running
-      description: git-push Sensor is in Running phase
-      try:
-        - assert:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Sensor
-              metadata:
-                name: git-push
-                namespace: argo-events
-              status:
-                phase: Running
-
-    - name: argo-events-service-has-ip
-      description: git-push EventSource LoadBalancer service has MetalLB IP 192.168.0.221
+    - name: argo-events-eventbus-deployed
+      description: EventBus default is Configured and Deployed (v1.9.x uses conditions, not phase)
       try:
         - script:
             content: |
-              IP=$(kubectl get svc -n argo-events \
-                -l eventsource-name=git-push \
-                -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+              # Argo Events v1.9.x uses status.conditions instead of status.phase.
+              # Check that both Configured and Deployed conditions are True.
+              CONFIGURED=$(kubectl get eventbus default -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="Configured")].status}' 2>/dev/null)
+              DEPLOYED=$(kubectl get eventbus default -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="Deployed")].status}' 2>/dev/null)
+              if [ "$CONFIGURED" = "True" ] && [ "$DEPLOYED" = "True" ]; then
+                echo "EventBus is Configured and Deployed"
+                exit 0
+              fi
+              echo "EventBus not ready — Configured=$CONFIGURED Deployed=$DEPLOYED"
+              exit 1
+
+    - name: argo-events-eventsource-deployed
+      description: git-push EventSource is Deployed and SourcesProvided (v1.9.x uses conditions)
+      try:
+        - script:
+            content: |
+              # Argo Events v1.9.x uses status.conditions instead of status.phase.
+              # Check that Deployed and SourcesProvided conditions are True.
+              DEPLOYED=$(kubectl get eventsource git-push -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="Deployed")].status}' 2>/dev/null)
+              SOURCES=$(kubectl get eventsource git-push -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="SourcesProvided")].status}' 2>/dev/null)
+              if [ "$DEPLOYED" = "True" ] && [ "$SOURCES" = "True" ]; then
+                echo "EventSource is Deployed and SourcesProvided"
+                exit 0
+              fi
+              echo "EventSource not ready — Deployed=$DEPLOYED SourcesProvided=$SOURCES"
+              exit 1
+
+    - name: argo-events-sensor-deployed
+      description: git-push Sensor is Deployed, DependenciesProvided, TriggersProvided
+      try:
+        - script:
+            content: |
+              # Argo Events v1.9.x uses status.conditions instead of status.phase.
+              DEPLOYED=$(kubectl get sensor git-push -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="Deployed")].status}' 2>/dev/null)
+              DEPS=$(kubectl get sensor git-push -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="DependenciesProvided")].status}' 2>/dev/null)
+              TRIGGERS=$(kubectl get sensor git-push -n argo-events \
+                -o jsonpath='{.status.conditions[?(@.type=="TriggersProvided")].status}' 2>/dev/null)
+              if [ "$DEPLOYED" = "True" ] && [ "$DEPS" = "True" ] && [ "$TRIGGERS" = "True" ]; then
+                echo "Sensor is Deployed, DependenciesProvided, TriggersProvided"
+                exit 0
+              fi
+              echo "Sensor not ready — Deployed=$DEPLOYED DepsProvided=$DEPS TriggersProvided=$TRIGGERS"
+              exit 1
+
+    - name: argo-events-service-has-ip
+      description: git-push-eventsource-lb LoadBalancer service has MetalLB IP 192.168.0.221
+      try:
+        - script:
+            content: |
+              # The LoadBalancer service is named git-push-eventsource-lb (separate from
+              # the ClusterIP service created by the EventSource controller).
+              IP=$(kubectl get svc git-push-eventsource-lb -n argo-events \
+                -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
               [ "$IP" = "192.168.0.221" ] || { echo "Expected 192.168.0.221, got: $IP"; exit 1; }
               echo "MetalLB IP confirmed: $IP"
 
