@@ -21,8 +21,8 @@ spec:
     # (eventbus/, eventsources/, sensors/). Without this ArgoCD only looks in the
     # root of the path and finds nothing, resulting in an empty sync (no error,
     # just zero resources applied). The cosmo app uses the same pattern.
-  directory:
-    recurse: true
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     # Most resources are namespaced to argo-events; the ClusterRole/Binding
