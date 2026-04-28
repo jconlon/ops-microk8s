@@ -94,6 +94,66 @@ argo-status:
 test-argo-workflows:
     chainsaw test tests/argo-workflows
 
+# E2e build test: submit a minimal Alpine image via image-build-push WorkflowTemplate,
+# verify the image appears in Harbor, then clean up the workflow and artifact.
+# Requires: harbor-credentials secret, image-build-push WorkflowTemplate, tests/e2e-build/Dockerfile.
+# NOTE: the robot account needs delete permission in Harbor for artifact cleanup to succeed.
+test-build-e2e:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    NS=argo-workflows
+    PROJECT=library
+    REPO=kaniko-e2e-test
+    TAG=e2e-$(date +%s)
+    IMAGE="registry.verticon.com/$PROJECT/$REPO:$TAG"
+
+    cleanup() {
+        if [ -n "${WF_NAME:-}" ]; then
+            echo ">>> Cleaning up workflow $WF_NAME..."
+            kubectl delete workflow "$WF_NAME" -n $NS --ignore-not-found >/dev/null 2>&1 || true
+        fi
+    }
+    trap cleanup EXIT
+
+    echo ">>> Submitting kaniko build: $IMAGE"
+    WF_NAME=$(argo submit -n $NS \
+        --from workflowtemplate/image-build-push \
+        -p repo-url=https://github.com/jconlon/ops-microk8s \
+        -p image="$IMAGE" \
+        -p context=tests/e2e-build \
+        -o name)
+    echo "    workflow: $WF_NAME"
+
+    echo ">>> Waiting for completion (timeout: 10m)..."
+    if ! argo wait -n $NS "$WF_NAME" --timeout 10m; then
+        echo "FAIL  workflow did not succeed"
+        argo logs -n $NS "$WF_NAME" 2>/dev/null || true
+        exit 1
+    fi
+    echo "PASS  workflow succeeded"
+
+    echo ">>> Verifying image in Harbor..."
+    AUTH=$(kubectl get secret harbor-credentials -n $NS \
+        -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); print(d['auths']['registry.verticon.com']['auth'])")
+    DIGEST=$(curl -sf \
+        -H "Authorization: Basic $AUTH" \
+        "https://registry.verticon.com/api/v2.0/projects/$PROJECT/repositories/$REPO/artifacts/$TAG" | \
+        python3 -c "import sys,json; print(json.load(sys.stdin)['digest'][:19])")
+    echo "PASS  image present in Harbor: $DIGEST"
+
+    echo ">>> Removing artifact from Harbor..."
+    HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+        -H "Authorization: Basic $AUTH" \
+        "https://registry.verticon.com/api/v2.0/projects/$PROJECT/repositories/$REPO/artifacts/$TAG")
+    if [ "$HTTP" = "200" ] || [ "$HTTP" = "202" ]; then
+        echo "PASS  artifact deleted"
+    else
+        echo "WARN  artifact deletion returned HTTP $HTTP — robot account may lack delete permission; clean up manually in Harbor"
+    fi
+
+    echo ">>> Done."
+
 # ── Argo Events ───────────────────────────────────────────────────────────────
 
 # Show Argo Events pod and resource status

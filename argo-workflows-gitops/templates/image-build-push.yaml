@@ -6,18 +6,30 @@ metadata:
 spec:
   entrypoint: build-and-push
   serviceAccountName: argo-workflow
+  arguments:
+    parameters:
+      - name: repo-url
+      - name: revision
+        value: main
+      - name: image
+      - name: context
+        value: .
+      - name: dockerfile
+        value: Dockerfile
   templates:
     - name: build-and-push
       inputs:
         parameters:
           - name: repo-url
+            value: "{{workflow.parameters.repo-url}}"
           - name: revision
-            value: main
+            value: "{{workflow.parameters.revision}}"
           - name: image
+            value: "{{workflow.parameters.image}}"
           - name: context
-            value: .
+            value: "{{workflow.parameters.context}}"
           - name: dockerfile
-            value: Dockerfile
+            value: "{{workflow.parameters.dockerfile}}"
       volumes:
         - name: harbor-credentials
           secret:
