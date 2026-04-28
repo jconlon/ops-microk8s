@@ -39,6 +39,19 @@ spec:
               status:
                 sync:
                   status: Synced
+        - script:
+            content: |
+              # Guard against silent directory.recurse failure — if ArgoCD synced
+              # but recurse was missing/broken, zero resources would be applied
+              # with no error. Assert at least 3 resources (EventBus + EventSource
+              # + Sensor) were actually applied.
+              COUNT=$(kubectl get eventbus,eventsource,sensor -n argo-events --no-headers 2>/dev/null | wc -l)
+              if [ "$COUNT" -ge 3 ]; then
+                echo "Resource count OK: $COUNT (EventBus + EventSource + Sensor present)"
+                exit 0
+              fi
+              echo "Too few argo-events resources: expected >= 3, got $COUNT (directory.recurse may be broken)"
+              exit 1
 
     - name: argo-events-controller-running
       description: Argo Events controller Deployment is available

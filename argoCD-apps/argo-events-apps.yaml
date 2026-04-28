@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: deploy-argo-events
+    targetRevision: HEAD
     path: argoCD-apps/argo-events
   destination:
     server: https://kubernetes.default.svc

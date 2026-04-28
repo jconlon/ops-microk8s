@@ -15,7 +15,7 @@ spec:
         valueFiles:
           - $values/argo-events-gitops/helm/argo-events-values.yaml
     - repoURL: https://github.com/jconlon/ops-microk8s
-      targetRevision: deploy-argo-events
+      targetRevision: HEAD
       ref: values
   destination:
     server: https://kubernetes.default.svc
