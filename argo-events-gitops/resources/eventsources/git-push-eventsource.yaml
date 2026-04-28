@@ -14,6 +14,9 @@ metadata:
 spec:
   # Expose the EventSource pod as a LoadBalancer service.
   service:
+    # Must explicitly set LoadBalancer type — default is ClusterIP.
+    # MetalLB annotation alone does not change the service type.
+    type: LoadBalancer
     ports:
       - port: 12000
         targetPort: 12000
