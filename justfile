@@ -118,7 +118,7 @@ test-build-e2e:
     echo ">>> Submitting kaniko build: $IMAGE"
     WF_NAME=$(argo submit -n $NS \
         --from workflowtemplate/image-build-push \
-        -p repo-url=https://github.com/jconlon/ops-microk8s.git \
+        -p repo-url=https://github.com/jconlon/ops-microk8s \
         -p image="$IMAGE" \
         -p context=tests/e2e-build \
         -o name)

@@ -8,8 +8,6 @@ spec:
   serviceAccountName: argo-workflow
   arguments:
     parameters:
-      # repo-url must end in .git — Kaniko uses git clone only when the URL ends with .git;
-      # without it Kaniko treats the URL as a tar download and fails with "gzip: invalid header".
       - name: repo-url
       - name: revision
         value: main
@@ -33,22 +31,41 @@ spec:
           - name: dockerfile
             value: "{{workflow.parameters.dockerfile}}"
       volumes:
+        - name: workspace
+          emptyDir: {}
         - name: harbor-credentials
           secret:
             secretName: harbor-credentials
             items:
               - key: .dockerconfigjson
                 path: config.json
+      # Kaniko treats all https:// URLs as tar downloads regardless of .git suffix.
+      # An init container clones the repo so Kaniko can use a local dir:// context.
+      initContainers:
+        - name: git-clone
+          image: alpine/git:latest
+          command:
+            - git
+            - clone
+            - --depth=1
+            - --branch
+            - "{{inputs.parameters.revision}}"
+            - "{{inputs.parameters.repo-url}}"
+            - /workspace
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
       container:
         image: gcr.io/kaniko-project/executor:latest
         args:
           - --dockerfile={{inputs.parameters.dockerfile}}
-          - --context={{inputs.parameters.repo-url}}#{{inputs.parameters.revision}}
+          - --context=dir:///workspace
           - --context-sub-path={{inputs.parameters.context}}
           - --destination={{inputs.parameters.image}}
           - --cache=true
-          # Requires a 'cache' project to exist in Harbor (registry.verticon.com/cache).
           - --cache-repo=registry.verticon.com/cache
         volumeMounts:
+          - name: workspace
+            mountPath: /workspace
           - name: harbor-credentials
             mountPath: /kaniko/.docker
