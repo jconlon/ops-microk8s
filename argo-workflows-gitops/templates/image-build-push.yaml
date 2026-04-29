@@ -8,6 +8,8 @@ spec:
   serviceAccountName: argo-workflow
   arguments:
     parameters:
+      # repo-url must end in .git — Kaniko uses git clone only when the URL ends with .git;
+      # without it Kaniko treats the URL as a tar download and fails with "gzip: invalid header".
       - name: repo-url
       - name: revision
         value: main

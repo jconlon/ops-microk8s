@@ -118,18 +118,29 @@ test-build-e2e:
     echo ">>> Submitting kaniko build: $IMAGE"
     WF_NAME=$(argo submit -n $NS \
         --from workflowtemplate/image-build-push \
-        -p repo-url=https://github.com/jconlon/ops-microk8s \
+        -p repo-url=https://github.com/jconlon/ops-microk8s.git \
         -p image="$IMAGE" \
         -p context=tests/e2e-build \
         -o name)
     echo "    workflow: $WF_NAME"
 
     echo ">>> Waiting for completion (timeout: 10m)..."
-    if ! argo wait -n $NS "$WF_NAME" --timeout 10m; then
-        echo "FAIL  workflow did not succeed"
-        argo logs -n $NS "$WF_NAME" 2>/dev/null || true
-        exit 1
-    fi
+    DEADLINE=$(($(date +%s) + 600))
+    while true; do
+        PHASE=$(kubectl get workflow "$WF_NAME" -n $NS \
+            -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        [ "$PHASE" = "Succeeded" ] && break
+        if [[ "$PHASE" =~ ^(Failed|Error)$ ]]; then
+            echo "FAIL  workflow phase: $PHASE"
+            argo logs -n $NS "$WF_NAME" 2>/dev/null || true
+            exit 1
+        fi
+        if [ "$(date +%s)" -gt "$DEADLINE" ]; then
+            echo "FAIL  timed out after 10m (phase: ${PHASE:-Unknown})"
+            exit 1
+        fi
+        sleep 15
+    done
     echo "PASS  workflow succeeded"
 
     echo ">>> Verifying image in Harbor..."
