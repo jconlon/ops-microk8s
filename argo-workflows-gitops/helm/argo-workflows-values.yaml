@@ -10,6 +10,12 @@ crds:
 controller:
   workflowNamespaces:
     - argo-workflows
+  workflowDefaults:
+    spec:
+      ttlStrategy:
+        secondsAfterCompletion: 86400    # delete 24h after completion
+        secondsAfterSuccess: 86400
+        secondsAfterFailure: 259200      # keep failed workflows 3 days for debugging
 
 workflow:
   serviceAccount:
