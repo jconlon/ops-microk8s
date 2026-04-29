@@ -109,6 +109,10 @@ kubectl apply -f argoCD-apps/argocd-self-managed.yaml
 
 ### Development Tools
 
+> **Claude Code skill — trycycle**: The `trycycle` global skill has been moved from
+> `~/.claude/skills/` to `~/special-tools/.claude/skills/`. It is only available when
+> launching Claude Code with: `claude --add-dir ~/special-tools`
+
 ```bash
 # Use devbox for development tools
 devbox shell  # Provides argocd, k9s, python, uv, and all cluster tools
