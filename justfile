@@ -142,6 +142,17 @@ test-build-e2e:
         python3 -c "import sys,json; print(json.load(sys.stdin)['digest'][:19])")
     echo "PASS  image present in Harbor: $DIGEST"
 
+    echo ">>> Verifying Kaniko layer cache populated in Harbor..."
+    CACHE_COUNT=$(curl -sf \
+        -H "Authorization: Basic $AUTH" \
+        "https://registry.verticon.com/api/v2.0/projects/cache/repositories?page_size=100" | \
+        python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+    if [ "${CACHE_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        echo "PASS  Kaniko cache populated: $CACHE_COUNT repositor$([ "$CACHE_COUNT" = "1" ] && echo y || echo ies) in registry.verticon.com/cache"
+    else
+        echo "WARN  no cache repositories found — cache project may be empty on first build or --cache-repo not reachable"
+    fi
+
     echo ">>> Removing artifact from Harbor..."
     HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
         -H "Authorization: Basic $AUTH" \
