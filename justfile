@@ -94,10 +94,36 @@ argo-status:
 test-argo-workflows:
     chainsaw test tests/argo-workflows
 
-# E2e build test: submit a minimal Alpine image via image-build-push WorkflowTemplate,
-# verify the image appears in Harbor, then clean up the workflow and artifact.
-# Requires: harbor-credentials secret, image-build-push WorkflowTemplate, tests/e2e-build/Dockerfile.
-# NOTE: the robot account needs delete permission in Harbor for artifact cleanup to succeed.
+# End-to-end CI pipeline validation. Builds a minimal Alpine image using the
+# image-build-push WorkflowTemplate, verifies the result in Harbor, then cleans up.
+# Run manually after changes to the CI pipeline — not part of the routine chainsaw suite
+# because Kaniko must pull its executor image, clone the repo, build, and push (3–10 min).
+#
+# Prerequisites:
+#   - harbor-credentials secret in argo-workflows namespace (issue #62)
+#   - image-build-push WorkflowTemplate deployed and ArgoCD synced (issue #63)
+#   - 'library' project in Harbor (default, always present)
+#   - 'cache' project in Harbor with robot$argo-workflows push/pull access (issue #63)
+#   - robot$argo-workflows has Artifact:Delete permission on 'library' project (issue #62)
+#
+# Steps:
+#   1. Submit  — creates a Workflow from the image-build-push WorkflowTemplate via
+#                `argo submit --from`. Kaniko clones ops-microk8s (git init container),
+#                builds tests/e2e-build/Dockerfile (FROM alpine:latest), and pushes
+#                to registry.verticon.com/library/kaniko-e2e-test:<epoch-tag>.
+#   2. Wait    — polls workflow phase every 15s up to 10 minutes. On failure, dumps
+#                Kaniko logs before exiting non-zero.
+#   3. Verify image — hits Harbor API to confirm the artifact was actually pushed and
+#                returns its digest. Auth is extracted from the harbor-credentials secret
+#                already in the cluster (no passwords in the command).
+#   4. Verify cache — queries Harbor API for repositories in the 'cache' project. A PASS
+#                means Kaniko wrote layer cache entries to registry.verticon.com/cache.
+#                WARN (not failure) on first build with a bare FROM — Kaniko only caches
+#                RUN layers, so FROM alpine:latest alone produces no cache entries.
+#   5. Delete artifact — removes the test artifact from Harbor via API (DELETE on the tag
+#                reference). Warns but does not fail if the robot account lacks Artifact:Delete.
+#   6. Cleanup — trap on EXIT deletes the Workflow object from the cluster regardless of
+#                success or failure, keeping the argo-workflows namespace tidy.
 test-build-e2e:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -107,6 +133,7 @@ test-build-e2e:
     TAG=e2e-$(date +%s)
     IMAGE="registry.verticon.com/$PROJECT/$REPO:$TAG"
 
+    # Step 6: runs on EXIT (success or failure) to delete the Workflow object.
     cleanup() {
         if [ -n "${WF_NAME:-}" ]; then
             echo ">>> Cleaning up workflow $WF_NAME..."
@@ -115,6 +142,8 @@ test-build-e2e:
     }
     trap cleanup EXIT
 
+    # Step 1: submit Workflow from the image-build-push WorkflowTemplate.
+    # -p flags override WorkflowTemplate defaults; -o name captures the generated name.
     echo ">>> Submitting kaniko build: $IMAGE"
     WF_NAME=$(argo submit -n $NS \
         --from workflowtemplate/image-build-push \
@@ -124,6 +153,8 @@ test-build-e2e:
         -o name)
     echo "    workflow: $WF_NAME"
 
+    # Step 2: poll workflow phase every 15s with a 10-minute hard deadline.
+    # argo wait --timeout is not supported in this CLI version.
     echo ">>> Waiting for completion (timeout: 10m)..."
     DEADLINE=$(($(date +%s) + 600))
     while true; do
@@ -143,6 +174,8 @@ test-build-e2e:
     done
     echo "PASS  workflow succeeded"
 
+    # Step 3: extract Basic auth from the harbor-credentials dockerconfigjson secret
+    # and call the Harbor API to confirm the artifact exists and return its digest.
     echo ">>> Verifying image in Harbor..."
     AUTH=$(kubectl get secret harbor-credentials -n $NS \
         -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | \
@@ -153,6 +186,8 @@ test-build-e2e:
         python3 -c "import sys,json; print(json.load(sys.stdin)['digest'][:19])")
     echo "PASS  image present in Harbor: $DIGEST"
 
+    # Step 4: check the cache project for repositories written by Kaniko --cache-repo.
+    # WARN (not FAIL) because FROM-only Dockerfiles produce no RUN layers to cache.
     echo ">>> Verifying Kaniko layer cache populated in Harbor..."
     CACHE_COUNT=$(curl -sf \
         -H "Authorization: Basic $AUTH" \
@@ -164,6 +199,8 @@ test-build-e2e:
         echo "WARN  no cache repositories found — cache project may be empty on first build or --cache-repo not reachable"
     fi
 
+    # Step 5: delete the test artifact by tag reference via Harbor API.
+    # Requires Artifact:Delete permission on the library project for robot$argo-workflows.
     echo ">>> Removing artifact from Harbor..."
     HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
         -H "Authorization: Basic $AUTH" \
