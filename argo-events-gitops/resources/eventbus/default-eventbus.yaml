@@ -1,14 +1,12 @@
-# EventBus — NATS message broker managed by Argo Events controller.
-# The default EventBus is used by all EventSources and Sensors in the namespace
-# unless overridden by spec.eventBusName.
+# EventBus — Kafka backend using the cluster's existing Strimzi Kafka deployment.
+# Kafka is a cluster-wide resource (kafka-system namespace), so all app-namespace
+# EventBus objects can point at the same broker without spinning up per-namespace NATS.
+# Topics are auto-created by Argo Events per EventSource/Sensor pair.
 apiVersion: argoproj.io/v1alpha1
 kind: EventBus
 metadata:
   name: default
   namespace: argo-events
 spec:
-  nats:
-    native:
-      # 3 replicas for HA; matches the 3-control-plane topology.
-      replicas: 3
-      auth: none
+  kafka:
+    url: kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092

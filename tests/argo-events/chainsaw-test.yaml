@@ -67,12 +67,20 @@ spec:
                 (availableReplicas >= `1`): true
 
     - name: argo-events-eventbus-deployed
-      description: EventBus default is Configured and Deployed (v1.9.x uses conditions, not phase)
+      description: EventBus default uses Kafka backend and is Configured and Deployed
       try:
         - script:
             content: |
+              # Assert Kafka backend — not NATS.
+              BACKEND=$(kubectl get eventbus default -n argo-events \
+                -o jsonpath='{.spec}' 2>/dev/null | \
+                python3 -c "import sys,json; d=json.load(sys.stdin); print('kafka' if 'kafka' in d else 'nats' if 'nats' in d else 'unknown')")
+              if [ "$BACKEND" != "kafka" ]; then
+                echo "Expected kafka EventBus backend, got: $BACKEND"
+                exit 1
+              fi
+              echo "EventBus backend: kafka"
               # Argo Events v1.9.x uses status.conditions instead of status.phase.
-              # Check that both Configured and Deployed conditions are True.
               CONFIGURED=$(kubectl get eventbus default -n argo-events \
                 -o jsonpath='{.status.conditions[?(@.type=="Configured")].status}' 2>/dev/null)
               DEPLOYED=$(kubectl get eventbus default -n argo-events \
