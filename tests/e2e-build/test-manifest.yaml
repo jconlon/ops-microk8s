@@ -14,4 +14,4 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.verticon.com/library/kaniko-e2e-test:placeholder
+          image: registry.verticon.com/library/kaniko-e2e-test:e2e-1777842845
