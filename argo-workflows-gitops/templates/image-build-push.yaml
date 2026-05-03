@@ -1,8 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
+kind: ClusterWorkflowTemplate
 metadata:
   name: image-build-push
-  namespace: argo-workflows
 spec:
   entrypoint: build-and-push
   serviceAccountName: argo-workflow

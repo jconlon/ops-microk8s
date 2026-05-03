@@ -146,7 +146,7 @@ test-build-e2e:
     # -p flags override WorkflowTemplate defaults; -o name captures the generated name.
     echo ">>> Submitting kaniko build: $IMAGE"
     WF_NAME=$(argo submit -n $NS \
-        --from workflowtemplate/image-build-push \
+        --from clusterworkflowtemplate/image-build-push \
         -p repo-url=https://github.com/jconlon/ops-microk8s \
         -p image="$IMAGE" \
         -p context=tests/e2e-build \
@@ -304,6 +304,29 @@ loki-journal-check node="puffer" filter="Power key" since="24h":
     else
       echo "WARN  no journal entries in last 5 min — stream may be delayed or node down"
     fi
+
+# ── GitHub ───────────────────────────────────────────────────────────────────
+
+# List open GitHub issues
+issues:
+    gh issue list --repo jconlon/ops-microk8s
+
+# Show details of a GitHub issue by number
+issue issue:
+    #!/usr/bin/env bash
+    gh issue view {{issue}} --repo jconlon/ops-microk8s \
+      --json number,title,state,labels,body,comments,url \
+      | jq -r '
+        "# [\(.state)] #\(.number) — \(.title)",
+        "URL: \(.url)",
+        (if (.labels | length) > 0 then "Labels: \(.labels | map(.name) | join(", "))" else empty end),
+        "",
+        .body,
+        (if (.comments | length) > 0 then (
+          "\n---",
+          (.comments[] | "\n**\(.author.login)** \(.createdAt[:10])\n\(.body)")
+        ) else empty end)
+      '
 
 # Check syslog is flowing from all 8 nodes into Loki (last 15 minutes)
 loki-node-logs:
