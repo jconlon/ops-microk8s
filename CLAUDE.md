@@ -60,6 +60,10 @@ This repository contains the infrastructure configuration for a MicroK8s cluster
   - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
   - Schema Registry: running in `kafka-system`, backed by PostgreSQL
 - **Loki**: Grafana Loki log aggregation at 192.168.0.220 (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80
+- **Argo Workflows**: CI/CD engine at https://workflows.verticon.com (192.168.0.209:2746); `argo-workflows` namespace
+  - `image-build-push` ClusterWorkflowTemplate — builds images via Kaniko and pushes to Harbor; callable from any namespace
+  - `ci-tools` image at `registry.verticon.com/library/ci-tools:latest` — contains `git`, `gh`, `yq`; source at `images/ci-tools/Dockerfile`; rebuild with `argo submit --from clusterworkflowtemplate/image-build-push -p repo-url=https://github.com/jconlon/ops-microk8s -p image=registry.verticon.com/library/ci-tools:latest -p context=images/ci-tools`
+  - To build any image: `argo submit -n argo-workflows --from clusterworkflowtemplate/image-build-push -p repo-url=<repo> -p image=registry.verticon.com/<project>/<name>:<tag> -p context=<subdir>`
 - **Argo Events**: Event-driven automation companion to Argo Workflows; `argo-events` namespace
   - WebhookEventSource at `https://events.verticon.com/push` (192.168.0.221:12000)
   - Triggers `git-push-build` WorkflowTemplate in `argo-workflows` on POST

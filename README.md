@@ -321,6 +321,57 @@ kubectl create secret generic harbor-s3-credentials \
 
 ---
 
+## Argo Workflows — CI/CD Pipeline
+
+[Argo Workflows](https://argoproj.github.io/workflows/) is the cluster's CI engine, deployed in the `argo-workflows` namespace and accessible at https://workflows.verticon.com (192.168.0.209:2746).
+
+### image-build-push ClusterWorkflowTemplate
+
+The primary CI primitive is the `image-build-push` ClusterWorkflowTemplate. It builds container images using Kaniko and pushes them to Harbor. Being cluster-scoped, it is callable from any namespace without duplication.
+
+```bash
+argo submit -n argo-workflows \
+  --from clusterworkflowtemplate/image-build-push \
+  -p repo-url=https://github.com/jconlon/myapp \
+  -p image=registry.verticon.com/library/myapp:v1.0.0 \
+  -p context=.                  `# subdirectory containing Dockerfile` \
+  -p dockerfile=Dockerfile      `# path within context` \
+  -p revision=main              `# branch or tag to build`
+```
+
+Kaniko uses the `harbor-credentials` secret for Harbor authentication and caches layers to `registry.verticon.com/cache`.
+
+### ci-tools image
+
+A lightweight helper image used by workflow steps that need `git`, `gh` (GitHub CLI), and `yq`:
+
+- **Image**: `registry.verticon.com/library/ci-tools:latest`
+- **Source**: `images/ci-tools/Dockerfile` in this repo
+- **Rebuilt via**: `image-build-push` ClusterWorkflowTemplate (see below)
+
+To rebuild after updating the Dockerfile:
+
+```bash
+argo submit -n argo-workflows \
+  --from clusterworkflowtemplate/image-build-push \
+  -p repo-url=https://github.com/jconlon/ops-microk8s \
+  -p image=registry.verticon.com/library/ci-tools:latest \
+  -p context=images/ci-tools
+```
+
+### Adding a new image to Harbor via CI
+
+Any Dockerfile in this repo (or any other repo) can be built and pushed using the ClusterWorkflowTemplate. Place the Dockerfile in a subdirectory and submit with the appropriate `context` parameter. No local Docker daemon required — Kaniko runs inside the cluster.
+
+### just recipes
+
+```bash
+just test-build-e2e     # Full end-to-end CI pipeline test (Kaniko build → Harbor push → cleanup)
+just argo-status        # Show Argo Workflows pod status
+```
+
+---
+
 ## Loki Log Aggregation
 
 [Grafana Loki](https://grafana.com/oss/loki/) is a horizontally scalable, multi-tenant log aggregation system. It is deployed in monolithic single-binary mode in the `loki` namespace, with Ceph RGW S3 as the log chunk backend.
