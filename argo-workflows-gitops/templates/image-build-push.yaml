@@ -3,8 +3,10 @@ kind: ClusterWorkflowTemplate
 metadata:
   name: image-build-push
 spec:
-  entrypoint: build-and-push
+  entrypoint: main
   serviceAccountName: argo-workflow
+  imagePullSecrets:
+    - name: harbor-credentials
   arguments:
     parameters:
       - name: repo-url
@@ -15,20 +17,47 @@ spec:
         value: .
       - name: dockerfile
         value: Dockerfile
+      - name: spec-repo-url
+        value: ""
+      - name: spec-manifest
+        value: ""
   templates:
+    - name: main
+      steps:
+        - - name: build-and-push
+            template: build-and-push
+            arguments:
+              parameters:
+                - name: repo-url
+                  value: "{{workflow.parameters.repo-url}}"
+                - name: revision
+                  value: "{{workflow.parameters.revision}}"
+                - name: image
+                  value: "{{workflow.parameters.image}}"
+                - name: context
+                  value: "{{workflow.parameters.context}}"
+                - name: dockerfile
+                  value: "{{workflow.parameters.dockerfile}}"
+        - - name: create-pr
+            template: create-pr
+            when: '"{{workflow.parameters.spec-repo-url}}" != ""'
+            arguments:
+              parameters:
+                - name: spec-repo-url
+                  value: "{{workflow.parameters.spec-repo-url}}"
+                - name: spec-manifest
+                  value: "{{workflow.parameters.spec-manifest}}"
+                - name: image
+                  value: "{{workflow.parameters.image}}"
+
     - name: build-and-push
       inputs:
         parameters:
           - name: repo-url
-            value: "{{workflow.parameters.repo-url}}"
           - name: revision
-            value: "{{workflow.parameters.revision}}"
           - name: image
-            value: "{{workflow.parameters.image}}"
           - name: context
-            value: "{{workflow.parameters.context}}"
           - name: dockerfile
-            value: "{{workflow.parameters.dockerfile}}"
       volumes:
         - name: workspace
           emptyDir: {}
@@ -68,3 +97,61 @@ spec:
             mountPath: /workspace
           - name: harbor-credentials
             mountPath: /kaniko/.docker
+
+    - name: create-pr
+      inputs:
+        parameters:
+          - name: spec-repo-url
+          - name: spec-manifest
+          - name: image
+      container:
+        image: registry.verticon.com/library/ci-tools:latest
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: github-pat
+                key: token
+        command: [bash, -c]
+        args:
+          - |
+            set -euo pipefail
+            IMAGE="{{inputs.parameters.image}}"
+            SPEC_REPO_URL="{{inputs.parameters.spec-repo-url}}"
+            SPEC_MANIFEST="{{inputs.parameters.spec-manifest}}"
+            IMAGE_PREFIX="${IMAGE%:*}"
+            TAG="${IMAGE##*:}"
+            BRANCH="image-update/${TAG}"
+
+            echo ">>> Configuring git auth via GITHUB_TOKEN..."
+            gh auth setup-git
+
+            echo ">>> Cloning spec repo $SPEC_REPO_URL..."
+            git clone "$SPEC_REPO_URL" /spec-repo
+            cd /spec-repo
+
+            git config user.email "argo-workflows@verticon.com"
+            git config user.name "Argo Workflows"
+
+            echo ">>> Creating branch $BRANCH..."
+            git checkout -b "$BRANCH"
+
+            echo ">>> Updating image in $SPEC_MANIFEST..."
+            sed -i "s|image: ${IMAGE_PREFIX}:.*|image: ${IMAGE}|g" "$SPEC_MANIFEST"
+            grep -q "image: ${IMAGE}" "$SPEC_MANIFEST" \
+              || { echo "FAIL  image not updated in $SPEC_MANIFEST"; exit 1; }
+
+            echo ">>> Committing..."
+            git add "$SPEC_MANIFEST"
+            git commit -m "chore: update image to ${IMAGE}"
+
+            echo ">>> Pushing branch $BRANCH..."
+            git push origin "$BRANCH"
+
+            echo ">>> Creating PR..."
+            gh pr create \
+              --title "chore: update image to ${IMAGE}" \
+              --body "Automated image tag update from Argo Workflows CI build." \
+              --base main \
+              --head "$BRANCH"
+            echo ">>> Done."

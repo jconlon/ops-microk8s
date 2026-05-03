@@ -132,31 +132,44 @@ test-build-e2e:
     REPO=kaniko-e2e-test
     TAG=e2e-$(date +%s)
     IMAGE="registry.verticon.com/$PROJECT/$REPO:$TAG"
+    SPEC_BRANCH="image-update/${TAG}"
+    PR_NUMBER=""
 
-    # Step 6: runs on EXIT (success or failure) to delete the Workflow object.
+    # Step 6+: runs on EXIT (success or failure) to delete the Workflow object,
+    # close the test PR, and delete the spec branch.
     cleanup() {
         if [ -n "${WF_NAME:-}" ]; then
             echo ">>> Cleaning up workflow $WF_NAME..."
             kubectl delete workflow "$WF_NAME" -n $NS --ignore-not-found >/dev/null 2>&1 || true
         fi
+        if [ -n "${PR_NUMBER:-}" ]; then
+            echo ">>> Closing PR #$PR_NUMBER..."
+            gh pr close "$PR_NUMBER" --repo jconlon/ops-microk8s 2>/dev/null || true
+        fi
+        echo ">>> Deleting spec branch $SPEC_BRANCH..."
+        gh api -X DELETE "repos/jconlon/ops-microk8s/git/refs/heads/$SPEC_BRANCH" 2>/dev/null || true
     }
     trap cleanup EXIT
 
-    # Step 1: submit Workflow from the image-build-push WorkflowTemplate.
-    # -p flags override WorkflowTemplate defaults; -o name captures the generated name.
+    # Step 1: submit build + PR workflow against this repo as the spec repo.
+    # spec-manifest points to tests/e2e-build/test-manifest.yaml which contains
+    # a placeholder image reference that the create-pr step will update.
     echo ">>> Submitting kaniko build: $IMAGE"
     WF_NAME=$(argo submit -n $NS \
         --from clusterworkflowtemplate/image-build-push \
         -p repo-url=https://github.com/jconlon/ops-microk8s \
         -p image="$IMAGE" \
         -p context=tests/e2e-build \
+        -p spec-repo-url=https://github.com/jconlon/ops-microk8s \
+        -p spec-manifest=tests/e2e-build/test-manifest.yaml \
         -o name)
     echo "    workflow: $WF_NAME"
 
-    # Step 2: poll workflow phase every 15s with a 10-minute hard deadline.
+    # Step 2: poll workflow phase every 15s with a 15-minute hard deadline.
+    # Two steps run sequentially: build-and-push (Kaniko) then create-pr.
     # argo wait --timeout is not supported in this CLI version.
     echo ">>> Waiting for completion (timeout: 10m)..."
-    DEADLINE=$(($(date +%s) + 600))
+    DEADLINE=$(($(date +%s) + 900))
     while true; do
         PHASE=$(kubectl get workflow "$WF_NAME" -n $NS \
             -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
@@ -209,6 +222,17 @@ test-build-e2e:
         echo "PASS  artifact deleted"
     else
         echo "WARN  artifact deletion returned HTTP $HTTP — robot account may lack delete permission; clean up manually in Harbor"
+    fi
+
+    # Step 7: verify the create-pr step opened a PR against this repo.
+    echo ">>> Verifying PR created for branch $SPEC_BRANCH..."
+    PR_NUMBER=$(gh pr list --repo jconlon/ops-microk8s \
+        --head "$SPEC_BRANCH" --json number -q '.[0].number' 2>/dev/null || echo "")
+    if [ -n "$PR_NUMBER" ]; then
+        echo "PASS  PR #$PR_NUMBER created: $SPEC_BRANCH"
+    else
+        echo "FAIL  no PR found for branch $SPEC_BRANCH"
+        exit 1
     fi
 
     echo ">>> Done."

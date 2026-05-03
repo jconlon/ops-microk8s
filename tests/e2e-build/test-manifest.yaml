@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: e2e-test
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: e2e-test
+  template:
+    metadata:
+      labels:
+        app: e2e-test
+    spec:
+      containers:
+        - name: app
+          image: registry.verticon.com/library/kaniko-e2e-test:placeholder
