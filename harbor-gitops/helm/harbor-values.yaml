@@ -96,6 +96,10 @@ core:
 jobservice:
   replicas: 1
   affinity: *avoid-mullet
+  # RWO PVC requires Recreate to avoid rolling-update deadlock (old pod must
+  # release the volume before the new pod can mount it on a different node)
+  strategy:
+    type: Recreate
 registry:
   replicas: 1
   affinity: *avoid-mullet
