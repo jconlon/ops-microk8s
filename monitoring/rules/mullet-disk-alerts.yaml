@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mullet-disk-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+spec:
+  groups:
+    - name: mullet.disk
+      interval: 1m
+      rules:
+        - alert: MulletRootDiskHigh
+          expr: |
+            (
+              node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+              - node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+            ) / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+            * on(instance) group_left(nodename)
+            node_uname_info{nodename="mullet"} > 0.75
+          for: 10m
+          labels:
+            severity: warning
+            node: mullet
+          annotations:
+            summary: "mullet root disk above 75%"
+            description: >-
+              mullet root filesystem (/) is {{ $value | humanizePercentage }} full.
+              Desktop snap/flatpak apps share the 117G root with containerd — soft eviction
+              begins at 82%, hard eviction at 90%. Act now to avoid pod evictions.
+              See issue #77 for long-term remediation.
+            runbook: "Check disk usage: ssh mullet df -h / && du -sh /snap /var/lib/snapd /var/lib/flatpak /var/log/journal"
+
+        - alert: MulletRootDiskCritical
+          expr: |
+            (
+              node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+              - node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+            ) / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|rootfs"}
+            * on(instance) group_left(nodename)
+            node_uname_info{nodename="mullet"} > 0.88
+          for: 5m
+          labels:
+            severity: critical
+            node: mullet
+          annotations:
+            summary: "mullet root disk critical — DiskPressure imminent"
+            description: >-
+              mullet root filesystem (/) is {{ $value | humanizePercentage }} full.
+              kubelet DiskPressure evictions will begin shortly. Immediate action required.
+            runbook: "ssh mullet 'sudo journalctl --vacuum-size=200M && snap list --all | awk /disabled/{print $1,$3} | while read n r; do sudo snap remove --revision $r $n; done'"
