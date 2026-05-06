@@ -149,7 +149,7 @@ PGPASSWORD="$password" psql -h localhost -p 5434 -U freshrss -d freshrss -f scri
 ops freshrss psql
 
 # Override host (default: postgresql.verticon.com)
-ops freshrss psql --host 192.168.0.211
+ops freshrss psql --host postgresql.verticon.com
 ```
 
 #### freshrss publish-links
