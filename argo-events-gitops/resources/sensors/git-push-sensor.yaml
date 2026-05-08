@@ -1,6 +1,6 @@
 # Sensor — listens to the git-push EventSource and submits an Argo Workflow.
-# Triggers the 'git-push-build' WorkflowTemplate in the 'argo-workflows' namespace.
-# Passes 'repo' and 'commit' from the webhook JSON body as workflow parameters.
+# Triggers the 'image-build-push' ClusterWorkflowTemplate.
+# Maps all 5 webhook payload fields to ClusterWorkflowTemplate parameters.
 #
 # RBAC: The sensor-sa ServiceAccount (created below) needs submit rights on
 # workflows.argoproj.io in argo-workflows. See argo-events-resources-app for
@@ -21,7 +21,7 @@ spec:
         argoWorkflow:
           # Submit to the argo-workflows namespace.
           namespace: argo-workflows
-          # Reference the placeholder WorkflowTemplate.
+          # Reference the image-build-push ClusterWorkflowTemplate.
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -31,15 +31,22 @@ spec:
                 namespace: argo-workflows
               spec:
                 workflowTemplateRef:
-                  name: git-push-build
+                  name: image-build-push
+                  clusterScope: true
                 arguments:
                   parameters:
-                    - name: repo
+                    - name: repo-url
                       value: "placeholder"
-                    - name: commit
+                    - name: revision
+                      value: "placeholder"
+                    - name: image
+                      value: "placeholder"
+                    - name: spec-repo-url
+                      value: "placeholder"
+                    - name: spec-manifest
                       value: "placeholder"
           operation: submit
-          # Map webhook JSON fields to workflow parameters.
+          # Map webhook JSON fields to ClusterWorkflowTemplate parameters.
           parameters:
             - src:
                 dependencyName: git-push-dep
@@ -49,6 +56,18 @@ spec:
                 dependencyName: git-push-dep
                 dataKey: body.commit
               dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: git-push-dep
+                dataKey: body.image
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: git-push-dep
+                dataKey: body.spec-repo-url
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: git-push-dep
+                dataKey: body.spec-manifest
+              dest: spec.arguments.parameters.4.value
   # ServiceAccount used by the Sensor pod.
   # Must be under spec.template.serviceAccountName (not spec.serviceAccountName).
   # This is confirmed by official Argo Events examples (webhook.yaml, special-workflow-trigger.yaml).
@@ -88,33 +107,3 @@ subjects:
   - kind: ServiceAccount
     name: argo-events-sensor-sa
     namespace: argo-events
----
-# WorkflowTemplate: generic placeholder that logs the push event.
-# Real per-repo build logic replaces the 'echo' step when ready.
-# Lives in argo-workflows so it is visible in the Argo Workflows UI.
-apiVersion: argoproj.io/v1alpha1
-kind: WorkflowTemplate
-metadata:
-  name: git-push-build
-  namespace: argo-workflows
-spec:
-  entrypoint: build
-  arguments:
-    parameters:
-      - name: repo
-      - name: commit
-  templates:
-    - name: build
-      inputs:
-        parameters:
-          - name: repo
-          - name: commit
-      container:
-        image: alpine:3.19
-        command: [sh, -c]
-        args:
-          - |
-            echo "git-push-build triggered"
-            echo "  repo:   {{inputs.parameters.repo}}"
-            echo "  commit: {{inputs.parameters.commit}}"
-            echo "Replace this step with your actual build workflow."

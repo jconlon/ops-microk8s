@@ -166,9 +166,10 @@ spec:
                 --no-headers 2>/dev/null | grep "^git-push-" | wc -l)
 
               # POST the webhook payload
+              COMMIT=$(date +%s)
               curl -sf -X POST http://192.168.0.221:12000/push \
                 -H 'Content-Type: application/json' \
-                -d "{\"repo\":\"https://github.com/jconlon/test\",\"commit\":\"$(date +%s)\"}" \
+                -d "{\"repo\":\"https://github.com/jconlon/test\",\"commit\":\"${COMMIT}\",\"image\":\"registry.verticon.com/library/test:${COMMIT}\",\"spec-repo-url\":\"\",\"spec-manifest\":\"\"}" \
                 > /dev/null 2>&1
 
               # Poll for a new workflow (up to 60s)
@@ -184,13 +185,12 @@ spec:
               echo "No new git-push workflow detected within 60s"
               exit 1
 
-    - name: argo-events-workflowtemplate-exists
-      description: git-push-build WorkflowTemplate exists in argo-workflows
+    - name: argo-events-clusterworkflowtemplate-exists
+      description: image-build-push ClusterWorkflowTemplate exists (cluster-scoped)
       try:
         - assert:
             resource:
               apiVersion: argoproj.io/v1alpha1
-              kind: WorkflowTemplate
+              kind: ClusterWorkflowTemplate
               metadata:
-                name: git-push-build
-                namespace: argo-workflows
+                name: image-build-push
