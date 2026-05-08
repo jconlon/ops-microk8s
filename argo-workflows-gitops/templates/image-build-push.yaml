@@ -159,6 +159,5 @@ spec:
             gh pr create \
               --title "chore: update image to ${IMAGE}" \
               --body "Automated image tag update from Argo Workflows CI build." \
-              --base main \
               --head "$BRANCH"
             echo ">>> Done."
