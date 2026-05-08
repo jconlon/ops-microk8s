@@ -77,7 +77,10 @@ spec:
             - -c
             - |
               git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-              git clone --depth=1 --branch "{{inputs.parameters.revision}}" "{{inputs.parameters.repo-url}}" /workspace
+              git init /workspace
+              git -C /workspace remote add origin "{{inputs.parameters.repo-url}}"
+              git -C /workspace fetch --depth=1 origin "{{inputs.parameters.revision}}"
+              git -C /workspace checkout FETCH_HEAD
           env:
             - name: GITHUB_TOKEN
               valueFrom:
