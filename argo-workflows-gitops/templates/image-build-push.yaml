@@ -153,7 +153,7 @@ spec:
             git commit -m "chore: update image to ${IMAGE}"
 
             echo ">>> Pushing branch $BRANCH..."
-            git push origin "$BRANCH"
+            git push --force-with-lease origin "$BRANCH"
 
             echo ">>> Creating PR..."
             gh pr create \
