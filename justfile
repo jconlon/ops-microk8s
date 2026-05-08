@@ -329,6 +329,19 @@ loki-journal-check node="puffer" filter="Power key" since="24h":
       echo "WARN  no journal entries in last 5 min — stream may be delayed or node down"
     fi
 
+# ── Backups ───────────────────────────────────────────────────────────────────
+
+# Show restic backup timer status and latest snapshots
+backup-status:
+    #!/usr/bin/env bash
+    echo "=== Restic backup timer ==="
+    systemctl status restic-backup.timer restic-backup.service --no-pager 2>&1 | \
+      grep -E "Active:|Trigger:|Finished|status="
+    echo ""
+    echo "=== Latest snapshots ==="
+    teller run --config ~/dotfiles/restic/restic/.teller-restic-ceph.yml -- \
+      restic snapshots --latest 5 2>&1 | grep -v "^-\*-"
+
 # ── GitHub ───────────────────────────────────────────────────────────────────
 
 # List open GitHub issues
