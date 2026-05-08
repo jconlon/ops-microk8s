@@ -73,13 +73,17 @@ spec:
         - name: git-clone
           image: alpine/git:latest
           command:
-            - git
-            - clone
-            - --depth=1
-            - --branch
-            - "{{inputs.parameters.revision}}"
-            - "{{inputs.parameters.repo-url}}"
-            - /workspace
+            - sh
+            - -c
+            - |
+              git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+              git clone --depth=1 --branch "{{inputs.parameters.revision}}" "{{inputs.parameters.repo-url}}" /workspace
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github-pat
+                  key: token
           volumeMounts:
             - name: workspace
               mountPath: /workspace
