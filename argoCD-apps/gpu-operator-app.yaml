@@ -22,13 +22,6 @@ spec:
     server: https://kubernetes.default.svc
     namespace: gpu-operator
 
-  ignoreDifferences:
-    - group: nvidia.com
-      kind: ClusterPolicy
-      name: cluster-policy
-      managedFieldsManagers:
-        - argocd-application-controller
-
   syncPolicy:
     automated:
       prune: true
