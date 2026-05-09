@@ -37,8 +37,19 @@ spec:
     # Deploy 2 RGW instances for HA and load balancing
     instances: 2
 
-    # Spread RGW instances across different nodes
+    # Spread RGW instances across different nodes, restricted to Ceph storage nodes.
+    # RGW uses hostNetwork=true so it competes with host services for port 80.
+    # Control plane nodes (mullet, trout, whale) run Caddy on port 80 — scheduling
+    # RGW there causes an "Address already in use" CrashLoopBackOff.
     placement:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: ceph-node
+              operator: In
+              values:
+              - "true"
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
         - weight: 100
@@ -50,17 +61,6 @@ spec:
                 values:
                 - rook-ceph-rgw
             topologyKey: kubernetes.io/hostname
-
-      # Optional: Prefer non-storage nodes for RGW
-      # nodeAffinity:
-      #   preferredDuringSchedulingIgnoredDuringExecution:
-      #   - weight: 100
-      #     preference:
-      #       matchExpressions:
-      #       - key: role
-      #         operator: NotIn
-      #         values:
-      #         - storage
 
     # Resource allocation per RGW instance
     resources:
