@@ -1,0 +1,20 @@
+# Teller config for freshrss-producer — reuses the existing freshrss PostgreSQL role
+# No new GSM secrets required; DB_USERNAME is the literal "freshrss".
+
+project: ops-microk8s
+
+providers:
+  google_secretmanager:
+    env:
+      DB_PASSWORD:
+        path: projects/1000827005146/secrets/freshrss-role/versions/latest
+
+# Create producer-secret in freshrss namespace:
+#
+# teller run --config teller/.teller-freshrss-producer.yml -- bash -c '
+#   kubectl create secret generic producer-secret \
+#     --namespace freshrss \
+#     --from-literal=DB_USERNAME="freshrss" \
+#     --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+#     --dry-run=client -o yaml | kubectl apply -f -
+# '
