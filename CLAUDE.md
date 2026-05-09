@@ -38,6 +38,23 @@ Please follow these memory protocols at the beginning of each Claude Code sessio
 
 This repository contains the infrastructure configuration for a MicroK8s cluster with 8 nodes: mullet, trout, tuna, whale, gold, squid, puffer, and carp. The cluster uses Rook/Ceph for distributed replicated storage. Monitoring is provided by Prometheus/Grafana.
 
+## Work Scope
+
+This repository covers **cluster infrastructure creation and management** — the platform layer that all projects run on.
+
+**In scope:**
+- Cluster provisioning, node management, and MicroK8s configuration
+- Core platform services: ArgoCD, Rook/Ceph, MetalLB, Prometheus/Grafana, Loki, cert-manager
+- Shared infrastructure: PostgreSQL operator, Kafka/Strimzi, Harbor registry, Argo Workflows/Events
+- Cluster-wide secrets, RBAC, and networking
+- Infrastructure issues raised by projects (e.g., a project needs a new secret, storage class, or service)
+
+**Out of scope:**
+- Individual machine OS configuration and tooling → [`dotfiles`](https://gitlab.com/jconlon1/dotfiles) repo
+- Project-specific development and application logic → tracked in each project's own repo and tagged with the `project` label in their issues
+
+Projects may open issues here when they need cluster-level support (secrets, storage, ingress, service accounts, etc.).
+
 ## Architecture
 
 ### Cluster Configuration
