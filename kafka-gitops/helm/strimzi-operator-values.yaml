@@ -1,9 +1,5 @@
 # Strimzi Kafka Operator Helm Values
 
-# Watch only the kafka-system namespace
-watchNamespaces:
-  - kafka-system
-
 # Resource limits for the operator
 resources:
   requests:
