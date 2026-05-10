@@ -1,4 +1,5 @@
 routerSpec:
+  tag: "v0.1.11"
   serviceType: LoadBalancer
   serviceAnnotations:
     metallb.universe.tf/loadBalancerIPs: "192.168.0.218"
@@ -11,7 +12,7 @@ servingEngineSpec:
   modelSpec:
     - name: "qwen25-7b"
       repository: "vllm/vllm-openai"
-      tag: "latest"
+      tag: "v0.20.2"
       modelURL: "Qwen/Qwen2.5-7B-Instruct-AWQ"
       replicaCount: 1
 
