@@ -26,6 +26,11 @@
       "export MC_HOST_ceph=https://s3.verticon.com"
     ],
     "scripts": {
+      "agent":           ["claude --continue --name ops-microk8s"],
+      "agent-new":       ["claude --name ops-microk8s"],
+      "agent-plan":      ["claude --name ops-microk8s --model opus --permission-mode plan"],
+      "agent-small":     ["claude --name ops-microk8s --model haiku"],
+      "agent-big":       ["claude --name ops-microk8s --model opus"],
       "argocd-login": ["./ops argocd login"],
       "freshrss-psql": ["./ops freshrss psql"],
       "freshrss-publish-links": ["./ops freshrss publish-links"],
