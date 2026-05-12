@@ -152,10 +152,12 @@ tolerations:
     effect: NoSchedule
 
 # NODE_NAME env var for syslog relabeling
+# defaultArgs overrides the container args list entirely.
 # -config.expand-env=true is required: without it ${NODE_NAME} in relabel_configs
 # replacement is treated as a regex capture group reference (expands to empty string)
 # rather than an environment variable, silently dropping the node label.
-extraArgs:
+defaultArgs:
+  - -config.file=/etc/promtail/promtail.yaml
   - -config.expand-env=true
 
 extraEnv:
