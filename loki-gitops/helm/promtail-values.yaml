@@ -152,6 +152,12 @@ tolerations:
     effect: NoSchedule
 
 # NODE_NAME env var for syslog relabeling
+# -config.expand-env=true is required: without it ${NODE_NAME} in relabel_configs
+# replacement is treated as a regex capture group reference (expands to empty string)
+# rather than an environment variable, silently dropping the node label.
+extraArgs:
+  - -config.expand-env=true
+
 extraEnv:
   - name: NODE_NAME
     valueFrom:
