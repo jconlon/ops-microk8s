@@ -201,11 +201,11 @@ Grafana pod (inside cluster)
 
 <h3>Cloudflare DNS</h3>
 <p>
-  Each service has an <strong>A record</strong> in Cloudflare pointing to mullet's WAN IP.
-  Records are set to <strong>DNS-only</strong> (grey cloud — proxying disabled) so that Caddy
-  receives the raw TCP connection and can terminate TLS itself.
-  Cloudflare proxying is intentionally off: the cluster services are not routed through
-  Cloudflare's CDN/WAF layer.
+  DNS records are managed at <strong>dash.cloudflare.com → verticon.com → DNS → Records</strong>.
+  Each service has an <strong>A record</strong> pointing to mullet's WAN IP, set to
+  <strong>DNS-only</strong> (grey cloud — proxying disabled) so that Caddy receives the raw TCP
+  connection and can terminate TLS itself. Cloudflare proxying is intentionally off: the cluster
+  services are not routed through Cloudflare's CDN/WAF layer.
 </p>
 <p>
   Cloudflare is also used as the <strong>ACME DNS provider</strong>. Caddy calls the Cloudflare API
@@ -292,10 +292,19 @@ Grafana pod (inside cluster)
   </li>
   <li>
     <div>
-      <strong>Add a Cloudflare DNS A record.</strong> In the Cloudflare dashboard for
-      <code>verticon.com</code>, create an A record:<br>
-      <code>Name: &lt;service&gt;</code> &nbsp;→&nbsp; <code>Content: &lt;mullet WAN IP&gt;</code><br>
-      Set to <strong>DNS-only</strong> (grey cloud, not proxied).
+      <strong>Add a Cloudflare DNS A record.</strong><br>
+      Navigate to: <strong>dash.cloudflare.com → verticon.com → DNS → Records → Add record</strong><br><br>
+      Set the fields:<br>
+      <table style="margin-top:0.5rem; width:auto;">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td><code>A</code></td></tr>
+          <tr><td>Name</td><td><code>&lt;service&gt;</code> (e.g. <code>kafka</code>)</td></tr>
+          <tr><td>IPv4 address</td><td>mullet's WAN IP</td></tr>
+          <tr><td>Proxy status</td><td><strong>DNS only</strong> (grey cloud — must not be proxied)</td></tr>
+          <tr><td>TTL</td><td>Auto</td></tr>
+        </tbody>
+      </table>
     </div>
   </li>
   <li>
