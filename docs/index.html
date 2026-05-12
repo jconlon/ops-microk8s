@@ -97,8 +97,39 @@
     letter-spacing: 0.04em;
     margin-top: 0.6rem;
   }
-  .tag-html   { background: #1e2a1a; color: var(--green);  border: 1px solid #2e4028; }
-  .tag-md     { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .tag-html      { background: #1e2a1a; color: var(--green);   border: 1px solid #2e4028; }
+  .tag-md        { background: #1a2240; color: var(--accent);  border: 1px solid #263060; }
+  .tag-gitops    { background: #1e1a38; color: var(--accent2); border: 1px solid #302860; }
+  .tag-monitoring{ background: #2a2210; color: var(--yellow);  border: 1px solid #453810; }
+  .tag-ci        { background: #2a1e10; color: var(--orange);  border: 1px solid #453018; }
+  .tag-registry  { background: #0f1f2a; color: #5ec4f5;        border: 1px solid #1a3a50; }
+
+  /* Service cards */
+  .svc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .svc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.3rem;
+    transition: border-color 0.15s, background 0.15s;
+    text-decoration: none;
+    display: block;
+  }
+  .svc-card:hover {
+    border-color: var(--accent);
+    background: var(--surface2);
+    text-decoration: none;
+  }
+  .svc-card-title { font-weight: 700; font-size: 1rem; color: var(--text); margin-bottom: 0.3rem; }
+  .svc-card:hover .svc-card-title { color: var(--accent); }
+  .svc-card-url   { font-family: "JetBrains Mono", monospace; font-size: 0.78rem; color: var(--accent); margin-bottom: 0.4rem; }
+  .svc-card-desc  { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+  .svc-card-ip    { font-family: "JetBrains Mono", monospace; font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; opacity: 0.7; }
 
   /* Scope table */
   .scope-grid {
@@ -153,6 +184,43 @@
     background: #141926;
   }
   .callout strong { color: var(--accent); }
+
+  /* Endpoint table */
+  .ep-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+  }
+  .ep-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .ep-table td {
+    padding: 0.65rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  .ep-table tr:last-child td { border-bottom: none; }
+  .ep-table tr:hover td { background: var(--surface); }
+  .ep-ip { font-family: "JetBrains Mono", monospace; font-size: 0.75rem; color: var(--muted); }
+  .ep-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.08em 0.4em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 0.3em;
+  }
 
   hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 </style>
@@ -242,6 +310,140 @@
   </a>
 
 </div>
+
+<!-- ── Web UIs ─────────────────────────────────────────────────────── -->
+<h2>Web UIs</h2>
+
+<div class="svc-grid">
+
+  <a href="https://argocd.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">ArgoCD</div>
+    <div class="svc-card-url">argocd.verticon.com</div>
+    <div class="svc-card-desc">GitOps dashboard — all Helm deployments, application sync status, and rollback history. Every cluster resource is managed from here.</div>
+    <span class="doc-card-tag tag-gitops">GitOps</span>
+    <div class="svc-card-ip">192.168.0.200</div>
+  </a>
+
+  <a href="https://workflows.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Argo Workflows</div>
+    <div class="svc-card-url">workflows.verticon.com</div>
+    <div class="svc-card-desc">CI/CD pipeline UI — kaniko image builds, push to Harbor, and workflow run history. Submit and monitor builds triggered by git push events.</div>
+    <span class="doc-card-tag tag-ci">CI/CD</span>
+    <div class="svc-card-ip">192.168.0.209 · port 2746</div>
+  </a>
+
+  <a href="https://grafana.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Grafana</div>
+    <div class="svc-card-url">grafana.verticon.com</div>
+    <div class="svc-card-desc">Metrics dashboards and log exploration. Covers cluster nodes, Ceph storage, PostgreSQL, Kafka, and all pod logs via Loki datasource.</div>
+    <span class="doc-card-tag tag-monitoring">Monitoring</span>
+    <div class="svc-card-ip">192.168.0.201</div>
+  </a>
+
+  <a href="https://prometheus.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Prometheus</div>
+    <div class="svc-card-url">prometheus.verticon.com</div>
+    <div class="svc-card-desc">Raw metrics explorer and PromQL query interface. Use for ad-hoc metric investigation and confirming scrape targets and rule evaluation.</div>
+    <span class="doc-card-tag tag-monitoring">Monitoring</span>
+    <div class="svc-card-ip">192.168.0.202</div>
+  </a>
+
+  <a href="https://alertmanager.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">AlertManager</div>
+    <div class="svc-card-url">alertmanager.verticon.com</div>
+    <div class="svc-card-desc">Alert routing, grouping, and silencing. View active alerts and manage silences during maintenance windows.</div>
+    <span class="doc-card-tag tag-monitoring">Monitoring</span>
+    <div class="svc-card-ip">192.168.0.203</div>
+  </a>
+
+  <a href="https://registry.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Harbor</div>
+    <div class="svc-card-url">registry.verticon.com</div>
+    <div class="svc-card-desc">Container image registry. All cluster images — including <code>ci-tools</code> and project images — are pushed here by Argo Workflows and pulled by Kubernetes.</div>
+    <span class="doc-card-tag tag-registry">Registry</span>
+    <div class="svc-card-ip">192.168.0.219</div>
+  </a>
+
+  <a href="https://freshrss.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">FreshRSS</div>
+    <div class="svc-card-url">freshrss.verticon.com</div>
+    <div class="svc-card-desc">Self-hosted RSS feed aggregator and reader. Backed by PostgreSQL.</div>
+    <span class="doc-card-tag tag-gitops">App</span>
+    <div class="svc-card-ip">192.168.0.205</div>
+  </a>
+
+  <a href="https://pgadmin.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">pgAdmin</div>
+    <div class="svc-card-url">pgadmin.verticon.com</div>
+    <div class="svc-card-desc">PostgreSQL administration UI — query editor, schema browser, and cluster management for the CloudNativePG instance.</div>
+    <span class="doc-card-tag tag-registry">Database</span>
+    <div class="svc-card-ip">192.168.0.212</div>
+  </a>
+
+  <a href="https://wallabag.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Wallabag</div>
+    <div class="svc-card-url">wallabag.verticon.com</div>
+    <div class="svc-card-desc">Self-hosted read-later and article archiving service.</div>
+    <span class="doc-card-tag tag-gitops">App</span>
+    <div class="svc-card-ip">192.168.0.215</div>
+  </a>
+
+</div>
+
+<!-- ── Service Endpoints ──────────────────────────────────────────── -->
+<h2>Service Endpoints</h2>
+<p style="font-size:0.88rem; color:var(--muted); margin-bottom:1rem;">
+  Non-UI services accessible by hostname or IP — APIs, brokers, and data plane endpoints.
+</p>
+
+<table class="ep-table">
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>External</th>
+      <th>Internal (cluster DNS)</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Loki</strong> <span class="ep-tag tag-monitoring">Monitoring</span></td>
+      <td><code>https://loki.verticon.com</code><br><span class="ep-ip">192.168.0.220</span></td>
+      <td><code>http://loki-gateway.loki.svc:80</code></td>
+      <td>LogQL HTTP API; query via Grafana Explore or <code>logcli</code>. Not a browser UI.</td>
+    </tr>
+    <tr>
+      <td><strong>Ceph S3 / RGW</strong> <span class="ep-tag tag-registry">Storage</span></td>
+      <td><code>https://s3.verticon.com</code><br><span class="ep-ip">192.168.0.204:80</span></td>
+      <td><code>rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:80</code></td>
+      <td>S3-compatible API; path-style access. Use <code>mc</code> (<code>MC_HOST_ceph</code>) or AWS SDK.</td>
+    </tr>
+    <tr>
+      <td><strong>Kafka</strong> <span class="ep-tag tag-ci">Messaging</span></td>
+      <td><code>kafka.verticon.com:9094</code><br><span class="ep-ip">192.168.0.213</span></td>
+      <td><code>kafka-kafka-bootstrap.kafka-system.svc:9092</code></td>
+      <td>External bootstrap broker. 3-broker KRaft cluster (no ZooKeeper).</td>
+    </tr>
+    <tr>
+      <td><strong>Schema Registry</strong> <span class="ep-tag tag-ci">Messaging</span></td>
+      <td><code>https://schema-registry.verticon.com</code><br><span class="ep-ip">192.168.0.214:8081</span></td>
+      <td><code>schema-registry.kafka-system.svc:8081</code></td>
+      <td>Confluent-compatible REST API for Avro/Protobuf schemas. Backed by PostgreSQL.</td>
+    </tr>
+    <tr>
+      <td><strong>Argo Events Webhook</strong> <span class="ep-tag tag-gitops">Events</span></td>
+      <td><code>https://events.verticon.com/push</code><br><span class="ep-ip">192.168.0.221:12000</span></td>
+      <td>—</td>
+      <td>HTTP POST endpoint; triggers <code>git-push-build</code> WorkflowTemplate on receipt.</td>
+    </tr>
+    <tr>
+      <td><strong>PostgreSQL</strong> <span class="ep-tag tag-registry">Database</span></td>
+      <td>—</td>
+      <td><code>production-postgresql-rw.postgresql-system.svc:5432</code></td>
+      <td>CloudNativePG primary (read-write). Use <code>kubectl cnpg status</code> or <code>ops freshrss psql</code>.</td>
+    </tr>
+  </tbody>
+</table>
 
 <!-- ── Quick reference ────────────────────────────────────────────── -->
 <h2>Quick reference</h2>
