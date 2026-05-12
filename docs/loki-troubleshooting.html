@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loki Troubleshooting Guide — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  h4 { font-size: 0.9rem; font-weight: 600; color: var(--muted); margin: 1rem 0 0.35rem;
+       text-transform: uppercase; letter-spacing: 0.06em; }
+  p  { margin-bottom: 0.75rem; color: var(--text); }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+  }
+  .card.syslog .card-title { color: var(--accent); }
+  .card.journal .card-title { color: var(--accent2); }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green); border: 1px solid #2a4a3a; }
+  .badge-purple { background: #241f3a; color: var(--accent2); border: 1px solid #352a50; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-red    { background: #2e1a1c; color: var(--red); border: 1px solid #4a282c; }
+
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-tip    { border-color: var(--green);  background: #151f1a; }
+  .callout-warn   { border-color: var(--yellow); background: #1e1a0f; }
+  .callout-note   { border-color: var(--accent); background: #141926; }
+  .callout strong { font-weight: 700; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .callout-note strong { color: var(--accent); }
+
+  .scenario {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.8rem;
+  }
+  .scenario-header {
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+    font-size: 0.92rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: default;
+  }
+  .scenario-body { padding: 0.8rem 1rem; font-size: 0.9rem; }
+  .scenario-body p { margin-bottom: 0.4rem; }
+  .scenario-body pre { margin-top: 0.4rem; }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.5rem 0;
+  }
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 0.6rem;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 0.82rem;
+  }
+  .flow-arrow { color: var(--border); font-size: 1rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.3rem;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+  }
+  .toc h4 { margin: 0 0 0.5rem; }
+  .toc ol { margin: 0; }
+  .toc li { margin-bottom: 0.2rem; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Loki Troubleshooting Guide</h1>
+<p class="subtitle">ops-microk8s · Updated 2026-05-12 · Loki 3.4.2 · Promtail 3.0.0</p>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#architecture">Architecture &amp; Log Pipelines</a></li>
+    <li><a href="#streams">Stream Labels Reference</a></li>
+    <li><a href="#tools">Query Tools</a></li>
+    <li><a href="#when-to-use">When to Use Which Tool</a></li>
+    <li><a href="#scenarios">Common Scenarios</a></li>
+    <li><a href="#chainsaw">Chainsaw Health Tests</a></li>
+    <li><a href="#known-issues">Known Issues</a></li>
+  </ol>
+</div>
+
+<!-- ── Architecture ─────────────────────────────────────────────────── -->
+<h2 id="architecture">Architecture &amp; Log Pipelines</h2>
+
+<p>Two independent pipelines ship logs from each node to Loki. They capture different event sets and have different failure modes.</p>
+
+<div class="two-col">
+  <div class="card syslog">
+    <div class="card-title">Pipeline 1 — OS Syslog</div>
+    <div class="flow">
+      <span class="flow-node">systemd journal</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">rsyslog</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">/var/log/syslog</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">Promtail</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">Loki</span>
+    </div>
+    <p style="font-size:0.88rem; color:var(--muted); margin-top:0.5rem;">
+      Covers: syslog, kern.log, auth.log.<br>
+      Job label: <code>job="syslog"</code>
+    </p>
+  </div>
+  <div class="card journal">
+    <div class="card-title">Pipeline 2 — systemd Journal</div>
+    <div class="flow">
+      <span class="flow-node">systemd journal</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">Promtail journal input</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-node">Loki</span>
+    </div>
+    <p style="font-size:0.88rem; color:var(--muted); margin-top:0.5rem;">
+      Filtered: warning+ severity and all logind events.<br>
+      Job label: <code>job="journal"</code>
+    </p>
+  </div>
+</div>
+
+<div class="callout callout-warn">
+  <strong>Why two pipelines?</strong> rsyslog rate-limits high-frequency events before they reach syslog.
+  During the puffer ACPI incident (#59), 312 <em>Power key pressed</em> events were silently dropped by rsyslog
+  and never appeared in Loki. The journal pipeline reads the binary journal directly — no rate limiting,
+  and cursor-based recovery ships pre-crash entries after a reboot.
+</div>
+
+<h3>Node coverage</h3>
+<table>
+  <thead><tr><th>Node</th><th>OS</th><th>Syslog format</th><th>Role</th></tr></thead>
+  <tbody>
+    <tr><td>mullet</td><td>Ubuntu 22.04</td><td>RFC 3339</td><td>Control plane + desktop</td></tr>
+    <tr><td>trout</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Control plane</td></tr>
+    <tr><td>tuna</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Worker</td></tr>
+    <tr><td>whale</td><td>Ubuntu 22.04</td><td>Traditional</td><td>Worker + GPU (RTX 2000 Ada)</td></tr>
+    <tr><td>gold</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Ceph storage (Dell R320)</td></tr>
+    <tr><td>squid</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Ceph storage (Dell R320)</td></tr>
+    <tr><td>puffer</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Ceph storage (Dell R320)</td></tr>
+    <tr><td>carp</td><td>Ubuntu 24.04</td><td>RFC 3339</td><td>Ceph storage (Dell R320)</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Streams ───────────────────────────────────────────────────────── -->
+<h2 id="streams">Stream Labels Reference</h2>
+
+<table>
+  <thead><tr><th>Label</th><th>Values</th><th>Present on</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>job</code></td>
+      <td><code>syslog</code> · <code>journal</code> · <code>kubernetes-pods</code></td>
+      <td>All streams</td>
+    </tr>
+    <tr>
+      <td><code>node</code></td>
+      <td>mullet · trout · tuna · whale · gold · squid · puffer · carp</td>
+      <td>syslog (since 2026-05-12), journal (always)</td>
+    </tr>
+    <tr>
+      <td><code>filename</code></td>
+      <td><code>/var/log/syslog</code> · <code>/var/log/auth.log</code> · <code>/var/log/kern.log</code></td>
+      <td>syslog streams</td>
+    </tr>
+    <tr>
+      <td><code>unit</code></td>
+      <td>systemd unit name, e.g. <code>kubelet.service</code></td>
+      <td>journal streams</td>
+    </tr>
+    <tr>
+      <td><code>level</code></td>
+      <td><code>warning</code> · <code>error</code> · <code>critical</code> · <code>alert</code> · <code>emergency</code></td>
+      <td>journal streams (warning+ only)</td>
+    </tr>
+    <tr>
+      <td><code>syslog_identifier</code></td>
+      <td>process name, e.g. <code>systemd-logind</code> · <code>kernel</code></td>
+      <td>journal streams</td>
+    </tr>
+    <tr>
+      <td><code>namespace</code> · <code>pod</code> · <code>container</code></td>
+      <td>Kubernetes metadata</td>
+      <td>kubernetes-pods streams</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-note">
+  <strong>Note:</strong> Syslog streams acquired the <code>node</code> label on 2026-05-12 via a
+  <code>pipeline_stages</code> regex fix (issue #89). Entries before that date are in an unlabeled
+  shared stream — use content search (<code>|= " hostname "</code>) to reach them.
+</div>
+
+<!-- ── Tools ─────────────────────────────────────────────────────────── -->
+<h2 id="tools">Query Tools</h2>
+
+<div class="card syslog">
+  <div class="card-title"><code>just loki-syslog-node</code> <span class="badge badge-blue">syslog pipeline</span></div>
+  <p style="font-size:0.9rem; margin:0.5rem 0;">Queries <code>{job="syslog", node="&lt;node&gt;"}</code> — covers syslog, auth.log, and kern.log together.</p>
+<pre>just loki-syslog-node &lt;node&gt; [since] [filter]
+
+just loki-syslog-node whale          # last 1 hour
+just loki-syslog-node mullet 6h      # last 6 hours
+just loki-syslog-node tuna 24h error # last 24h, grep "error"</pre>
+  <p style="font-size:0.88rem; color:var(--muted);">Includes a 5-minute stream health check at the end.</p>
+</div>
+
+<div class="card journal">
+  <div class="card-title"><code>just loki-journal-check</code> <span class="badge badge-purple">journal pipeline</span></div>
+  <p style="font-size:0.9rem; margin:0.5rem 0;">Queries <code>{job="journal", node="&lt;node&gt;"}</code> — warning+severity events and all logind events. Use for crashes, OOM, power events, unit failures.</p>
+<pre>just loki-journal-check &lt;node&gt; [filter] [since]
+
+just loki-journal-check puffer "Power key" 24h
+just loki-journal-check gold "OOM" 48h
+just loki-journal-check whale "entered failed state" 7d</pre>
+  <p style="font-size:0.88rem; color:var(--muted);">Includes a 5-minute stream health check at the end.</p>
+</div>
+
+<div class="card" style="border-color: var(--border);">
+  <div class="card-title" style="color:var(--muted)"><code>just loki-node-events</code> <span class="badge badge-yellow">content search</span></div>
+  <p style="font-size:0.9rem; margin:0.5rem 0;">Searches syslog content for the node name. Reaches pre-2026-05-12 data that lacks the <code>node</code> label. Also available: <code>loki-shutdown-events</code>, <code>loki-idrac</code>, <code>loki-reboot-history</code>, <code>loki-tail</code>.</p>
+<pre>just loki-node-events puffer 24h
+just loki-shutdown-events puffer 7d
+just loki-idrac puffer 30d
+just loki-reboot-history 7d</pre>
+</div>
+
+<!-- ── When to Use ───────────────────────────────────────────────────── -->
+<h2 id="when-to-use">When to Use Which Tool</h2>
+
+<table>
+  <thead><tr><th>Situation</th><th>Start with</th><th>Escalate to</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Node behaving strangely — general sweep</td>
+      <td><code>loki-syslog-node</code></td>
+      <td><code>loki-journal-check</code> if nothing obvious</td>
+    </tr>
+    <tr>
+      <td>Node rebooted unexpectedly</td>
+      <td><code>loki-shutdown-events</code></td>
+      <td><code>loki-journal-check</code> — pre-crash entries recovered via cursor</td>
+    </tr>
+    <tr>
+      <td>Suspected OOM kill</td>
+      <td><code>loki-journal-check &lt;node&gt; "OOM"</code></td>
+      <td>—  kernel OOM events bypass rsyslog rate limiting</td>
+    </tr>
+    <tr>
+      <td>Power / ACPI event (puffer-style)</td>
+      <td><code>loki-journal-check &lt;node&gt; "Power key"</code></td>
+      <td>— rsyslog drops floods; journal catches every event</td>
+    </tr>
+    <tr>
+      <td>systemd unit failure</td>
+      <td><code>loki-journal-check &lt;node&gt; "failed"</code></td>
+      <td><code>loki-syslog-node</code> for surrounding context</td>
+    </tr>
+    <tr>
+      <td>SSH / authentication audit</td>
+      <td><code>loki-syslog-node &lt;node&gt; 24h "pam\|sshd"</code></td>
+      <td>— auth events go through rsyslog to auth.log</td>
+    </tr>
+    <tr>
+      <td>Cron / scheduled job investigation</td>
+      <td><code>loki-syslog-node &lt;node&gt; 24h "CRON"</code></td>
+      <td>— cron logs via syslog</td>
+    </tr>
+    <tr>
+      <td>iDRAC hardware alert (Dell R320s)</td>
+      <td><code>just loki-idrac &lt;node&gt; 7d</code></td>
+      <td>— iDRAC sends UDP syslog → rsyslog → Loki</td>
+    </tr>
+    <tr>
+      <td>Pre-2026-05-12 syslog (no node label)</td>
+      <td><code>loki-node-events &lt;node&gt;</code></td>
+      <td>— uses content search, reaches the old unlabeled stream</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ── Scenarios ─────────────────────────────────────────────────────── -->
+<h2 id="scenarios">Common Scenarios</h2>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-red">Incident</span>
+    Node rebooted unexpectedly
+  </div>
+  <div class="scenario-body">
+    <p>Check boot history, then look at journal for what happened right before shutdown.</p>
+<pre>just loki-reboot-history 7d                       # all nodes: boot times + shutdown count
+just loki-shutdown-events puffer 7d               # power/reboot events on specific node
+just loki-journal-check puffer "shutdown\|reboot\|panic" 24h  # pre-crash journal entries</pre>
+    <p>The journal pipeline uses cursor-based recovery — if Promtail was running before the crash, pre-reboot entries will appear in Loki after the node comes back up.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-red">Incident</span>
+    Pod evicted due to disk pressure (mullet)
+  </div>
+  <div class="scenario-body">
+    <p>Mullet's root disk (<code>/dev/sda5</code>, 117G) hit DiskPressure in 2026-05 (issue #77). Check disk-related syslog and kubelet events.</p>
+<pre>just loki-syslog-node mullet 6h "disk\|evict\|pressure"
+just loki-journal-check mullet "kubelet\|DiskPressure" 6h</pre>
+    <p>Monitor root disk usage: Prometheus alert fires at 80% (<code>MulletRootDiskHigh</code>).</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-yellow">Investigate</span>
+    Syslog missing from a node in Loki
+  </div>
+  <div class="scenario-body">
+    <p>Run the chainsaw test first, then check Promtail drop metrics.</p>
+<pre>just test-loki                                    # loki-healthy + promtail-drop-rate-low
+kubectl get pods -n loki -l app.kubernetes.io/name=promtail -o wide  # pod per node?
+# Check Prometheus for permanent drops:
+# rate(promtail_dropped_entries_total{reason="ingester_error"}[1h]) * 3600</pre>
+    <p>If a pod is dropping >500 entries/hour, the chainsaw test will fail. Restart the Promtail pod to clear state; investigate Loki ingester health if drops recur.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-yellow">Investigate</span>
+    Investigating a specific systemd unit
+  </div>
+  <div class="scenario-body">
+<pre>just loki-journal-check whale "containerd" 24h
+just loki-journal-check tuna "kafka" 12h
+# Use the unit label directly in logcli for precision:
+logcli --addr=http://192.168.0.220 \
+  query '{job="journal", node="whale", unit="snap.microk8s.daemon-containerd.service"}' \
+  --since=6h --limit=100 --timezone=Local</pre>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-blue">Routine</span>
+    Verify all nodes are shipping logs after a maintenance window
+  </div>
+  <div class="scenario-body">
+<pre>just loki-node-logs              # content search: all 8 nodes, last 15 min
+just test-loki                   # full chainsaw suite: syslog + drops + Loki health</pre>
+  </div>
+</div>
+
+<!-- ── Chainsaw Tests ─────────────────────────────────────────────────── -->
+<h2 id="chainsaw">Chainsaw Health Tests</h2>
+
+<p>Run the full Loki suite with <code>just test-loki</code> or include it in the cluster-wide <code>just test</code>.</p>
+
+<table>
+  <thead><tr><th>Step</th><th>What it checks</th><th>Fails when</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>loki-storage-cephobjectstoreuser-ready</code></td>
+      <td>Ceph object store user provisioned</td>
+      <td>S3 credentials not available</td>
+    </tr>
+    <tr>
+      <td><code>loki-s3-credentials-secret-exists</code></td>
+      <td><code>loki-s3-credentials</code> secret has a non-empty access key</td>
+      <td>Secret missing or empty</td>
+    </tr>
+    <tr>
+      <td><code>loki-argocd-app-synced</code></td>
+      <td>Loki ArgoCD app Synced + Healthy</td>
+      <td>ArgoCD drift or Helm error</td>
+    </tr>
+    <tr>
+      <td><code>promtail-argocd-app-synced</code></td>
+      <td>Promtail ArgoCD app Synced + Healthy</td>
+      <td>ArgoCD drift or Helm error</td>
+    </tr>
+    <tr>
+      <td><code>loki-pod-running</code></td>
+      <td>Loki StatefulSet has 1 ready replica</td>
+      <td>Loki pod crash or pending</td>
+    </tr>
+    <tr>
+      <td><code>promtail-daemonset-ready</code></td>
+      <td>Promtail DaemonSet has all 8 pods ready</td>
+      <td>Pod not scheduled on a node</td>
+    </tr>
+    <tr>
+      <td><code>loki-service-has-ip</code></td>
+      <td>Gateway LoadBalancer IP = <code>192.168.0.220</code></td>
+      <td>MetalLB IP lost or changed</td>
+    </tr>
+    <tr>
+      <td><code>loki-ready-endpoint</code></td>
+      <td>Loki <code>/loki/api/v1/status/buildinfo</code> responds</td>
+      <td>Loki unresponsive or gateway down</td>
+    </tr>
+    <tr>
+      <td><code>loki-has-labels</code></td>
+      <td>Labels API returns data (Promtail is ingesting)</td>
+      <td>No logs ingested at all</td>
+    </tr>
+    <tr>
+      <td><code>loki-query-returns-logs</code></td>
+      <td>Recent log lines from <code>loki</code> namespace</td>
+      <td>Query pipeline broken</td>
+    </tr>
+    <tr>
+      <td><code>loki-retention-configured</code></td>
+      <td>30-day retention in Loki config</td>
+      <td>Retention config missing</td>
+    </tr>
+    <tr>
+      <td><code>syslog-from-all-nodes</code></td>
+      <td>All 8 nodes shipped syslog in last 15 min (content search)</td>
+      <td>Any node's syslog gap &gt; 15 min</td>
+    </tr>
+    <tr>
+      <td><code>promtail-drop-rate-low</code> <span class="badge badge-blue">added 2026-05-12</span></td>
+      <td>No Promtail pod dropping &gt;500 entries/hour (Prometheus query)</td>
+      <td>Loki ingester refusing or timing out pushes acutely</td>
+    </tr>
+    <tr>
+      <td><code>grafana-loki-datasource-registered</code></td>
+      <td>Grafana is healthy + Loki datasource configured</td>
+      <td>Grafana down or datasource missing</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-tip">
+  <strong>Tip:</strong> <code>promtail-drop-rate-low</code> is an early warning —
+  it fires before <code>syslog-from-all-nodes</code> notices a gap. If drops are &gt;500/hr
+  but syslog is still flowing, Promtail is under stress but hasn't lost data yet.
+</div>
+
+<!-- ── Known Issues ──────────────────────────────────────────────────── -->
+<h2 id="known-issues">Known Issues</h2>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-yellow">Open</span>
+    Periodic Loki ingester 500s — every few hours, all nodes simultaneously
+  </div>
+  <div class="scenario-body">
+    <p>Loki returns <code>rpc error: code = DeadlineExceeded desc = context deadline exceeded</code> on
+    Promtail push at irregular intervals (roughly every 4–6 hours). All nodes are affected at the same
+    timestamp, suggesting an internal Loki event (WAL flush, compaction, or ingester backpressure from
+    Ceph S3 write latency). Promtail retries and usually recovers; the <code>promtail-drop-rate-low</code>
+    chainsaw test will catch it if drops become acute (&gt;500/hr).</p>
+    <p>Tracked in issue #89. Root cause investigation pending.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-green">Resolved 2026-05-12</span>
+    Whale syslog absent from Loki for 7 days — issue #89
+  </div>
+  <div class="scenario-body">
+    <p>Root cause: <code>replacement: ${NODE_NAME}</code> in Promtail <code>relabel_configs</code> was
+    treated as a regex capture group reference (not an env var), silently producing an empty label.
+    All syslog landed in one unlabeled shared stream. Fixed with a <code>pipeline_stages</code> regex
+    that extracts the hostname from syslog content. Two timestamp formats handled:</p>
+<pre># Traditional (Ubuntu 22.04 — whale):
+May 12 12:34:53 whale systemd[1]: ...
+
+# RFC 3339 (Ubuntu 24.04 — all other nodes):
+2026-05-12T12:34:53.47-04:00 mullet caddy[2443]: ...</pre>
+  </div>
+</div>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  Loki gateway: <code>http://192.168.0.220</code> &nbsp;·&nbsp;
+  External: <a href="https://loki.verticon.com">https://loki.verticon.com</a> &nbsp;·&nbsp;
+  Grafana: <a href="https://grafana.verticon.com">https://grafana.verticon.com</a> &nbsp;·&nbsp;
+  Source: <code>loki-gitops/helm/</code>
+</p>
+
+</div>
+</body>
+</html>
