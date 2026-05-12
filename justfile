@@ -355,6 +355,12 @@ loki-syslog-node node="mullet" since="1h" filter="":
       echo "WARN  no syslog in last 5 min — node may be quiet or stream stale (pre-2026-05-12 data lacks node label)"
     fi
 
+# ── Docs ──────────────────────────────────────────────────────────────────────
+
+# Open the Loki troubleshooting guide in a browser
+loki-docs:
+    xdg-open docs/loki-troubleshooting.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
