@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ops-microk8s Docs</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 1rem 0 0.4rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.35rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 0.92rem; margin-bottom: 2rem; }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+
+  /* Doc cards */
+  .doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .doc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem 1.3rem;
+    transition: border-color 0.15s, background 0.15s;
+    text-decoration: none;
+    display: block;
+  }
+  .doc-card:hover {
+    border-color: var(--accent);
+    background: var(--surface2);
+    text-decoration: none;
+  }
+  .doc-card-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .doc-card-title { font-weight: 700; font-size: 1rem; color: var(--text); margin-bottom: 0.3rem; }
+  .doc-card:hover .doc-card-title { color: var(--accent); }
+  .doc-card-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+  .doc-card-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1em 0.45em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.6rem;
+  }
+  .tag-html   { background: #1e2a1a; color: var(--green);  border: 1px solid #2e4028; }
+  .tag-md     { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+
+  /* Scope table */
+  .scope-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 600px) { .scope-grid { grid-template-columns: 1fr; } }
+  .scope-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    font-size: 0.88rem;
+  }
+  .scope-box h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em;
+                  color: var(--muted); margin-bottom: 0.5rem; }
+  .scope-in  { border-left: 3px solid var(--green); }
+  .scope-out { border-left: 3px solid var(--border); }
+  .scope-in  li::marker { color: var(--green); }
+  .scope-out li::marker { color: var(--muted); }
+
+  /* Quick ref */
+  .qr-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .qr-section h3 { color: var(--accent); font-size: 0.9rem; margin-bottom: 0.6rem; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.12em 0.5em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue  { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+    background: #141926;
+  }
+  .callout strong { color: var(--accent); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>ops-microk8s</h1>
+<p class="subtitle">Infrastructure configuration and documentation for the Verticon MicroK8s cluster</p>
+
+<!-- ── About ──────────────────────────────────────────────────────── -->
+<h2>About this repository</h2>
+
+<p>
+  This repository is the <strong>single source of truth for cluster infrastructure</strong>.
+  Everything the cluster runs — storage, databases, message queues, CI/CD, monitoring, registries —
+  is defined here and deployed via ArgoCD GitOps. Changing something means opening a PR here;
+  ArgoCD reconciles the cluster to match.
+</p>
+<p>
+  The cluster is an 8-node MicroK8s HA setup running on a mix of desktop hardware and Dell R320
+  servers. It serves as the shared platform for all Verticon projects.
+  See <a href="cluster.html">Cluster Reference</a> for hardware, networking, and service details.
+</p>
+
+<div class="scope-grid">
+  <div class="scope-box scope-in">
+    <h3>In scope</h3>
+    <ul>
+      <li>Cluster provisioning &amp; node management</li>
+      <li>Core platform services: ArgoCD, Rook/Ceph, MetalLB, Prometheus/Grafana, Loki, cert-manager</li>
+      <li>Shared infrastructure: PostgreSQL operator, Kafka/Strimzi, Harbor, Argo Workflows/Events</li>
+      <li>Cluster-wide secrets, RBAC, and networking</li>
+      <li>Infrastructure issues raised by projects (secrets, storage classes, ingress, service accounts)</li>
+    </ul>
+  </div>
+  <div class="scope-box scope-out">
+    <h3>Out of scope</h3>
+    <ul>
+      <li>Individual machine OS config and tooling → <a href="https://gitlab.com/jconlon1/dotfiles">dotfiles</a> repo</li>
+      <li>Project-specific application logic → each project's own repo</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Docs ───────────────────────────────────────────────────────── -->
+<h2>Documentation</h2>
+
+<div class="doc-grid">
+
+  <a href="cluster.html" class="doc-card">
+    <div class="doc-card-icon">🖥</div>
+    <div class="doc-card-title">Cluster Reference</div>
+    <div class="doc-card-desc">Node hardware, roles, networking (MetalLB, Caddy/Cloudflare), Ceph storage, platform services, CI/CD pipeline, and service endpoints.</div>
+    <span class="doc-card-tag tag-html">HTML</span>
+  </a>
+
+  <a href="loki-troubleshooting.html" class="doc-card">
+    <div class="doc-card-icon">📋</div>
+    <div class="doc-card-title">Loki Troubleshooting</div>
+    <div class="doc-card-desc">Log pipelines (syslog vs journal), stream labels, when to use <code>loki-syslog-node</code> vs <code>loki-journal-check</code>, chainsaw tests, and known issues.</div>
+    <span class="doc-card-tag tag-html">HTML</span>
+  </a>
+
+  <a href="object-storage-design.md" class="doc-card">
+    <div class="doc-card-icon">🗄</div>
+    <div class="doc-card-title">Object Storage Design</div>
+    <div class="doc-card-desc">Architecture design for Ceph RGW S3 object storage: pool options, erasure coding vs replication trade-offs, capacity planning, and bucket layout.</div>
+    <span class="doc-card-tag tag-md">Markdown</span>
+  </a>
+
+  <a href="music-library-monitoring.md" class="doc-card">
+    <div class="doc-card-icon">🎵</div>
+    <div class="doc-card-title">Music Library Monitoring</div>
+    <div class="doc-card-desc">Grafana dashboard setup for monitoring the music library stored in Ceph RGW. Pool metrics, bucket sizes, and Prometheus query reference.</div>
+    <span class="doc-card-tag tag-md">Markdown</span>
+  </a>
+
+</div>
+
+<!-- ── Quick reference ────────────────────────────────────────────── -->
+<h2>Quick reference</h2>
+
+<div class="qr-section">
+  <h3>Health checks</h3>
+<pre>just test                    # full e2e chainsaw suite — nodes, ceph, gpu, pg, argocd, loki
+just test-suite &lt;suite&gt;      # single suite: cluster · storage · gpu · postgresql · argocd · loki
+just node-status             # uptime + reboot-required for all 8 nodes
+just pods-unhealthy          # non-running pods cluster-wide</pre>
+</div>
+
+<div class="qr-section">
+  <h3>Logs</h3>
+<pre>just loki-syslog-node &lt;node&gt; [since] [filter]   # syslog by node label (2026-05-12+)
+just loki-journal-check &lt;node&gt; [filter] [since]  # journal: warning+, crashes, OOM, logind
+just loki-node-events &lt;node&gt; [since]             # content search (pre-label-era data)
+just loki-reboot-history [since]                 # all node boot times
+just loki-docs                                   # open Loki troubleshooting guide</pre>
+</div>
+
+<div class="qr-section">
+  <h3>Storage</h3>
+<pre>just ceph-status             # Ceph cluster health
+just pg-status               # CloudNativePG cluster status</pre>
+</div>
+
+<div class="qr-section">
+  <h3>CI/CD</h3>
+<pre>just argo-status             # Argo Workflows pods
+just argo-events-status      # EventBus, EventSource, Sensor status
+just test-build-e2e          # end-to-end kaniko build → Harbor → PR</pre>
+</div>
+
+<div class="qr-section">
+  <h3>ArgoCD</h3>
+<pre>ops argocd login             # authenticate
+ops argocd list-app          # all applications and sync status
+argocd app sync &lt;app&gt; --force</pre>
+</div>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  GitHub: <a href="https://github.com/jconlon/ops-microk8s">jconlon/ops-microk8s</a> &nbsp;·&nbsp;
+  ArgoCD: <a href="https://argocd.verticon.com">argocd.verticon.com</a> &nbsp;·&nbsp;
+  Grafana: <a href="https://grafana.verticon.com">grafana.verticon.com</a>
+</p>
+
+</div>
+</body>
+</html>

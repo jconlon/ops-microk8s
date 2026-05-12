@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cluster Reference — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-purple { background: #241f3a; color: var(--accent2);border: 1px solid #352a50; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-orange { background: #2e1e0a; color: var(--orange); border: 1px solid #4a3010; }
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-note { border-color: var(--accent);  background: #141926; }
+  .callout-tip  { border-color: var(--green);   background: #151f1a; }
+  .callout strong { font-weight: 700; }
+  .callout-note strong { color: var(--accent); }
+  .callout-tip  strong { color: var(--green); }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 700px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+  }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin: 0.1rem 0; }
+  .stat-sub   { font-size: 0.8rem; color: var(--muted); }
+  .node-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .node-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.82rem;
+    font-family: monospace;
+  }
+  .node-cp { border-color: var(--accent); color: var(--accent); }
+  .node-w  { border-color: var(--border); color: var(--text); }
+  .node-g  { border-color: var(--orange); color: var(--orange); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.3rem;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+    columns: 2;
+  }
+  @media (max-width: 600px) { .toc { columns: 1; } }
+  .toc h4 { color: var(--muted); font-size: 0.75rem; text-transform: uppercase;
+             letter-spacing: 0.06em; margin-bottom: 0.5rem; column-span: all; }
+  .toc ul { padding-left: 1.2rem; margin: 0; }
+  .toc li { margin-bottom: 0.2rem; break-inside: avoid; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="breadcrumb"><a href="index.html">← Docs</a></div>
+<h1>Cluster Reference</h1>
+<p class="subtitle">ops-microk8s · MicroK8s v1.32 · 8 nodes · Updated 2026-05-12</p>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ul>
+    <li><a href="#overview">At a glance</a></li>
+    <li><a href="#nodes">Nodes</a></li>
+    <li><a href="#networking">Networking</a></li>
+    <li><a href="#storage">Storage</a></li>
+    <li><a href="#services">Platform services</a></li>
+    <li><a href="#ci">CI/CD</a></li>
+    <li><a href="#monitoring">Monitoring &amp; logging</a></li>
+    <li><a href="#access">Service endpoints</a></li>
+    <li><a href="#ops">Day-2 operations</a></li>
+  </ul>
+</div>
+
+<!-- ── At a glance ─────────────────────────────────────────────────── -->
+<h2 id="overview">At a glance</h2>
+
+<div class="grid-3">
+  <div class="stat-card">
+    <div class="stat-label">Nodes</div>
+    <div class="stat-value">8</div>
+    <div class="stat-sub">3 control plane · 5 workers</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Kubernetes</div>
+    <div class="stat-value">v1.32</div>
+    <div class="stat-sub">MicroK8s · HA etcd</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Storage</div>
+    <div class="stat-value">16 TB</div>
+    <div class="stat-sub">Rook/Ceph · 3× replication</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">LoadBalancer IPs</div>
+    <div class="stat-value">31</div>
+    <div class="stat-sub">MetalLB · 192.168.0.200–.230</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">GPU</div>
+    <div class="stat-value">1×</div>
+    <div class="stat-sub">RTX 2000 Ada on whale · vLLM</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">GitOps</div>
+    <div class="stat-value">ArgoCD</div>
+    <div class="stat-sub">Self-managed · all Helm charts</div>
+  </div>
+</div>
+
+<div class="callout callout-note">
+  <strong>Scope:</strong> This cluster is the platform layer. It runs shared infrastructure —
+  ArgoCD, storage, Kafka, PostgreSQL, Harbor, monitoring — that application projects build on.
+  Node OS config and per-machine tooling live in the
+  <a href="https://gitlab.com/jconlon1/dotfiles">dotfiles</a> repo.
+</div>
+
+<!-- ── Nodes ──────────────────────────────────────────────────────── -->
+<h2 id="nodes">Nodes</h2>
+
+<p style="margin-bottom:0.75rem;">
+  Control plane nodes:
+  <span class="node-row" style="display:inline-flex">
+    <span class="node-chip node-cp">mullet</span>
+    <span class="node-chip node-cp">trout</span>
+    <span class="node-chip node-cp">whale</span>
+  </span>
+  &nbsp; Storage / worker nodes:
+  <span class="node-row" style="display:inline-flex">
+    <span class="node-chip node-g">gold</span>
+    <span class="node-chip node-g">squid</span>
+    <span class="node-chip node-g">puffer</span>
+    <span class="node-chip node-g">carp</span>
+  </span>
+  &nbsp; Worker:
+  <span class="node-chip node-w">tuna</span>
+</p>
+
+<table>
+  <thead>
+    <tr><th>Node</th><th>Role</th><th>OS</th><th>Hardware</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>mullet</code></td>
+      <td><span class="badge badge-blue">Control plane</span></td>
+      <td>Ubuntu 22.04</td>
+      <td>Desktop PC · 117 GB root SSD · 3.6 TB <code>/home</code></td>
+      <td>Runs Caddy reverse proxy. Desktop apps bind-mounted to <code>/home/system/</code> (issue #77)</td>
+    </tr>
+    <tr>
+      <td><code>trout</code></td>
+      <td><span class="badge badge-blue">Control plane</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>—</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><code>tuna</code></td>
+      <td><span class="badge badge-purple">Worker</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>—</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><code>whale</code></td>
+      <td><span class="badge badge-blue">Control plane</span> <span class="badge badge-green">GPU</span></td>
+      <td>Ubuntu 22.04</td>
+      <td>RTX 2000 Ada (16 GB VRAM) · CUDA 12.4</td>
+      <td>vLLM inference node. Traditional syslog timestamp format.</td>
+    </tr>
+    <tr>
+      <td><code>gold</code></td>
+      <td><span class="badge badge-orange">Ceph storage</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>Dell R320 · 4 TB <code>/dev/sdc</code> OSD</td>
+      <td>iDRAC syslog → Loki</td>
+    </tr>
+    <tr>
+      <td><code>squid</code></td>
+      <td><span class="badge badge-orange">Ceph storage</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>Dell R320 · 4 TB <code>/dev/sdc</code> OSD</td>
+      <td>iDRAC syslog → Loki</td>
+    </tr>
+    <tr>
+      <td><code>puffer</code></td>
+      <td><span class="badge badge-orange">Ceph storage</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>Dell R320 · 4 TB <code>/dev/sdc</code> OSD</td>
+      <td>iDRAC syslog → Loki. ACPI power button suppressed (issue #59)</td>
+    </tr>
+    <tr>
+      <td><code>carp</code></td>
+      <td><span class="badge badge-orange">Ceph storage</span></td>
+      <td>Ubuntu 24.04</td>
+      <td>Dell R320 · 4 TB <code>/dev/sdc</code> OSD</td>
+      <td>iDRAC syslog → Loki</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Node health commands</h3>
+<pre>just node-status          # uptime + kured reboot-required for all 8 nodes
+just pods-unhealthy       # non-running pods cluster-wide
+just test                 # full chainsaw e2e suite</pre>
+
+<!-- ── Networking ─────────────────────────────────────────────────── -->
+<h2 id="networking">Networking</h2>
+
+<h3>LoadBalancer — MetalLB</h3>
+<p>IP range: <code>192.168.0.200–192.168.0.230</code>. Each service gets a fixed IP via
+<code>metallb.universe.tf/loadBalancerIPs</code> annotations.</p>
+
+<div class="callout callout-note">
+  <strong>Avoid conflicts:</strong> The PiHole DNS server is on the same subnet.
+  New MetalLB IPs must not overlap with DHCP reservations or PiHole's address.
+</div>
+
+<h3>External DNS + TLS — Cloudflare + Caddy</h3>
+<p>All external hostnames follow the same pattern:</p>
+<ul>
+  <li>Cloudflare A record: <code>&lt;service&gt;.verticon.com</code> → mullet's public IP</li>
+  <li>Caddy on mullet: terminates TLS (Cloudflare DNS challenge), reverse proxies to MetalLB IP</li>
+  <li>Services use HTTP internally — no per-service TLS needed</li>
+</ul>
+<pre># Standard Caddyfile entry pattern:
+&lt;service&gt;.verticon.com {
+    reverse_proxy &lt;MetalLB-IP&gt;:80
+    tls { resolvers 1.1.1.1 1.0.0.1 }
+}</pre>
+
+<!-- ── Storage ────────────────────────────────────────────────────── -->
+<h2 id="storage">Storage</h2>
+
+<h3>Rook/Ceph — Block &amp; Object</h3>
+<div class="grid-2">
+  <div class="stat-card">
+    <div class="stat-label">Block storage</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0"><code>rook-ceph-block</code></div>
+    <div class="stat-sub">3-way replication · default StorageClass · all workloads</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Object storage (S3)</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0"><code>s3.verticon.com</code></div>
+    <div class="stat-sub">Ceph RGW · 192.168.0.204 · path-style access · <code>MC_HOST_ceph</code> in devbox</div>
+  </div>
+</div>
+
+<table>
+  <thead><tr><th>Bucket</th><th>Contents</th><th>Size (approx)</th></tr></thead>
+  <tbody>
+    <tr><td><code>loki-logs</code></td><td>Loki log chunks + TSDB index</td><td>growing</td></tr>
+    <tr><td><code>argo-artifacts</code></td><td>Argo Workflows step artifacts</td><td>growing</td></tr>
+    <tr><td><code>harbor-registry</code></td><td>Container image layers (Harbor backend)</td><td>growing</td></tr>
+    <tr><td><code>restic-backups</code></td><td>Restic home directory backups</td><td>~79 GB</td></tr>
+    <tr><td><code>music-library</code></td><td>Music collection mirrored from <code>~/Music</code></td><td>~72 GB</td></tr>
+    <tr><td><code>pictures</code></td><td>Photos mirrored from <code>~/Pictures/pictures</code></td><td>growing</td></tr>
+  </tbody>
+</table>
+
+<pre>just ceph-status                                          # cluster health
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph df  # pool usage</pre>
+
+<!-- ── Services ───────────────────────────────────────────────────── -->
+<h2 id="services">Platform Services</h2>
+
+<table>
+  <thead><tr><th>Service</th><th>Namespace</th><th>Purpose</th><th>Operator / chart</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>ArgoCD</td><td><code>argocd</code></td>
+      <td>GitOps — deploys all Helm charts from this repo</td>
+      <td>Self-managed Helm</td>
+    </tr>
+    <tr>
+      <td>Rook/Ceph</td><td><code>rook-ceph</code></td>
+      <td>Block storage (PVCs) + object storage (S3/RGW)</td>
+      <td>Rook operator</td>
+    </tr>
+    <tr>
+      <td>MetalLB</td><td><code>metallb-system</code></td>
+      <td>Bare-metal LoadBalancer for all external-facing services</td>
+      <td>MetalLB addon</td>
+    </tr>
+    <tr>
+      <td>CloudNativePG</td><td><code>postgresql-system</code></td>
+      <td>Managed PostgreSQL clusters (primary + replica + backups to S3)</td>
+      <td>CNPG operator</td>
+    </tr>
+    <tr>
+      <td>Strimzi / Kafka</td><td><code>kafka-system</code></td>
+      <td>3-broker KRaft cluster + Schema Registry</td>
+      <td>Strimzi operator</td>
+    </tr>
+    <tr>
+      <td>Harbor</td><td><code>harbor</code></td>
+      <td>Container registry (images pushed by CI, pulled by workloads)</td>
+      <td>Harbor Helm chart</td>
+    </tr>
+    <tr>
+      <td>cert-manager</td><td><code>cert-manager</code></td>
+      <td>In-cluster TLS certificates</td>
+      <td>cert-manager Helm chart</td>
+    </tr>
+    <tr>
+      <td>kured</td><td><code>kured</code></td>
+      <td>Automated rolling node reboots after OS updates</td>
+      <td>kured DaemonSet</td>
+    </tr>
+    <tr>
+      <td>GPU Operator</td><td><code>gpu-operator</code></td>
+      <td>NVIDIA driver + device plugin for whale</td>
+      <td>NVIDIA GPU Operator</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ── CI/CD ──────────────────────────────────────────────────────── -->
+<h2 id="ci">CI/CD Pipeline</h2>
+
+<p>CI is event-driven: a <code>git push</code> on any application repo triggers an image build via Argo Events → Argo Workflows → Kaniko → Harbor.</p>
+
+<pre>git push origin main
+  → post-push git hook (developer machine, LAN)
+    → HTTP POST → Argo Events WebhookEventSource (events.verticon.com)
+      → Sensor → Argo Workflows
+        → image-build-push ClusterWorkflowTemplate
+          → Kaniko build → Harbor registry
+            → create-pr step updates image tag in spec repo</pre>
+
+<table>
+  <thead><tr><th>Component</th><th>Namespace</th><th>Endpoint</th></tr></thead>
+  <tbody>
+    <tr><td>Argo Workflows</td><td><code>argo-workflows</code></td><td><a href="https://workflows.verticon.com">workflows.verticon.com</a> · 192.168.0.209:2746</td></tr>
+    <tr><td>Argo Events webhook</td><td><code>argo-events</code></td><td><a href="https://events.verticon.com">events.verticon.com</a> · 192.168.0.221:12000</td></tr>
+    <tr><td>Harbor registry</td><td><code>harbor</code></td><td><a href="https://registry.verticon.com">registry.verticon.com</a></td></tr>
+  </tbody>
+</table>
+
+<h3>Reusable templates</h3>
+<pre># Build any image:
+argo submit -n argo-workflows \
+  --from clusterworkflowtemplate/image-build-push \
+  -p repo-url=https://github.com/jconlon/&lt;repo&gt; \
+  -p image=registry.verticon.com/&lt;project&gt;/&lt;name&gt;:&lt;tag&gt; \
+  -p context=&lt;subdir&gt;
+
+# ci-tools image (contains git, gh, yq):
+registry.verticon.com/library/ci-tools:latest</pre>
+
+<!-- ── Monitoring ─────────────────────────────────────────────────── -->
+<h2 id="monitoring">Monitoring &amp; Logging</h2>
+
+<div class="grid-2">
+  <div class="stat-card">
+    <div class="stat-label">Metrics</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0">Prometheus + Grafana</div>
+    <div class="stat-sub">kube-state-metrics, node-exporter, Ceph exporter, CNPG exporter, DCGM (GPU)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Logs</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0">Loki + Promtail</div>
+    <div class="stat-sub">Pod logs · syslog (node-labeled) · systemd journal · iDRAC UDP syslog</div>
+  </div>
+</div>
+
+<p>See the <a href="loki-troubleshooting.html">Loki Troubleshooting Guide</a> for log pipeline details, query tools, and chainsaw health tests.</p>
+
+<!-- ── Endpoints ──────────────────────────────────────────────────── -->
+<h2 id="access">Service Endpoints</h2>
+
+<table>
+  <thead><tr><th>Service</th><th>External URL</th><th>Internal IP</th></tr></thead>
+  <tbody>
+    <tr><td>ArgoCD</td><td><a href="https://argocd.verticon.com">argocd.verticon.com</a></td><td>—</td></tr>
+    <tr><td>Grafana</td><td><a href="https://grafana.verticon.com">grafana.verticon.com</a></td><td>192.168.0.201</td></tr>
+    <tr><td>Prometheus</td><td><a href="https://prometheus.verticon.com">prometheus.verticon.com</a></td><td>192.168.0.202</td></tr>
+    <tr><td>AlertManager</td><td><a href="https://alertmanager.verticon.com">alertmanager.verticon.com</a></td><td>192.168.0.203</td></tr>
+    <tr><td>Ceph RGW (S3)</td><td><a href="https://s3.verticon.com">s3.verticon.com</a></td><td>192.168.0.204</td></tr>
+    <tr><td>Loki</td><td><a href="http://loki.verticon.com">loki.verticon.com</a></td><td>192.168.0.220</td></tr>
+    <tr><td>Argo Events</td><td><a href="https://events.verticon.com">events.verticon.com</a></td><td>192.168.0.221</td></tr>
+    <tr><td>Argo Workflows</td><td><a href="https://workflows.verticon.com">workflows.verticon.com</a></td><td>192.168.0.209</td></tr>
+    <tr><td>Harbor registry</td><td><a href="https://registry.verticon.com">registry.verticon.com</a></td><td>—</td></tr>
+    <tr><td>Kafka (external)</td><td>—</td><td>192.168.0.213:9094</td></tr>
+    <tr><td>Schema Registry</td><td>—</td><td>192.168.0.214:8081</td></tr>
+    <tr><td>PostgreSQL (replica, read)</td><td>postgresql.verticon.com</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<div class="callout callout-tip">
+  <strong>Kafka tip:</strong> Always connect via IP (<code>192.168.0.213:9094</code>), not DNS.
+  Broker reconnect after failover requires the IP — DNS-based connections drop silently.
+</div>
+
+<!-- ── Day-2 ops ───────────────────────────────────────────────────── -->
+<h2 id="ops">Day-2 Operations</h2>
+
+<h3>Health checks</h3>
+<pre>just test                         # full e2e chainsaw suite (all suites)
+just test-suite cluster           # nodes ready
+just test-suite storage           # Ceph health
+just test-suite postgresql        # CNPG cluster
+just test-suite loki              # log pipeline + Promtail drops
+just test-suite argocd            # all apps Synced + Healthy</pre>
+
+<h3>Secrets management — Teller</h3>
+<p>Cluster K8s secrets are managed out-of-band via Teller configs in <code>teller/</code>.
+Secrets are sourced from Google Secret Manager.</p>
+<pre>teller run --config teller/.teller-freshrss.yml -- bash -c 'kubectl apply ...'
+teller run --config teller/.teller-postgresql.yml -- bash -c 'kubectl apply ...'</pre>
+
+<h3>Node drain / maintenance</h3>
+<pre>kubectl drain &lt;node&gt; --ignore-daemonsets --delete-emptydir-data
+# ... perform maintenance ...
+kubectl uncordon &lt;node&gt;</pre>
+
+<h3>ArgoCD</h3>
+<pre>ops argocd login                  # authenticate (fetches password from cluster secret)
+ops argocd list-app               # list all applications
+argocd app sync &lt;app&gt; --force     # force re-sync an app</pre>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  GitHub: <a href="https://github.com/jconlon/ops-microk8s">jconlon/ops-microk8s</a> &nbsp;·&nbsp;
+  ArgoCD: <a href="https://argocd.verticon.com">argocd.verticon.com</a> &nbsp;·&nbsp;
+  Grafana: <a href="https://grafana.verticon.com">grafana.verticon.com</a>
+</p>
+
+</div>
+</body>
+</html>

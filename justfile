@@ -357,9 +357,17 @@ loki-syslog-node node="mullet" since="1h" filter="":
 
 # ── Docs ──────────────────────────────────────────────────────────────────────
 
+# Open the docs index in a browser
+docs:
+    xdg-open docs/index.html
+
 # Open the Loki troubleshooting guide in a browser
 loki-docs:
     xdg-open docs/loki-troubleshooting.html
+
+# Open the cluster reference in a browser
+cluster-docs:
+    xdg-open docs/cluster.html
 
 # ── Backups ───────────────────────────────────────────────────────────────────
 
