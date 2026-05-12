@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Networking — DNS, Caddy &amp; Cloudflare — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --orange: #e09a5c;
+    --red: #e06c75;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.35rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle  { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-note { border-color: var(--accent);  background: #141926; }
+  .callout-tip  { border-color: var(--green);   background: #151f1a; }
+  .callout-warn { border-color: var(--yellow);  background: #1e1a0e; }
+  .callout strong { font-weight: 700; }
+  .callout-note strong { color: var(--accent); }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .flow-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.8rem;
+    margin: 0.5rem 0 1.5rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.82rem;
+    line-height: 2;
+    color: #c9d1d9;
+  }
+  .flow-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-left: 0.5rem;
+  }
+  .step-list { counter-reset: steps; padding-left: 0; list-style: none; }
+  .step-list li {
+    counter-increment: steps;
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+    align-items: flex-start;
+  }
+  .step-list li::before {
+    content: counter(steps);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 0.78rem;
+    font-weight: 700;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Networking</p>
+<h1>Networking</h1>
+<p class="subtitle">How Cloudflare DNS, Caddy, and MetalLB route external traffic to cluster services on mullet</p>
+
+<!-- ── Overview ───────────────────────────────────────────────────── -->
+<h2>Overview</h2>
+
+<p>
+  All <code>*.verticon.com</code> hostnames resolve to <strong>mullet</strong>'s WAN IP via Cloudflare DNS.
+  Caddy runs on mullet as a TLS-terminating reverse proxy, forwarding each hostname to the
+  appropriate MetalLB LoadBalancer IP inside the cluster LAN (<code>192.168.0.x</code>).
+  Certificates are obtained automatically via the ACME DNS-01 challenge using the Cloudflare API —
+  no public HTTP exposure is required.
+</p>
+
+<div class="flow-box">
+Internet client
+    │
+    │  DNS query: grafana.verticon.com
+    ▼
+Cloudflare DNS  ──────────────────────────────  A record → mullet WAN IP
+    │
+    │  HTTPS :443
+    ▼
+mullet (Caddy)  ──  TLS termination (Let's Encrypt cert via Cloudflare DNS-01)
+    │
+    │  HTTP reverse proxy → 192.168.0.201:80
+    ▼
+MetalLB VIP 192.168.0.201  ──  LoadBalancer service: monitoring/grafana
+    │
+    ▼
+Grafana pod (inside cluster)
+</div>
+
+<!-- ── Components ─────────────────────────────────────────────────── -->
+<h2>Components</h2>
+
+<h3>Cloudflare DNS</h3>
+<p>
+  Each service has an <strong>A record</strong> in Cloudflare pointing to mullet's WAN IP.
+  Records are set to <strong>DNS-only</strong> (grey cloud — proxying disabled) so that Caddy
+  receives the raw TCP connection and can terminate TLS itself.
+  Cloudflare proxying is intentionally off: the cluster services are not routed through
+  Cloudflare's CDN/WAF layer.
+</p>
+<p>
+  Cloudflare is also used as the <strong>ACME DNS provider</strong>. Caddy calls the Cloudflare API
+  to create a temporary <code>_acme-challenge</code> TXT record to prove domain ownership during
+  certificate issuance. This avoids any requirement for port 80 to be publicly reachable.
+</p>
+
+<h3>Caddy on mullet</h3>
+<p>
+  Caddy is installed as a systemd service on <strong>mullet</strong> (Ubuntu 22.04).
+  The configuration lives at <code>/etc/caddy/Caddyfile</code>.
+  Caddy uses the <a href="https://github.com/caddy-dns/cloudflare">caddy-dns/cloudflare</a>
+  plugin (compiled into the binary) to handle DNS-01 challenges automatically.
+</p>
+
+<table>
+  <thead><tr><th>Item</th><th>Path / command</th></tr></thead>
+  <tbody>
+    <tr><td>Config file</td><td><code>/etc/caddy/Caddyfile</code></td></tr>
+    <tr><td>Systemd service</td><td><code>sudo systemctl status caddy</code></td></tr>
+    <tr><td>Reload config</td><td><code>sudo systemctl reload caddy</code></td></tr>
+    <tr><td>Logs</td><td><code>journalctl -u caddy -f</code></td></tr>
+    <tr><td>TLS cert cache</td><td><code>/var/lib/caddy/.local/share/caddy/certificates/</code></td></tr>
+    <tr><td>Cloudflare API token</td><td><code>CLOUDFLARE_API_TOKEN</code> env var (set in caddy systemd override)</td></tr>
+  </tbody>
+</table>
+
+<h3>MetalLB</h3>
+<p>
+  MetalLB assigns each Kubernetes <code>LoadBalancer</code> service a stable IP from the pool
+  <code>192.168.0.200–192.168.0.230</code>.  These IPs are on the cluster LAN and are only reachable
+  from mullet and other LAN hosts — they are never directly exposed to the internet.
+  Caddy's <code>reverse_proxy</code> directives target these IPs.
+</p>
+
+<!-- ── Caddyfile structure ─────────────────────────────────────────── -->
+<h2>Caddyfile structure</h2>
+
+<p>The global block enables the Cloudflare DNS plugin for all TLS certificates:</p>
+
+<pre>{
+    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    debug
+}</pre>
+
+<p>Each service block follows the same pattern:</p>
+
+<pre>grafana.verticon.com {
+    reverse_proxy http://192.168.0.201:80   # MetalLB VIP for the service
+    tls {
+        resolvers 1.1.1.1 1.0.0.1           # use Cloudflare DNS to verify the DNS-01 challenge
+    }
+}</pre>
+
+<p>
+  The <code>tls { resolvers ... }</code> block tells Caddy to use Cloudflare's public resolvers
+  when verifying that the <code>_acme-challenge</code> TXT record has propagated before completing
+  the certificate request.
+</p>
+
+<div class="callout callout-note">
+  <strong>Note:</strong> The Harbor entry adds <code>request_body { max_size 0 }</code> to allow
+  unlimited image push sizes. Any service that accepts large uploads needs this override.
+</div>
+
+<!-- ── Adding a new service ───────────────────────────────────────── -->
+<h2>Adding a new service</h2>
+
+<ol class="step-list">
+  <li>
+    <div>
+      <strong>Assign a MetalLB IP.</strong> Pick the next free IP from the pool
+      (<code>192.168.0.200–230</code>). Check current assignments with:<br>
+      <code>kubectl get svc -A --field-selector spec.type=LoadBalancer</code>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Annotate the Kubernetes service.</strong> Add the MetalLB annotation to the service manifest:
+<pre>metadata:
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.NNN"</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add a Cloudflare DNS A record.</strong> In the Cloudflare dashboard for
+      <code>verticon.com</code>, create an A record:<br>
+      <code>Name: &lt;service&gt;</code> &nbsp;→&nbsp; <code>Content: &lt;mullet WAN IP&gt;</code><br>
+      Set to <strong>DNS-only</strong> (grey cloud, not proxied).
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add a Caddyfile block</strong> on mullet at <code>/etc/caddy/Caddyfile</code>:
+<pre>&lt;service&gt;.verticon.com {
+    reverse_proxy http://192.168.0.NNN:80
+    tls {
+        resolvers 1.1.1.1 1.0.0.1
+    }
+}</pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Reload Caddy:</strong><br>
+      <code>sudo systemctl reload caddy</code><br>
+      Caddy will automatically request a TLS certificate for the new hostname via DNS-01.
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Update <code>docs/index.html</code></strong> — add the service to the Web UIs or
+      Service Endpoints section.
+    </div>
+  </li>
+</ol>
+
+<!-- ── DNS record reference ───────────────────────────────────────── -->
+<h2>Cloudflare DNS records</h2>
+
+<p>All records are type <strong>A</strong>, pointing to mullet's WAN IP, DNS-only (not proxied).</p>
+
+<table>
+  <thead>
+    <tr><th>Hostname</th><th>MetalLB IP (LAN)</th><th>Service</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>argocd.verticon.com</code></td><td>192.168.0.200</td><td>ArgoCD</td></tr>
+    <tr><td><code>grafana.verticon.com</code></td><td>192.168.0.201</td><td>Grafana</td></tr>
+    <tr><td><code>prometheus.verticon.com</code></td><td>192.168.0.202</td><td>Prometheus</td></tr>
+    <tr><td><code>alertmanager.verticon.com</code></td><td>192.168.0.203</td><td>AlertManager</td></tr>
+    <tr><td><code>s3.verticon.com</code></td><td>192.168.0.204</td><td>Ceph RGW / S3</td></tr>
+    <tr><td><code>freshrss.verticon.com</code></td><td>192.168.0.205</td><td>FreshRSS</td></tr>
+    <tr><td><code>workflows.verticon.com</code></td><td>192.168.0.209</td><td>Argo Workflows</td></tr>
+    <tr><td><code>pgadmin.verticon.com</code></td><td>192.168.0.212</td><td>pgAdmin</td></tr>
+    <tr><td><code>kafka.verticon.com</code></td><td>192.168.0.213 / 192.168.0.222</td><td>Kafka broker (9094) / Kafka UI (80)</td></tr>
+    <tr><td><code>schema-registry.verticon.com</code></td><td>192.168.0.214</td><td>Schema Registry</td></tr>
+    <tr><td><code>wallabag.verticon.com</code></td><td>192.168.0.215</td><td>Wallabag</td></tr>
+    <tr><td><code>hasura.verticon.com</code></td><td>192.168.0.217</td><td>Hasura</td></tr>
+    <tr><td><code>registry.verticon.com</code></td><td>192.168.0.219</td><td>Harbor</td></tr>
+    <tr><td><code>loki.verticon.com</code></td><td>192.168.0.220</td><td>Loki gateway</td></tr>
+    <tr><td><code>events.verticon.com</code></td><td>192.168.0.221</td><td>Argo Events webhook</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Troubleshooting ────────────────────────────────────────────── -->
+<h2>Troubleshooting</h2>
+
+<h3>Certificate not issued / renewal failed</h3>
+<ul>
+  <li>Check Caddy logs: <code>journalctl -u caddy -f</code></li>
+  <li>Confirm the <code>CLOUDFLARE_API_TOKEN</code> env var is set and the token has <strong>Zone DNS Edit</strong> permissions for <code>verticon.com</code></li>
+  <li>Confirm the Cloudflare A record exists and is set to DNS-only (not proxied)</li>
+  <li>Caddy caches cert failures — after fixing, run <code>sudo systemctl restart caddy</code> to retry immediately</li>
+</ul>
+
+<h3>Service unreachable after adding Caddyfile block</h3>
+<ul>
+  <li>Verify the MetalLB service has an external IP: <code>kubectl get svc -n &lt;ns&gt; &lt;name&gt;</code></li>
+  <li>Test the LAN target directly from mullet: <code>curl -v http://192.168.0.NNN:80</code></li>
+  <li>Confirm Caddy reloaded cleanly: <code>sudo systemctl reload caddy &amp;&amp; journalctl -u caddy -n 30</code></li>
+</ul>
+
+<h3>Validate Caddyfile syntax before reload</h3>
+<pre>caddy validate --config /etc/caddy/Caddyfile</pre>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a>
+</p>
+
+</div>
+</body>
+</html>

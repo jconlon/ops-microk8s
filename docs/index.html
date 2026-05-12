@@ -295,6 +295,13 @@
     <span class="doc-card-tag tag-html">HTML</span>
   </a>
 
+  <a href="networking.html" class="doc-card">
+    <div class="doc-card-icon">🌐</div>
+    <div class="doc-card-title">Networking</div>
+    <div class="doc-card-desc">How Cloudflare DNS, Caddy reverse proxy, and MetalLB work together on mullet to route external traffic to cluster services. Includes step-by-step guide for adding new services.</div>
+    <span class="doc-card-tag tag-html">HTML</span>
+  </a>
+
   <a href="object-storage-design.md" class="doc-card">
     <div class="doc-card-icon">🗄</div>
     <div class="doc-card-title">Object Storage Design</div>
@@ -396,6 +403,14 @@
     <div class="svc-card-ip">192.168.0.215</div>
   </a>
 
+  <a href="https://hasura.verticon.com" class="svc-card" target="_blank" rel="noopener">
+    <div class="svc-card-title">Hasura</div>
+    <div class="svc-card-url">hasura.verticon.com</div>
+    <div class="svc-card-desc">GraphQL engine with a web console — explore the schema, run queries, and manage metadata against the PostgreSQL cluster.</div>
+    <span class="doc-card-tag tag-registry">Database</span>
+    <div class="svc-card-ip">192.168.0.217</div>
+  </a>
+
 </div>
 
 <!-- ── Service Endpoints ──────────────────────────────────────────── -->
@@ -445,10 +460,34 @@
       <td>HTTP POST endpoint; triggers <code>git-push-build</code> WorkflowTemplate on receipt.</td>
     </tr>
     <tr>
-      <td><strong>PostgreSQL</strong> <span class="ep-tag tag-registry">Database</span></td>
-      <td>—</td>
+      <td><strong>PostgreSQL (primary)</strong> <span class="ep-tag tag-registry">Database</span></td>
+      <td><span class="ep-ip">192.168.0.210:5432</span></td>
       <td><code>production-postgresql-rw.postgresql-system.svc:5432</code></td>
-      <td>CloudNativePG primary (read-write). Use <code>kubectl cnpg status</code> or <code>ops freshrss psql</code>.</td>
+      <td>CloudNativePG primary — read-write. Use <code>kubectl cnpg status</code> or <code>ops freshrss psql</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>PostgreSQL (replica)</strong> <span class="ep-tag tag-registry">Database</span></td>
+      <td><span class="ep-ip">192.168.0.211:5432</span></td>
+      <td><code>production-postgresql-ro.postgresql-system.svc:5432</code></td>
+      <td>CloudNativePG read-only replica — use for reporting queries and read-heavy workloads.</td>
+    </tr>
+    <tr>
+      <td><strong>vLLM</strong> <span class="ep-tag tag-ci">AI</span></td>
+      <td><code>http://192.168.0.218/v1</code><br><span class="ep-ip">192.168.0.218 · port 80</span></td>
+      <td><code>vllm-router-service.vllm.svc:80</code></td>
+      <td>OpenAI-compatible LLM inference API. Use as base URL in agents and SDKs (<code>/v1/chat/completions</code> etc.). Metrics on port 9000.</td>
+    </tr>
+    <tr>
+      <td><strong>Cosmo Router</strong> <span class="ep-tag tag-ci">GraphQL</span></td>
+      <td><span class="ep-ip">192.168.0.216 · ports 3002, 5025</span></td>
+      <td><code>cosmo-router.cosmo.svc:3002</code></td>
+      <td>GraphQL federation router — composes subgraphs into a unified schema. Port 3002: GraphQL endpoint; port 5025: metrics.</td>
+    </tr>
+    <tr>
+      <td><strong>Hasura</strong> <span class="ep-tag tag-registry">GraphQL</span></td>
+      <td><code>https://hasura.verticon.com</code><br><span class="ep-ip">192.168.0.217</span></td>
+      <td><code>hasura.hasura.svc:80</code></td>
+      <td>GraphQL API endpoint (<code>/v1/graphql</code>). Admin console at the same host. Requires <code>x-hasura-admin-secret</code> header for API access.</td>
     </tr>
   </tbody>
 </table>

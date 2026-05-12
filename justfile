@@ -373,6 +373,10 @@ cluster-docs:
 backup-docs:
     xdg-open docs/backups.html
 
+# Open the networking reference in a browser
+networking-docs:
+    xdg-open docs/networking.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
