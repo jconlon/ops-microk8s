@@ -329,6 +329,32 @@ loki-journal-check node="puffer" filter="Power key" since="24h":
       echo "WARN  no journal entries in last 5 min — stream may be delayed or node down"
     fi
 
+# Query syslog for a specific node using the node label (available since 2026-05-12
+# pipeline_stages fix — streams before that date lack the label).
+# Faster and more accurate than loki-node-events which searches line content.
+# Examples:
+#   just loki-syslog-node whale
+#   just loki-syslog-node mullet 6h "disk"
+#   just loki-syslog-node tuna 24h "error"
+loki-syslog-node node="mullet" since="1h" filter="":
+    #!/usr/bin/env bash
+    QUERY="{job=\"syslog\", node=\"{{node}}\"}"
+    [ -n "{{filter}}" ] && QUERY="$QUERY |= \"{{filter}}\""
+    echo "=== syslog: node={{node}} since={{since}}$([ -n "{{filter}}" ] && echo " filter='{{filter}}'") ==="
+    logcli --addr=http://192.168.0.220 \
+      query "$QUERY" \
+      --since={{since}} --limit=200 --timezone=Local
+    echo ""
+    echo "=== stream active? (last 5 min) ==="
+    COUNT=$(logcli --addr=http://192.168.0.220 \
+      query "{job=\"syslog\", node=\"{{node}}\"}" \
+      --since=5m --limit=1 --quiet 2>/dev/null | wc -l)
+    if [ "$COUNT" -gt 0 ]; then
+      echo "PASS  syslog stream active for {{node}}"
+    else
+      echo "WARN  no syslog in last 5 min — node may be quiet or stream stale (pre-2026-05-12 data lacks node label)"
+    fi
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
