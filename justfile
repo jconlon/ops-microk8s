@@ -369,6 +369,10 @@ loki-docs:
 cluster-docs:
     xdg-open docs/cluster.html
 
+# Open the backups reference in a browser
+backup-docs:
+    xdg-open docs/backups.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots

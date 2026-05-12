@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backups — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.4rem 0 0.5rem; }
+  h4 { font-size: 0.85rem; font-weight: 600; color: var(--muted); text-transform: uppercase;
+       letter-spacing: 0.06em; margin: 1rem 0 0.35rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 600;
+    padding: 0.15em 0.55em; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-purple { background: #241f3a; color: var(--accent2);border: 1px solid #352a50; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .callout {
+    border-left: 3px solid; border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem;
+  }
+  .callout-tip  { border-color: var(--green);  background: #151f1a; }
+  .callout-warn { border-color: var(--yellow); background: #1e1a0f; }
+  .callout-note { border-color: var(--accent); background: #141926; }
+  .callout strong { font-weight: 700; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .callout-note strong { color: var(--accent); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.3rem; margin-bottom: 1rem;
+  }
+  .card-title { font-weight: 700; font-size: 1rem; margin-bottom: 0.5rem; }
+  .timeline {
+    position: relative; padding-left: 1.6rem; margin-bottom: 1rem;
+  }
+  .timeline::before {
+    content: ''; position: absolute; left: 0.45rem; top: 0.5rem; bottom: 0;
+    width: 2px; background: var(--border);
+  }
+  .tl-item { position: relative; margin-bottom: 1.1rem; }
+  .tl-item::before {
+    content: ''; position: absolute; left: -1.3rem; top: 0.45rem;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--surface2); border: 2px solid var(--accent);
+  }
+  .tl-time { font-size: 0.8rem; color: var(--accent); font-weight: 600; font-family: monospace; }
+  .tl-title { font-weight: 600; font-size: 0.95rem; }
+  .tl-body { font-size: 0.87rem; color: var(--muted); margin-top: 0.15rem; }
+  .toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.3rem; margin-bottom: 2rem; font-size: 0.9rem;
+  }
+  .toc h4 { margin: 0 0 0.5rem; }
+  .toc ol { margin: 0; }
+  .toc li { margin-bottom: 0.2rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="breadcrumb"><a href="index.html">← Docs</a></div>
+<h1>Backups</h1>
+<p class="subtitle">ops-microk8s · Three independent backup strategies · Updated 2026-05-12</p>
+
+<div class="toc">
+  <h4>Contents</h4>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#restic">Restic — home directory</a></li>
+    <li><a href="#postgresql">PostgreSQL — continuous WAL archiving</a></li>
+    <li><a href="#media">Media sync — music &amp; pictures</a></li>
+    <li><a href="#schedule">Backup schedule</a></li>
+    <li><a href="#status">Checking backup status</a></li>
+    <li><a href="#restore">Restore procedures</a></li>
+  </ol>
+</div>
+
+<!-- ── Overview ───────────────────────────────────────────────────── -->
+<h2 id="overview">Overview</h2>
+
+<p>Three independent strategies cover different data categories. All targets land in Ceph RGW (<code>s3.verticon.com</code> / <code>192.168.0.204</code>) — the cluster's internal S3-compatible object store.</p>
+
+<table>
+  <thead><tr><th>Strategy</th><th>What</th><th>Bucket</th><th>Retention</th><th>Mechanism</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-blue">Restic</span></td>
+      <td><code>/home/jconlon</code> (excluding Music, Downloads, caches)</td>
+      <td><code>restic-backups</code></td>
+      <td>24h · 7d · 4w · 6m · 2y</td>
+      <td>Systemd timer on mullet, daily 3 AM</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-purple">CloudNativePG</span></td>
+      <td>All PostgreSQL databases (WAL + base backups)</td>
+      <td><code>postgresql-backups</code></td>
+      <td>30 days</td>
+      <td>Barman continuous streaming from primary</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-green">mc mirror</span></td>
+      <td><code>~/Music</code> and <code>~/Pictures/pictures</code></td>
+      <td><code>music-library</code> · <code>pictures</code></td>
+      <td>Permanent (mirror)</td>
+      <td>Systemd timer on mullet, nightly</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-note">
+  <strong>All backups use Ceph RGW as the backend.</strong> If the Ceph cluster is degraded,
+  new backups will fail but existing snapshots remain intact — Ceph stores 3× replicated copies
+  across the four Dell R320 storage nodes (gold, squid, puffer, carp).
+</div>
+
+<!-- ── Restic ──────────────────────────────────────────────────────── -->
+<h2 id="restic">Restic — Home Directory</h2>
+
+<p>Restic backs up <code>/home/jconlon</code> to <code>s3:http://192.168.0.204/restic-backups</code>.
+Credentials are injected at runtime via Teller from Google Secret Manager — no secrets in the repo or systemd units.</p>
+
+<h3>What is backed up</h3>
+<ul>
+  <li>All of <code>/home/jconlon</code> — dotfiles, git repos, documents, config</li>
+  <li><strong>Excluded:</strong> <code>~/Music</code> (covered by mc mirror), <code>~/Downloads</code>,
+      caches (<code>.cache</code>, <code>node_modules</code>, <code>.venv</code>, build artifacts),
+      and <code>~/Pictures/pictures</code> (covered by mc mirror)</li>
+</ul>
+
+<h3>Retention policy</h3>
+<table>
+  <thead><tr><th>Window</th><th>Snapshots kept</th></tr></thead>
+  <tbody>
+    <tr><td>Hourly</td><td>24 (last 24 hours)</td></tr>
+    <tr><td>Daily</td><td>7 (last 7 days)</td></tr>
+    <tr><td>Weekly</td><td>4 (last 4 weeks)</td></tr>
+    <tr><td>Monthly</td><td>6 (last 6 months)</td></tr>
+    <tr><td>Yearly</td><td>2 (last 2 years)</td></tr>
+  </tbody>
+</table>
+
+<h3>Systemd services</h3>
+<p>All three services live in <code>scripts/restic/systemd/</code>. Install once with <code>sudo ./install-restic.sh</code>.</p>
+<table>
+  <thead><tr><th>Service</th><th>Schedule</th><th>What it does</th><th>Log</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>restic-backup.timer</code></td>
+      <td>Daily · 3:00 AM</td>
+      <td>Incremental snapshot of <code>/home/jconlon</code> to Ceph RGW</td>
+      <td><code>/var/log/restic-backup.log</code></td>
+    </tr>
+    <tr>
+      <td><code>restic-prune.timer</code></td>
+      <td>Weekly · Sun 4:00 AM</td>
+      <td>Enforce retention policy, remove old snapshots, reclaim space</td>
+      <td><code>/var/log/restic-prune.log</code></td>
+    </tr>
+    <tr>
+      <td><code>restic-verify.timer</code></td>
+      <td>Monthly · 1st 5:00 AM</td>
+      <td>Integrity check (reads 5% of data), lists 5 most recent snapshots</td>
+      <td><code>/var/log/restic-verify.log</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-tip">
+  <strong>Persistent timers:</strong> All timers use <code>Persistent=true</code>. If mullet was off
+  at the scheduled time, the job runs automatically on next boot (after the
+  <code>OnBootSec</code> delay). No missed backups due to downtime.
+</div>
+
+<h3>Ad-hoc commands</h3>
+<pre># Check timer status and next run
+systemctl list-timers restic-*
+just backup-status
+
+# Run a backup immediately
+sudo systemctl start restic-backup.service
+
+# Follow backup logs
+sudo journalctl -u restic-backup.service -f
+tail -f /var/log/restic-backup.log</pre>
+
+<h3>Credentials</h3>
+<p>Teller config: <code>~/dotfiles/restic/restic/.teller-restic-ceph.yml</code> (in the dotfiles repo, not here).
+Secrets are sourced from Google Secret Manager at runtime — the systemd unit contains no credentials.</p>
+
+<!-- ── PostgreSQL ──────────────────────────────────────────────────── -->
+<h2 id="postgresql">PostgreSQL — Continuous WAL Archiving</h2>
+
+<p>CloudNativePG streams WAL (Write-Ahead Log) continuously to Ceph RGW and takes periodic base backups.
+This enables point-in-time recovery (PITR) to any second within the retention window.</p>
+
+<h3>Configuration</h3>
+<table>
+  <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Destination</td><td><code>s3://postgresql-backups/production/</code></td></tr>
+    <tr><td>S3 endpoint</td><td><code>http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80</code> (internal)</td></tr>
+    <tr><td>Retention</td><td>30 days</td></tr>
+    <tr><td>WAL compression</td><td>gzip · 2 parallel streams</td></tr>
+    <tr><td>Data compression</td><td>gzip · 2 parallel jobs</td></tr>
+    <tr><td>Backup target</td><td>Primary</td></tr>
+    <tr><td>Credentials secret</td><td><code>ceph-s3-credentials</code> in <code>postgresql-system</code> namespace</td></tr>
+  </tbody>
+</table>
+
+<div class="callout callout-note">
+  <strong>Barman Cloud:</strong> CNPG uses <code>barman-cloud-wal-archive</code> and
+  <code>barman-cloud-backup</code> under the hood. WAL segments are archived continuously
+  as transactions commit — recovery is possible to any point in the last 30 days,
+  not just the last base backup.
+</div>
+
+<h3>Status and management</h3>
+<pre># Cluster health and backup status
+just pg-status
+kubectl cnpg status production-postgresql -n postgresql-system
+
+# List available backups
+kubectl cnpg backup list production-postgresql -n postgresql-system
+
+# Trigger a base backup immediately
+kubectl cnpg backup production-postgresql -n postgresql-system
+
+# Check WAL archiving (should show 0 failed)
+kubectl cnpg status production-postgresql -n postgresql-system | grep -A5 "WAL"</pre>
+
+<h3>Recreating the credentials secret</h3>
+<p>If the <code>ceph-s3-credentials</code> secret is lost or rotated:</p>
+<pre>teller run --config teller/.teller-postgresql.yml -- bash -c '
+  kubectl create secret generic ceph-s3-credentials \
+    --namespace postgresql-system \
+    --from-literal=ACCESS_KEY_ID="$ACCESS_KEY_ID" \
+    --from-literal=ACCESS_SECRET_KEY="$ACCESS_SECRET_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+'</pre>
+
+<!-- ── Media sync ──────────────────────────────────────────────────── -->
+<h2 id="media">Media Sync — Music &amp; Pictures</h2>
+
+<p>Two nightly <code>mc mirror</code> jobs keep the media libraries in sync with Ceph RGW.
+These are mirrors, not versioned backups — deleted local files will eventually be deleted from the bucket too.</p>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title" style="color:var(--accent)">Music Library</div>
+    <p style="font-size:0.88rem; color:var(--muted); margin-bottom:0.5rem;">~72 GB · ~3,200 objects</p>
+    <table style="font-size:0.85rem; margin:0">
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Source</td><td><code>~/Music</code></td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Bucket</td><td><code>ceph-rgw/music-library</code></td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Schedule</td><td>Daily · 2:00 AM</td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Log</td><td><code>/var/log/music-sync.log</code></td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color:var(--accent)">Pictures</div>
+    <p style="font-size:0.88rem; color:var(--muted); margin-bottom:0.5rem;">Growing</p>
+    <table style="font-size:0.85rem; margin:0">
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Source</td><td><code>~/Pictures/pictures</code></td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Bucket</td><td><code>ceph-rgw/pictures</code></td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Schedule</td><td>Daily · 3:00 AM</td></tr>
+      <tr><td style="color:var(--muted); padding:0.2rem 0.6rem 0.2rem 0">Log</td><td><code>/var/log/pictures-sync.log</code></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="callout callout-warn">
+  <strong>Mirror semantics:</strong> <code>mc mirror</code> is one-way and non-versioned.
+  If a file is deleted locally it will be deleted from the bucket on the next sync.
+  For versioned protection of the music library, use Restic (which backs up <code>/home/jconlon</code>
+  but excludes <code>~/Music</code>). Consider enabling Ceph RGW object versioning on these buckets
+  if accidental deletion is a concern.
+</div>
+
+<h3>Status and management</h3>
+<pre># Check timer status
+systemctl list-timers music-sync.timer pictures-sync.timer
+
+# Check bucket contents via mc
+mc ls ceph-rgw/music-library --summarize
+mc ls ceph-rgw/pictures --summarize
+
+# Run a sync immediately
+sudo systemctl start music-sync.service
+sudo systemctl start pictures-sync.service
+
+# Follow sync logs
+tail -f /var/log/music-sync.log
+tail -f /var/log/pictures-sync.log</pre>
+
+<!-- ── Schedule ────────────────────────────────────────────────────── -->
+<h2 id="schedule">Backup Schedule</h2>
+
+<div class="timeline">
+  <div class="tl-item">
+    <div class="tl-time">2:00 AM daily</div>
+    <div class="tl-title">Music sync</div>
+    <div class="tl-body"><code>~/Music</code> → <code>ceph-rgw/music-library</code> via mc mirror</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-time">3:00 AM daily</div>
+    <div class="tl-title">Restic backup + Pictures sync</div>
+    <div class="tl-body">
+      <code>/home/jconlon</code> → <code>restic-backups</code> (incremental snapshot)<br>
+      <code>~/Pictures/pictures</code> → <code>ceph-rgw/pictures</code> via mc mirror
+    </div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-time">Continuous</div>
+    <div class="tl-title">PostgreSQL WAL archiving</div>
+    <div class="tl-body">WAL segments streamed to <code>postgresql-backups</code> as transactions commit</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-time">4:00 AM Sunday</div>
+    <div class="tl-title">Restic prune</div>
+    <div class="tl-body">Enforce retention policy, remove old snapshots, reclaim S3 space</div>
+  </div>
+  <div class="tl-item">
+    <div class="tl-time">5:00 AM 1st of month</div>
+    <div class="tl-title">Restic verify</div>
+    <div class="tl-body">Read 5% of stored data, verify checksums, list 5 most recent snapshots</div>
+  </div>
+</div>
+
+<!-- ── Status ─────────────────────────────────────────────────────── -->
+<h2 id="status">Checking Backup Status</h2>
+
+<h3>Quick health check</h3>
+<pre>just backup-status         # restic timer status + latest snapshots</pre>
+
+<h3>Restic</h3>
+<pre># Timer next-run and last-run summary
+systemctl list-timers restic-*
+
+# Last backup outcome
+systemctl status restic-backup.service
+sudo journalctl -u restic-backup.service --since "yesterday" | tail -20
+
+# List snapshots (requires teller for credentials)
+cd ~/dotfiles
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic snapshots --latest 10
+
+# Repository size
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic stats --mode restore-size</pre>
+
+<h3>PostgreSQL</h3>
+<pre># CNPG status — shows backup schedule, WAL archiving, last backup time
+just pg-status
+kubectl cnpg status production-postgresql -n postgresql-system
+
+# List all base backups stored in S3
+kubectl cnpg backup list production-postgresql -n postgresql-system
+
+# S3 bucket contents (base backups + WAL segments)
+mc ls ceph-rgw/postgresql-backups/ --recursive --summarize</pre>
+
+<h3>Media sync</h3>
+<pre>systemctl status music-sync.service pictures-sync.service
+tail -50 /var/log/music-sync.log
+tail -50 /var/log/pictures-sync.log
+mc ls ceph-rgw/music-library --summarize
+mc ls ceph-rgw/pictures --summarize</pre>
+
+<!-- ── Restore ─────────────────────────────────────────────────────── -->
+<h2 id="restore">Restore Procedures</h2>
+
+<h3>Restore a file from Restic</h3>
+<pre># In the dotfiles devbox context, run all restic commands via teller:
+cd ~/dotfiles
+
+# Find the snapshot containing the file
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic snapshots
+
+# Search for a specific file across all snapshots
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic find --long /home/jconlon/path/to/file
+
+# Restore a single file from a snapshot (use snapshot ID from above)
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic restore &lt;snapshot-id&gt; \
+     --include /home/jconlon/path/to/file \
+     --target /tmp/restore
+
+# Restore entire home directory from latest snapshot
+devbox run -- teller run \
+  --config /home/jconlon/dotfiles/restic/restic/.teller-restic-ceph.yml \
+  -- restic restore latest --target /tmp/restore</pre>
+
+<h3>PostgreSQL point-in-time recovery (PITR)</h3>
+<p>CNPG supports recovering to a specific timestamp within the 30-day retention window.
+Create a new cluster pointing at the backup and specify the recovery target:</p>
+<pre># Create a recovery cluster from the backup (edit YAML with desired targetTime)
+kubectl apply -f - &lt;&lt;EOF
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: production-postgresql-recovery
+  namespace: postgresql-system
+spec:
+  instances: 1
+  bootstrap:
+    recovery:
+      source: production-postgresql
+      recoveryTarget:
+        targetTime: "2026-05-10 12:00:00"  # adjust as needed
+  externalClusters:
+    - name: production-postgresql
+      barmanObjectStore:
+        destinationPath: "s3://postgresql-backups/production/"
+        endpointURL: "http://rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80"
+        s3Credentials:
+          accessKeyId:
+            name: ceph-s3-credentials
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: ceph-s3-credentials
+            key: ACCESS_SECRET_KEY
+EOF</pre>
+
+<div class="callout callout-warn">
+  <strong>PITR is a new cluster, not an in-place restore.</strong> The recovered cluster comes up
+  in read-only mode until you promote it. Validate data before switching application connections.
+</div>
+
+<h3>Restore media from Ceph RGW</h3>
+<pre># Restore music from Ceph bucket
+mc mirror ceph-rgw/music-library ~/Music
+
+# Restore pictures from Ceph bucket
+mc mirror ceph-rgw/pictures ~/Pictures/pictures</pre>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  Ceph RGW (S3): <a href="https://s3.verticon.com">s3.verticon.com</a> · 192.168.0.204 &nbsp;·&nbsp;
+  Restic scripts: <code>scripts/restic/</code> &nbsp;·&nbsp;
+  PG backup config: <code>postgresql-gitops/cluster/</code>
+</p>
+
+</div>
+</body>
+</html>
