@@ -53,9 +53,13 @@ config:
             labels:
               job: syslog
               __path__: /var/log/{syslog,kern.log,auth.log}
-        relabel_configs:
-          - target_label: node
-            replacement: ${NODE_NAME}
+        pipeline_stages:
+          - regex:
+              # Extract hostname from standard syslog format:
+              # "May 12 12:34:53 whale systemd[1]: ..."
+              expression: '^\w{3} +\d+ \d+:\d+:\d+ (?P<hostname>\S+)'
+          - labels:
+              node: hostname
 
       # === systemd journal (warning+ and logind) ===
       # Captures events that rsyslog misses or rate-limits: logind power key events,
@@ -151,20 +155,7 @@ tolerations:
     operator: Exists
     effect: NoSchedule
 
-# NODE_NAME env var for syslog relabeling
-# defaultArgs overrides the container args list entirely.
-# -config.expand-env=true is required: without it ${NODE_NAME} in relabel_configs
-# replacement is treated as a regex capture group reference (expands to empty string)
-# rather than an environment variable, silently dropping the node label.
-defaultArgs:
-  - -config.file=/etc/promtail/promtail.yaml
-  - -config.expand-env=true
-
-extraEnv:
-  - name: NODE_NAME
-    valueFrom:
-      fieldRef:
-        fieldPath: spec.nodeName
+extraEnv: []
 
 serviceMonitor:
   enabled: true
