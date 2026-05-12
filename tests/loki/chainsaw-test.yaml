@@ -187,6 +187,33 @@ spec:
               done
               exit $FAILED
 
+    - name: promtail-drop-rate-low
+      description: No Promtail pod is dropping >500 entries/hour due to Loki ingester errors (acute push failure detection)
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              PROM="http://192.168.0.202"
+              # Rate of ingester_error drops per pod over last hour (entries/hour)
+              RESULT=$(curl -sfG \
+                --data-urlencode 'query=rate(promtail_dropped_entries_total{reason="ingester_error"}[1h]) * 3600' \
+                "$PROM/api/v1/query")
+              FAILED=0
+              echo "$RESULT" | python3 -c "
+              import sys, json
+              d = json.load(sys.stdin)
+              threshold = 500
+              for r in d['data']['result']:
+                  pod = r['metric'].get('pod', '?')
+                  rate = float(r['value'][1])
+                  if rate > threshold:
+                      print(f'FAIL {pod}: {rate:.0f} entries/hour dropped (ingester_error) — Loki push failures acute')
+                      sys.exit(1)
+                  else:
+                      print(f'PASS {pod}: {rate:.1f} entries/hour dropped (below {threshold} threshold)')
+              " || FAILED=1
+              exit $FAILED
+
     - name: grafana-loki-datasource-registered
       description: Grafana is healthy and Loki datasource config is applied via ArgoCD
       try:
