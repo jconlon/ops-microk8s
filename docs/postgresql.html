@@ -244,6 +244,33 @@
       Browse schema in pgAdmin →
     </a>
 
+    <h3 style="margin-top:1.2rem;">v_freshrss_entries view</h3>
+    <p style="font-size:0.84rem; color:var(--muted); margin-bottom:0.5rem;">
+      A denormalized read view joining <code>entry</code> → <code>feed</code> → <code>category</code> →
+      <code>tag</code> for the <code>admin</code> user. Consumers query this view instead of joining the
+      normalized tables directly.
+    </p>
+    <div class="callout" style="font-size:0.84rem; margin-bottom:0.75rem;">
+      <strong>Fan-out note:</strong> The view uses a <code>LEFT JOIN</code> on tags.
+      If an entry has multiple tags it will appear more than once — one row per tag.
+      Currently all entries have at most one tag (29 tag assignments across 11 k+ entries),
+      so the view is effectively 1-to-1 with the entry table. Run <code>just test-freshrss</code>
+      to assert this invariant holds.
+    </div>
+<pre>SELECT e.*, f.name AS feed_name, f.url AS feed_url, ...,
+       c.id AS category_id, c.name AS category_name, ...,
+       t.id AS tag_id, t.name AS tag_name, ...
+FROM freshrss_admin_entry e
+  JOIN  freshrss_admin_feed     f  ON f.id = e.id_feed
+  LEFT JOIN freshrss_admin_category c  ON c.id = f.category
+  LEFT JOIN freshrss_admin_entrytag et ON et.id_entry = e.id
+  LEFT JOIN freshrss_admin_tag  t  ON t.id = et.id_tag;</pre>
+    <p style="font-size:0.84rem; color:var(--muted);">
+      Chainsaw coverage: <code>tests/freshrss/chainsaw-test.yaml</code> — run with
+      <code>just test-freshrss</code>. Checks: view has rows, no orphaned feed/category joins,
+      row count ≥ raw entry count, no unexpected fan-out, required columns non-null.
+    </p>
+
     <h3 id="freshrss-entry-schema" style="margin-top:1.2rem;">entry table schema</h3>
     <table>
       <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>

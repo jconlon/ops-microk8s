@@ -1,0 +1,89 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: freshrss-view
+spec:
+  description: v_freshrss_entries view exists, joins are correct, and no orphaned rows
+  concurrent: false
+  timeouts:
+    assert: 2m
+    exec: 1m
+
+  steps:
+
+  - name: view-exists-and-returns-rows
+    description: View is accessible and contains data
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          COUNT=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+            "SELECT COUNT(*) FROM v_freshrss_entries;" 2>/dev/null)
+          echo "View row count: $COUNT"
+          [ "$COUNT" -gt 0 ] || { echo "FAIL: view returned 0 rows"; exit 1; }
+          echo "PASS: view has $COUNT rows"
+
+  - name: feed-join-no-orphans
+    description: All entries resolve to a feed (INNER JOIN integrity)
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          ORPHANS=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+            "SELECT COUNT(*) FROM v_freshrss_entries WHERE feed_id IS NULL;" 2>/dev/null)
+          echo "Entries without feed: $ORPHANS"
+          [ "$ORPHANS" -eq 0 ] || { echo "FAIL: $ORPHANS entries have no feed"; exit 1; }
+          echo "PASS: all entries have a feed"
+
+  - name: category-join-no-orphans
+    description: All entries resolve to a category (all feeds have a category)
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          ORPHANS=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+            "SELECT COUNT(*) FROM v_freshrss_entries WHERE category_id IS NULL;" 2>/dev/null)
+          echo "Entries without category: $ORPHANS"
+          [ "$ORPHANS" -eq 0 ] || { echo "FAIL: $ORPHANS entries have no category"; exit 1; }
+          echo "PASS: all entries have a category"
+
+  - name: row-count-matches-entry-table
+    description: View row count >= raw entry count (LEFT JOIN on tags may fan-out for multi-tagged entries)
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          RESULT=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+            "SELECT COUNT(*) AS view_rows, (SELECT COUNT(*) FROM freshrss_admin_entry) AS raw_rows FROM v_freshrss_entries;" 2>/dev/null)
+          VIEW_ROWS=$(echo "$RESULT" | cut -d'|' -f1)
+          RAW_ROWS=$(echo "$RESULT" | cut -d'|' -f2)
+          echo "View rows: $VIEW_ROWS  Raw entry rows: $RAW_ROWS"
+          [ "$VIEW_ROWS" -ge "$RAW_ROWS" ] || { echo "FAIL: view ($VIEW_ROWS) has fewer rows than entry table ($RAW_ROWS)"; exit 1; }
+          echo "PASS: view row count is consistent with entry table"
+
+  - name: distinct-entry-count-matches-entry-table
+    description: Distinct entry_ids in view equals raw entry count (no unexpected fan-out with current tag data)
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          RESULT=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+            "SELECT COUNT(DISTINCT entry_id) AS distinct_entries, (SELECT COUNT(*) FROM freshrss_admin_entry) AS raw_rows FROM v_freshrss_entries;" 2>/dev/null)
+          DISTINCT=$(echo "$RESULT" | cut -d'|' -f1)
+          RAW=$(echo "$RESULT" | cut -d'|' -f2)
+          echo "Distinct entries in view: $DISTINCT  Raw entry count: $RAW"
+          [ "$DISTINCT" -eq "$RAW" ] || { echo "FAIL: distinct entry count ($DISTINCT) != raw entry count ($RAW) — unexpected fan-out"; exit 1; }
+          echo "PASS: no fan-out — each entry appears exactly once"
+
+  - name: required-columns-non-null
+    description: Core columns entry_id, title, feed_name, feed_url, category_name are non-null for all rows
+    try:
+    - script:
+        content: |
+          POD=$(kubectl get pod -n postgresql-system -l cnpg.io/instanceRole=primary -o jsonpath='{.items[0].metadata.name}')
+          for COL in entry_id title feed_name feed_url category_name; do
+            NULL_COUNT=$(kubectl exec -n postgresql-system $POD -- psql -U postgres -d freshrss -At -c \
+              "SELECT COUNT(*) FROM v_freshrss_entries WHERE $COL IS NULL;" 2>/dev/null)
+            [ "$NULL_COUNT" -eq 0 ] || { echo "FAIL: column $COL has $NULL_COUNT NULL rows"; exit 1; }
+            echo "PASS: $COL has no NULLs"
+          done

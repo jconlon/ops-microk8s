@@ -373,6 +373,10 @@ cluster-docs:
 backup-docs:
     xdg-open docs/backups.html
 
+# Run FreshRSS chainsaw tests
+test-freshrss:
+    chainsaw test tests/freshrss
+
 # Open the PostgreSQL databases reference in a browser
 postgresql-docs:
     xdg-open docs/postgresql.html
