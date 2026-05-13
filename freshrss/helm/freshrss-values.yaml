@@ -4,6 +4,9 @@ image:
   type: alpine
   pullPolicy: IfNotPresent
 
+deploymentStrategy:
+  type: Recreate
+
 service:
   type: LoadBalancer
   port: 80
