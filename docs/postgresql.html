@@ -211,19 +211,22 @@
   <div class="db-card-header">
     <span class="db-name">freshrss</span>
     <span class="db-owner">owner: freshrss</span>
-    <span class="db-desc">FreshRSS RSS feed aggregator. Tables are namespaced per user: <code>freshrss_{username}_{table}</code>. Users: <code>admin</code>, <code>oyster</code>.</span>
+    <span class="db-desc">FreshRSS RSS feed aggregator. Each user gets their own complete set of 6 tables, named <code>freshrss_{username}_{tabletype}</code>. Adding a new FreshRSS user creates another full set. Currently 2 users: <code>admin</code>, <code>oyster</code>.</span>
   </div>
   <div class="db-card-body">
     <div class="schema-group">
-      <div class="schema-group-label">Per-user tables (prefix: <code>freshrss_admin_</code> / <code>freshrss_oyster_</code>)</div>
-      <div class="tag-list">
-        <span class="tag">category</span>
-        <span class="tag">feed</span>
-        <span class="tag">entry</span>
-        <span class="tag">entrytag</span>
-        <span class="tag">entrytmp</span>
-        <span class="tag">tag</span>
-      </div>
+      <div class="schema-group-label">Per-user tables — one full set per user (13 tables total = 2 users × 6 + 1 shared)</div>
+      <table style="margin-top:0.4rem;">
+        <thead><tr><th>Table type</th><th>admin</th><th>oyster</th></tr></thead>
+        <tbody>
+          <tr><td><code>category</code></td><td><code>freshrss_admin_category</code></td><td><code>freshrss_oyster_category</code></td></tr>
+          <tr><td><code>feed</code></td><td><code>freshrss_admin_feed</code></td><td><code>freshrss_oyster_feed</code></td></tr>
+          <tr><td><code>entry</code></td><td><code>freshrss_admin_entry</code></td><td><code>freshrss_oyster_entry</code></td></tr>
+          <tr><td><code>entrytag</code></td><td><code>freshrss_admin_entrytag</code></td><td><code>freshrss_oyster_entrytag</code></td></tr>
+          <tr><td><code>entrytmp</code></td><td><code>freshrss_admin_entrytmp</code></td><td><code>freshrss_oyster_entrytmp</code></td></tr>
+          <tr><td><code>tag</code></td><td><code>freshrss_admin_tag</code></td><td><code>freshrss_oyster_tag</code></td></tr>
+        </tbody>
+      </table>
     </div>
     <div class="schema-group" style="margin-top:0.75rem;">
       <div class="schema-group-label">Custom tables</div>
