@@ -373,6 +373,10 @@ cluster-docs:
 backup-docs:
     xdg-open docs/backups.html
 
+# Open the PostgreSQL databases reference in a browser
+postgresql-docs:
+    xdg-open docs/postgresql.html
+
 # Open the networking reference in a browser
 networking-docs:
     xdg-open docs/networking.html

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PostgreSQL Databases — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --orange: #e09a5c;
+    --red: #e06c75;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin: 1.1rem 0 0.4rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle  { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.87rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .db-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 2rem;
+    overflow: hidden;
+  }
+  .db-card-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.3rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .db-name {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .db-owner {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .db-desc {
+    font-size: 0.88rem;
+    color: var(--muted);
+    flex: 1 1 100%;
+    margin-top: 0.2rem;
+  }
+  .db-card-body { padding: 1rem 1.3rem; }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.12em 0.5em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-muted  { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .callout {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.7rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+    background: #141926;
+  }
+  .callout strong { color: var(--accent); }
+  .schema-group { margin-bottom: 0.75rem; }
+  .schema-group-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .tag {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.75rem;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.45em;
+    color: #c9d1d9;
+  }
+  .tag-custom { border-color: var(--accent); color: var(--accent); }
+  .pgadmin-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    margin-top: 0.75rem;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.35rem 0.75rem;
+    background: var(--surface2);
+    text-decoration: none;
+  }
+  .pgadmin-link:hover { border-color: var(--accent); text-decoration: none; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › PostgreSQL</p>
+<h1>PostgreSQL Databases</h1>
+<p class="subtitle">CloudNativePG cluster — all databases, owners, and schemas</p>
+
+<!-- ── Cluster overview ───────────────────────────────────────────── -->
+<h2>Cluster</h2>
+
+<table>
+  <thead><tr><th>Property</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Operator</td><td>CloudNativePG</td></tr>
+    <tr><td>Cluster name</td><td><code>production-postgresql</code> · namespace <code>postgresql-system</code></td></tr>
+    <tr><td>Primary (read-write)</td><td><code>192.168.0.210:5432</code> · <code>production-postgresql-rw.postgresql-system.svc:5432</code></td></tr>
+    <tr><td>Replica (read-only)</td><td><code>192.168.0.211:5432</code> · <code>production-postgresql-ro.postgresql-system.svc:5432</code></td></tr>
+    <tr><td>Admin UI</td><td><a href="https://pgadmin.verticon.com" target="_blank" rel="noopener">pgadmin.verticon.com</a> — navigate to <strong>Servers → production-postgresql → Databases → &lt;db&gt; → Schemas → public → Tables</strong></td></tr>
+    <tr><td>CLI status</td><td><code>kubectl cnpg status production-postgresql -n postgresql-system</code></td></tr>
+    <tr><td>psql (FreshRSS)</td><td><code>ops freshrss psql</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ── freshrss ───────────────────────────────────────────────────── -->
+<h2>Databases</h2>
+
+<div class="db-card">
+  <div class="db-card-header">
+    <span class="db-name">freshrss</span>
+    <span class="db-owner">owner: freshrss</span>
+    <span class="db-desc">FreshRSS RSS feed aggregator. Tables are namespaced per user: <code>freshrss_{username}_{table}</code>. Users: <code>admin</code>, <code>oyster</code>.</span>
+  </div>
+  <div class="db-card-body">
+    <div class="schema-group">
+      <div class="schema-group-label">Per-user tables (prefix: <code>freshrss_admin_</code> / <code>freshrss_oyster_</code>)</div>
+      <div class="tag-list">
+        <span class="tag">category</span>
+        <span class="tag">feed</span>
+        <span class="tag">entry</span>
+        <span class="tag">entrytag</span>
+        <span class="tag">entrytmp</span>
+        <span class="tag">tag</span>
+      </div>
+    </div>
+    <div class="schema-group" style="margin-top:0.75rem;">
+      <div class="schema-group-label">Custom tables</div>
+      <div class="tag-list">
+        <span class="tag tag-custom">producer_watermark</span>
+      </div>
+    </div>
+    <p style="font-size:0.84rem; color:var(--muted); margin-top:0.6rem;">
+      <code>producer_watermark</code> tracks Kafka producer offsets for the FreshRSS enrichment pipeline (issue
+      <a href="https://github.com/jconlon/ops-microk8s/issues/56">#56</a>).
+      The <code>entry</code> table is the core article store — see
+      <a href="#freshrss-entry-schema">entry schema</a> below for column details.
+    </p>
+    <a href="https://pgadmin.verticon.com" class="pgadmin-link" target="_blank" rel="noopener">
+      Browse schema in pgAdmin →
+    </a>
+
+    <h3 id="freshrss-entry-schema" style="margin-top:1.2rem;">entry table schema</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>bigint PK</td><td>Article ID</td></tr>
+        <tr><td><code>guid</code></td><td>varchar(767)</td><td>Feed-provided GUID, unique per feed</td></tr>
+        <tr><td><code>title</code></td><td>varchar(8192)</td><td></td></tr>
+        <tr><td><code>author</code></td><td>varchar(1024)</td><td></td></tr>
+        <tr><td><code>content</code></td><td>text</td><td>Full article body</td></tr>
+        <tr><td><code>link</code></td><td>varchar(16383)</td><td>Original article URL</td></tr>
+        <tr><td><code>date</code></td><td>bigint</td><td>Feed publish date (Unix ms)</td></tr>
+        <tr><td><code>lastSeen</code></td><td>bigint</td><td>Last time fetched from feed</td></tr>
+        <tr><td><code>lastUserModified</code></td><td>bigint</td><td>Last read/bookmark action — v1.28.0</td></tr>
+        <tr><td><code>lastModified</code></td><td>bigint</td><td>Server-side modification date — v1.29.0 (migration pending upgrade)</td></tr>
+        <tr><td><code>hash</code></td><td>bytea</td><td>Content hash for deduplication</td></tr>
+        <tr><td><code>is_read</code></td><td>smallint</td><td>0 = unread, 1 = read</td></tr>
+        <tr><td><code>is_favorite</code></td><td>smallint</td><td>0 = normal, 1 = starred</td></tr>
+        <tr><td><code>id_feed</code></td><td>int FK → feed</td><td></td></tr>
+        <tr><td><code>tags</code></td><td>varchar(2048)</td><td></td></tr>
+        <tr><td><code>attributes</code></td><td>text</td><td>JSON extra metadata</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── hasura ─────────────────────────────────────────────────────── -->
+<div class="db-card">
+  <div class="db-card-header">
+    <span class="db-name">hasura</span>
+    <span class="db-owner">owner: hasura</span>
+    <span class="db-desc">Hasura GraphQL engine internal metadata. Application data is federated from other databases (freshrss, wallabag) via Hasura remote schemas.</span>
+  </div>
+  <div class="db-card-body">
+    <div class="schema-group">
+      <div class="schema-group-label">hdb_catalog schema — Hasura internal</div>
+      <div class="tag-list">
+        <span class="tag">hdb_metadata</span>
+        <span class="tag">hdb_version</span>
+        <span class="tag">hdb_action_log</span>
+        <span class="tag">hdb_cron_events</span>
+        <span class="tag">hdb_cron_event_invocation_logs</span>
+        <span class="tag">hdb_scheduled_events</span>
+        <span class="tag">hdb_scheduled_event_invocation_logs</span>
+        <span class="tag">hdb_schema_notifications</span>
+      </div>
+    </div>
+    <p style="font-size:0.84rem; color:var(--muted); margin-top:0.6rem;">
+      The <code>public</code> schema is empty — Hasura connects to <code>freshrss</code> and <code>wallabag</code>
+      as external data sources rather than owning its own application tables.
+    </p>
+    <a href="https://hasura.verticon.com" class="pgadmin-link" target="_blank" rel="noopener">
+      Explore GraphQL schema in Hasura Console →
+    </a>
+  </div>
+</div>
+
+<!-- ── wallabag ───────────────────────────────────────────────────── -->
+<div class="db-card">
+  <div class="db-card-header">
+    <span class="db-name">wallabag</span>
+    <span class="db-owner">owner: wallabag</span>
+    <span class="db-desc">Wallabag read-later and article archive service.</span>
+  </div>
+  <div class="db-card-body">
+    <div class="schema-group">
+      <div class="schema-group-label">Application tables</div>
+      <div class="tag-list">
+        <span class="tag">wallabag_entry</span>
+        <span class="tag">wallabag_tag</span>
+        <span class="tag">wallabag_entry_tag</span>
+        <span class="tag">wallabag_annotation</span>
+        <span class="tag">wallabag_user</span>
+        <span class="tag">wallabag_config</span>
+        <span class="tag">wallabag_tagging_rule</span>
+        <span class="tag">wallabag_site_credential</span>
+        <span class="tag">wallabag_ignore_origin_instance_rule</span>
+        <span class="tag">wallabag_ignore_origin_user_rule</span>
+        <span class="tag">wallabag_internal_setting</span>
+      </div>
+    </div>
+    <div class="schema-group" style="margin-top:0.75rem;">
+      <div class="schema-group-label">OAuth2 tables</div>
+      <div class="tag-list">
+        <span class="tag">wallabag_oauth2_clients</span>
+        <span class="tag">wallabag_oauth2_access_tokens</span>
+        <span class="tag">wallabag_oauth2_auth_codes</span>
+        <span class="tag">wallabag_oauth2_refresh_tokens</span>
+      </div>
+    </div>
+    <div class="schema-group" style="margin-top:0.75rem;">
+      <div class="schema-group-label">System</div>
+      <div class="tag-list">
+        <span class="tag">migration_versions</span>
+      </div>
+    </div>
+    <a href="https://pgadmin.verticon.com" class="pgadmin-link" target="_blank" rel="noopener">
+      Browse schema in pgAdmin →
+    </a>
+  </div>
+</div>
+
+<!-- ── harbor ─────────────────────────────────────────────────────── -->
+<div class="db-card">
+  <div class="db-card-header">
+    <span class="db-name">harbor</span>
+    <span class="db-owner">owner: harbor</span>
+    <span class="db-desc">Harbor container registry internal metadata — images, artifacts, projects, users, replication policies, scan reports, and audit logs. Managed entirely by Harbor; do not modify directly.</span>
+  </div>
+  <div class="db-card-body">
+    <div class="schema-group">
+      <div class="schema-group-label">Key tables (48 total)</div>
+      <div class="tag-list">
+        <span class="tag">project</span>
+        <span class="tag">repository</span>
+        <span class="tag">artifact</span>
+        <span class="tag">tag</span>
+        <span class="tag">blob</span>
+        <span class="tag">harbor_user</span>
+        <span class="tag">robot</span>
+        <span class="tag">audit_log</span>
+        <span class="tag">scan_report</span>
+        <span class="tag">sbom_report</span>
+        <span class="tag">replication_policy</span>
+        <span class="tag">retention_policy</span>
+        <span class="tag">execution</span>
+        <span class="tag">task</span>
+        <span class="tag">quota</span>
+        <span class="tag">quota_usage</span>
+      </div>
+    </div>
+    <a href="https://pgadmin.verticon.com" class="pgadmin-link" target="_blank" rel="noopener">
+      Browse schema in pgAdmin →
+    </a>
+  </div>
+</div>
+
+<!-- ── app ────────────────────────────────────────────────────────── -->
+<div class="db-card">
+  <div class="db-card-header">
+    <span class="db-name">app</span>
+    <span class="db-owner">owner: app</span>
+    <span class="db-desc">Reserved / empty. Available for future application use.</span>
+  </div>
+  <div class="db-card-body">
+    <p style="font-size:0.84rem; color:var(--muted);">No tables. Created as part of the CloudNativePG cluster bootstrap.</p>
+  </div>
+</div>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="https://pgadmin.verticon.com" target="_blank" rel="noopener">pgAdmin →</a>
+</p>
+
+</div>
+</body>
+</html>
