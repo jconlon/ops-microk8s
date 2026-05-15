@@ -71,7 +71,7 @@ spec:
             - src:
                 dependencyName: git-push-dep
                 dataKey: body.service
-              dest: metadata.annotations["workflows.argoproj.io/title"]
+              dest: metadata.generateName
   # ServiceAccount used by the Sensor pod.
   # Must be under spec.template.serviceAccountName (not spec.serviceAccountName).
   # This is confirmed by official Argo Events examples (webhook.yaml, special-workflow-trigger.yaml).
