@@ -7,18 +7,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 For every Claude Code session in this project, follow these startup steps in order:
 
 1. **User Identification (Global Memory)**
-
    - Retrieve user identification from global memory (via the memory MCP persistent store).
    - If "jconlon" is not already identified as the default_user in global memory, add or update this entity accordingly.
    - Throughout all interactions, treat "jconlon" as the default_user.
 
 2. **Global Memory Retrieval**
-
    - Say "Remembering global memory..." and retrieve all relevant information from the global memory store (via memory MCP server).
    - When discussing persistent rules or reusable procedures, specify that these come from global memory.
 
 3. **Project Memory Retrieval**
-
    - Say "Remembering project memory..." and load all project-specific context from the "Memories" section of this CLAUDE.md.
    - When referencing local workflows, specific script usage, infrastructure, or sensitive details, make clear these originate solely from project memory.
 
@@ -38,11 +35,18 @@ Please follow these memory protocols at the beginning of each Claude Code sessio
 
 This repository contains the infrastructure configuration for a MicroK8s cluster with 8 nodes: mullet, trout, tuna, whale, gold, squid, puffer, and carp. The cluster uses Rook/Ceph for distributed replicated storage. Monitoring is provided by Prometheus/Grafana.
 
+## Task runner
+
+- This repo uses `just` as the canonical interface for developer workflows.
+- Prefer `just <recipe>` instead of ad hoc bash commands whenever a recipe exists.
+- Start by running `just --list` if you need to discover available tasks.
+
 ## Work Scope
 
 This repository covers **cluster infrastructure creation and management** — the platform layer that all projects run on.
 
 **In scope:**
+
 - Cluster provisioning, node management, and MicroK8s configuration
 - Core platform services: ArgoCD, Rook/Ceph, MetalLB, Prometheus/Grafana, Loki, cert-manager
 - Shared infrastructure: PostgreSQL operator, Kafka/Strimzi, Harbor registry, Argo Workflows/Events
@@ -50,6 +54,7 @@ This repository covers **cluster infrastructure creation and management** — th
 - Infrastructure issues raised by projects (e.g., a project needs a new secret, storage class, or service)
 
 **Out of scope:**
+
 - Individual machine OS configuration and tooling → [`dotfiles`](https://gitlab.com/jconlon1/dotfiles) repo
 - Project-specific development and application logic → tracked in each project's own repo and tagged with the `project` label in their issues
 
