@@ -13,6 +13,12 @@ config:
     # K8s pod logs — auto-detected from container runtime
     pipelineStages:
       - cri: {}
+      # Drop Argo Workflows emissary executor lifecycle lines before they reach Loki.
+      # These (e.g. "capturing logs argo=true", "sub-process exited argo=true") leak
+      # into the main container log stream but carry no diagnostic value — workflow
+      # status and exit codes are already recorded by Argo Workflows itself.
+      - drop:
+          expression: '.*argo=true.*'
 
     scrapeConfigs: |
       # === Kubernetes Pod Logs ===
