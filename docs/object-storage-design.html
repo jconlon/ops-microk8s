@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Object Storage Design — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --orange: #e09a5c;
+    --red: #e06c75;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  h4 { font-size: 0.9rem; font-weight: 600; color: var(--muted); margin: 1rem 0 0.4rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle  { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    background: #141926;
+  }
+  .callout strong { color: var(--accent); }
+  .callout-tip  { border-color: var(--green);  background: #151f1a; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn { border-color: var(--yellow); background: #1e1a0e; }
+  .callout-warn strong { color: var(--yellow); }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .option-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 680px) { .option-grid { grid-template-columns: 1fr; } }
+  .option-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+  }
+  .option-card.chosen { border-color: var(--green); }
+  .option-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.4rem; }
+  .option-stat  { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.2rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Object Storage Design</p>
+<h1>Object Storage Design</h1>
+<p class="subtitle">Architecture design for Ceph RGW S3 object storage — dated 2026-01-05</p>
+
+<div class="callout callout-tip">
+  <strong>Implemented:</strong> Option 2 (Erasure Coding ec:2+2) was chosen and is live at
+  <a href="https://s3.verticon.com">s3.verticon.com</a>. This document records the design
+  rationale and trade-offs evaluated at the time.
+</div>
+
+<!-- ── Context ────────────────────────────────────────────────────── -->
+<h2>Context</h2>
+
+<table>
+  <thead><tr><th>Property</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Cluster</td><td>MicroK8s 8-node (ops-microk8s)</td></tr>
+    <tr><td>Storage nodes</td><td>gold, squid, puffer, carp (Dell R320)</td></tr>
+    <tr><td>Available drives</td><td>4× 4TB at <code>/dev/sdc</code> (one per node)</td></tr>
+    <tr><td>Total raw capacity</td><td>~16 TB</td></tr>
+    <tr><td>Existing block storage</td><td>OSDs 0–3, 3-way replication, <code>rook-ceph-block</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ── Options ────────────────────────────────────────────────────── -->
+<h2>Design Options</h2>
+
+<div class="option-grid">
+  <div class="option-card">
+    <div class="option-title">Option 1 — Replicated (3×)</div>
+    <div class="option-stat">Usable capacity: ~5.3 TB</div>
+    <div class="option-stat">Failure tolerance: 1 OSD</div>
+    <div class="option-stat">Min OSDs: 3</div>
+    <ul style="font-size:0.84rem; margin-top:0.6rem;">
+      <li>Simpler config, lower CPU</li>
+      <li>Consistent with block storage</li>
+      <li>Better for small objects</li>
+      <li>33% storage efficiency</li>
+    </ul>
+  </div>
+  <div class="option-card chosen">
+    <div class="option-title">Option 2 — Erasure Coding ec:2+2 <span class="badge badge-green">Chosen</span></div>
+    <div class="option-stat">Usable capacity: ~8 TB</div>
+    <div class="option-stat">Failure tolerance: 2 OSDs</div>
+    <div class="option-stat">Min OSDs: 4</div>
+    <ul style="font-size:0.84rem; margin-top:0.6rem;">
+      <li>50% storage efficiency (vs 33%)</li>
+      <li>Higher durability</li>
+      <li>Suited for large objects (backups, media)</li>
+      <li>Higher CPU overhead for encode/decode</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Implemented config ─────────────────────────────────────────── -->
+<h2>Implemented Configuration</h2>
+
+<pre>apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: rook-ceph-rgw
+  namespace: rook-ceph
+spec:
+  metadataPool:
+    failureDomain: host
+    replicated:
+      size: 3
+      requireSafeReplicaSize: true
+    parameters:
+      compression_mode: none
+  dataPool:
+    failureDomain: host
+    erasureCoded:
+      dataChunks: 2
+      codingChunks: 2
+    parameters:
+      compression_mode: passive
+  preservePoolsOnDelete: true
+  gateway:
+    type: s3
+    port: 80
+    instances: 2
+    placement:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - rook-ceph-rgw
+            topologyKey: kubernetes.io/hostname
+    resources:
+      limits:
+        memory: "2Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"</pre>
+
+<!-- ── Buckets ─────────────────────────────────────────────────────── -->
+<h2>Bucket Layout</h2>
+
+<table>
+  <thead><tr><th>Bucket</th><th>Lifecycle</th><th>Quota</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>restic-backups</code></td><td>Retain 30 days</td><td>500 GB</td><td>PostgreSQL WAL + home Restic snapshots</td></tr>
+    <tr><td><code>music-library</code></td><td>Indefinite</td><td>2 TB</td><td>Music library mirror</td></tr>
+    <tr><td><code>pictures</code></td><td>Indefinite</td><td>2 TB</td><td>Photo library mirror</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Capacity ───────────────────────────────────────────────────── -->
+<h2>Capacity Planning</h2>
+
+<table>
+  <thead><tr><th>Pool</th><th>Encoding</th><th>Raw</th><th>Usable</th></tr></thead>
+  <tbody>
+    <tr><td>Metadata</td><td>3-way replication</td><td>~100 GB</td><td>~33 GB</td></tr>
+    <tr><td>Data</td><td>EC 2+2</td><td>~16 TB</td><td>~8 TB</td></tr>
+    <tr><td><strong>Total</strong></td><td></td><td><strong>~16 TB</strong></td><td><strong>~8 TB</strong></td></tr>
+  </tbody>
+</table>
+
+<!-- ── Scalability ────────────────────────────────────────────────── -->
+<h2>Scalability</h2>
+
+<p>Adding drives to an existing Ceph cluster is non-disruptive: update the CephCluster manifest to include new devices, Rook creates new OSDs, and Ceph rebalances automatically with no downtime.</p>
+
+<div class="callout callout-warn">
+  <strong>EC scheme is immutable after pool creation.</strong> Changing from ec:2+2 to ec:4+2
+  requires creating a new pool, migrating all data, and updating RGW — plan the scheme before
+  writing significant data.
+</div>
+
+<h3>Efficiency at scale</h3>
+<table>
+  <thead><tr><th>OSDs</th><th>EC 2+2 usable</th><th>EC 4+2 usable</th><th>3× replication</th></tr></thead>
+  <tbody>
+    <tr><td>4</td><td>8 TB (50%)</td><td>— (need 6)</td><td>5.3 TB (33%)</td></tr>
+    <tr><td>8</td><td>16 TB (50%)</td><td>21 TB (67%)</td><td>10.6 TB (33%)</td></tr>
+    <tr><td>12</td><td>24 TB (50%)</td><td>32 TB (67%)</td><td>16 TB (33%)</td></tr>
+    <tr><td>16</td><td>32 TB (50%)</td><td>43 TB (67%)</td><td>21 TB (33%)</td></tr>
+  </tbody>
+</table>
+<p style="font-size:0.85rem; color:var(--muted);">
+  Migrating from ec:2+2 to ec:4+2 becomes worthwhile at 8+ OSDs — it recovers ~5 TB of capacity
+  on an 8-OSD cluster with no additional hardware.
+</p>
+
+<!-- ── Performance ────────────────────────────────────────────────── -->
+<h2>Performance Expectations</h2>
+
+<table>
+  <thead><tr><th>Workload</th><th>EC 2+2</th><th>3× Replication</th></tr></thead>
+  <tbody>
+    <tr><td>Small objects (&lt;1 MB) ops/sec</td><td>100–300</td><td>200–500</td></tr>
+    <tr><td>Large objects (&gt;10 MB) MB/s</td><td>150–250</td><td>100–200</td></tr>
+    <tr><td>Write latency</td><td>15–75 ms</td><td>10–50 ms</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Access ─────────────────────────────────────────────────────── -->
+<h2>Access</h2>
+
+<table>
+  <thead><tr><th>Method</th><th>Endpoint</th></tr></thead>
+  <tbody>
+    <tr><td>External HTTPS</td><td><a href="https://s3.verticon.com">s3.verticon.com</a> (192.168.0.204) — path-style</td></tr>
+    <tr><td>Internal cluster</td><td><code>rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:80</code></td></tr>
+    <tr><td>mc CLI</td><td><code>mc ls ceph/</code> — <code>MC_HOST_ceph</code> set in devbox shell</td></tr>
+  </tbody>
+</table>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="music-library-monitoring.html">Music Library Monitoring →</a>
+</p>
+
+</div>
+</body>
+</html>

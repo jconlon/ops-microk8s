@@ -373,6 +373,14 @@ cluster-docs:
 backup-docs:
     xdg-open docs/backups.html
 
+# Open the object storage design in a browser
+object-storage-docs:
+    xdg-open docs/object-storage-design.html
+
+# Open the music library monitoring reference in a browser
+music-docs:
+    xdg-open docs/music-library-monitoring.html
+
 # Run FreshRSS chainsaw tests
 test-freshrss:
     chainsaw test tests/freshrss

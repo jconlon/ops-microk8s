@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music Library Monitoring — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  h4 { font-size: 0.9rem; font-weight: 600; color: var(--muted); margin: 1rem 0 0.4rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle  { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    background: #141926;
+  }
+  .callout strong { color: var(--accent); }
+  .callout-warn { border-color: var(--yellow); background: #1e1a0e; }
+  .callout-warn strong { color: var(--yellow); }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green { background: #1a3328; color: var(--green); border: 1px solid #2a4a3a; }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+  }
+  .metric-name { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--accent); margin-bottom: 0.3rem; }
+  .metric-desc { font-size: 0.84rem; color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Music Library Monitoring</p>
+<h1>Music Library Monitoring</h1>
+<p class="subtitle">Ceph RGW object storage monitoring via Prometheus and Grafana</p>
+
+<!-- ── Overview ───────────────────────────────────────────────────── -->
+<h2>Overview</h2>
+<p>
+  The music library (72 GiB, 3,209 objects) is stored in Ceph Object Storage (RGW) and monitored
+  through the existing Prometheus/Grafana stack. Pool-level metrics are available via Prometheus;
+  per-bucket breakdown requires <code>mc du</code>.
+</p>
+
+<!-- ── Storage layout ─────────────────────────────────────────────── -->
+<h2>Storage Layout</h2>
+
+<h3>RGW Buckets</h3>
+<table>
+  <thead><tr><th>Bucket</th><th>Size</th><th>Objects</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>music-library</code></td><td>72 GiB</td><td>3,209</td><td>Music library</td></tr>
+    <tr><td><code>restic-backups</code></td><td>79 GiB</td><td>16,852</td><td>PostgreSQL + home backups</td></tr>
+    <tr><td><code>test-bucket</code></td><td>14 B</td><td>1</td><td>Test</td></tr>
+  </tbody>
+</table>
+
+<h3>Ceph Pool</h3>
+<table>
+  <thead><tr><th>Property</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Pool name</td><td><code>rook-ceph-rgw.rgw.buckets.data</code> (Pool 10)</td></tr>
+    <tr><td>Encoding</td><td>Erasure coding ec:2+2 (2 data chunks + 2 parity)</td></tr>
+    <tr><td>Compression</td><td>Passive</td></tr>
+    <tr><td>Raw size in Prometheus</td><td>~304.6 GB</td></tr>
+    <tr><td>Actual data</td><td>~151 GiB (72 GiB music + 79 GiB backups)</td></tr>
+    <tr><td>Overhead factor</td><td>2× (ec:2+2 doubles raw usage)</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Storage math:</strong> 72 GiB music × 2 (ec) = ~144 GB + 79 GiB backups × 2 = ~158 GB ≈ 302 GB total pool usage (matches Prometheus)
+</div>
+
+<!-- ── Grafana ─────────────────────────────────────────────────────── -->
+<h2>Grafana Dashboard</h2>
+
+<table>
+  <thead><tr><th>Item</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>URL</td><td><a href="https://grafana.verticon.com" target="_blank" rel="noopener">grafana.verticon.com</a></td></tr>
+    <tr><td>Dashboard</td><td><a href="https://grafana.verticon.com/d/rook-ceph-cluster/ceph-cluster" target="_blank" rel="noopener">Ceph Cluster Overview</a></td></tr>
+    <tr><td>Relevant panel</td><td>Pool Usage / Pool Bytes Used — filter by <code>rook-ceph-rgw.rgw.buckets.data</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warn">
+  <strong>Note:</strong> Individual bucket metrics are not exposed by the Ceph RGW exporter.
+  Prometheus shows total pool usage only. Use <code>mc du</code> for per-bucket breakdown.
+</div>
+
+<!-- ── Prometheus metrics ──────────────────────────────────────────── -->
+<h2>Prometheus Metrics</h2>
+
+<h3>Storage</h3>
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-name">ceph_pool_bytes_used{pool="rook-ceph-rgw.rgw.buckets.data"}</div>
+    <div class="metric-desc">Total raw bytes used in the RGW data pool (~304 GB). Includes music + backups with ec overhead.</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-name">ceph_health_status</div>
+    <div class="metric-desc">Cluster-wide health. 0 = HEALTH_OK.</div>
+  </div>
+</div>
+
+<h3>RGW Operations</h3>
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-name">ceph_rgw_get / ceph_rgw_put</div>
+    <div class="metric-desc">GET and PUT request counts.</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-name">ceph_rgw_get_b / ceph_rgw_put_b</div>
+    <div class="metric-desc">Bytes transferred via GET and PUT.</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-name">ceph_rgw_req</div>
+    <div class="metric-desc">Total RGW requests.</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-name">ceph_rgw_qlen</div>
+    <div class="metric-desc">RGW request queue length.</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-name">ceph_rgw_cache_hit / ceph_rgw_cache_miss</div>
+    <div class="metric-desc">RGW cache performance.</div>
+  </div>
+</div>
+
+<!-- ── Grafana panel queries ──────────────────────────────────────── -->
+<h2>Custom Grafana Panel Queries</h2>
+
+<h3>Panel: RGW Object Storage (Stat / Gauge)</h3>
+<pre>ceph_pool_bytes_used{pool="rook-ceph-rgw.rgw.buckets.data"}
+# Unit: bytes (IEC)</pre>
+
+<h3>Panel: RGW GET Operations/sec (Graph)</h3>
+<pre>rate(ceph_rgw_get[5m])
+# Legend: {{instance}}</pre>
+
+<h3>Panel: RGW Network Throughput (Graph)</h3>
+<pre>rate(ceph_rgw_get_b[5m]) + rate(ceph_rgw_put_b[5m])
+# Unit: bytes/sec (IEC)</pre>
+
+<!-- ── Commands ───────────────────────────────────────────────────── -->
+<h2>Commands</h2>
+
+<h3>Per-bucket usage</h3>
+<pre>mc du ceph/music-library/
+mc du ceph/restic-backups/
+mc du ceph/test-bucket/
+
+# All buckets
+for bucket in music-library restic-backups test-bucket; do
+  echo "=== $bucket ===" && mc du ceph/$bucket/
+done</pre>
+
+<h3>Prometheus query</h3>
+<pre>curl -s 'https://prometheus.verticon.com/api/v1/query?query=ceph_pool_bytes_used{pool="rook-ceph-rgw.rgw.buckets.data"}' \
+  | jq -r '.data.result[0].value[1]'</pre>
+
+<h3>Cluster health check</h3>
+<pre>kubectl get cephcluster -n rook-ceph -o jsonpath='{.status.ceph.health}'
+kubectl get pods -n rook-ceph -l app=rook-ceph-rgw</pre>
+
+<!-- ── Limitations ────────────────────────────────────────────────── -->
+<h2>Limitations</h2>
+
+<p>The Ceph RGW Prometheus exporter does not expose per-bucket metrics — this is a Ceph limitation, not a monitoring stack issue. Workarounds:</p>
+
+<ul>
+  <li><strong>mc du</strong> — run manually or via systemd timer for per-bucket stats</li>
+  <li><strong>RGW admin API</strong> — <code>radosgw-admin bucket stats --bucket=music-library</code> (requires RGW admin credentials)</li>
+  <li><strong>Custom exporter</strong> — not implemented; would query RGW admin API and push per-bucket metrics to Prometheus</li>
+</ul>
+
+<!-- ── Status ─────────────────────────────────────────────────────── -->
+<h2>Status</h2>
+
+<table>
+  <thead><tr><th>Check</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Music library visible in Grafana (pool 10)</td><td><span class="badge badge-green">OK</span></td></tr>
+    <tr><td>RGW operation metrics (GET/PUT/requests)</td><td><span class="badge badge-green">OK</span></td></tr>
+    <tr><td>Per-bucket metrics in Prometheus</td><td>Not available — use <code>mc du</code></td></tr>
+    <tr><td>Pool usage alerting</td><td>Available — set alert on <code>ceph_pool_bytes_used</code></td></tr>
+  </tbody>
+</table>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="https://grafana.verticon.com/d/rook-ceph-cluster/ceph-cluster" target="_blank" rel="noopener">Ceph Cluster Dashboard →</a>
+</p>
+
+</div>
+</body>
+</html>
