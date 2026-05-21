@@ -393,6 +393,10 @@ postgresql-docs:
 networking-docs:
     xdg-open docs/networking.html
 
+# Open the tmux copy/paste cheat sheet in a browser
+tmux-docs:
+    xdg-open docs/tmux-copy-paste-cheatsheet.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots

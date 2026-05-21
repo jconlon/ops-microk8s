@@ -13,7 +13,8 @@
     "kyverno-chainsaw@0.1.9",
     "just@latest",
     "python@latest",
-    "uv@latest"
+    "uv@latest",
+    "xclip@latest"
   ],
   "shell": {
     "init_hook": [

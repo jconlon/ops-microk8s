@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tmux Copy/Paste — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+    background: #141926;
+  }
+  .callout strong { color: var(--accent); }
+  .callout-tip {
+    border-left-color: var(--green);
+    background: #151f1a;
+  }
+  .callout-tip strong { color: var(--green); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Tmux Copy/Paste</p>
+<h1>Tmux Copy/Paste</h1>
+<p class="subtitle">Workaround for apps (e.g. dot-agent-deck) that capture the mouse and break normal terminal copy/paste.</p>
+
+<!-- ── One-Time Setup ─────────────────────────────────────────────── -->
+<h2>One-Time Setup</h2>
+
+<p>Enable vi-style copy mode permanently by adding to <code>~/.tmux.conf</code>:</p>
+<pre>set -g mode-keys vi
+set -g focus-events on
+bind P run "xclip -selection clipboard -o | tmux load-buffer - &amp;&amp; tmux paste-buffer"</pre>
+
+<div class="callout callout-tip">
+  <strong>Already configured.</strong> These lines are already present in <code>~/.tmux.conf</code>. No setup needed for new sessions.
+</div>
+
+<!-- ── Copy Text from a Pane ──────────────────────────────────────── -->
+<h2>Copy Text from a Pane</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Step</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>Ctrl+b [</code> — enter copy mode (look for <code>[123/456]</code> counter in top-right)</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Arrow keys — move cursor to start of text</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>Space</code> — begin selection (text highlights as you move)</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Arrow keys — extend selection to end of text</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>Enter</code> — copy selection to tmux clipboard (exits copy mode)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ── Paste ──────────────────────────────────────────────────────── -->
+<h2>Paste</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Destination</th>
+      <th>Command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Same tmux pane</td>
+      <td><code>Ctrl+b ]</code></td>
+    </tr>
+    <tr>
+      <td>System clipboard (Ctrl+V)</td>
+      <td><code>tmux show-buffer | xclip -selection clipboard</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>pbpaste alias.</strong> The shell alias <code>pbpaste='xclip -selection clipboard -o'</code> reads from the system clipboard — it does not read from the tmux buffer. Use <code>Ctrl+b ]</code> to paste within tmux, or pipe <code>tmux show-buffer</code> to promote a tmux buffer to the system clipboard first.
+</div>
+
+<!-- ── Paste from System Clipboard ───────────────────────────────── -->
+<h2>Paste from System Clipboard into a Pane</h2>
+
+<p>When the app (e.g. dot-agent-deck) captures the mouse, <code>Shift+Ctrl+V</code> is blocked. Use the tmux buffer as a relay instead.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Method</th>
+      <th>Command</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Keybinding (recommended)</td>
+      <td><code>Ctrl+b P</code> — loads system clipboard into tmux buffer and pastes immediately</td>
+    </tr>
+    <tr>
+      <td>Manual</td>
+      <td><code>xclip -selection clipboard -o | tmux load-buffer -</code><br>then <code>Ctrl+b ]</code> to paste</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The keybinding is defined in <code>~/.tmux.conf</code>:</p>
+<pre>bind P run "xclip -selection clipboard -o | tmux load-buffer - &amp;&amp; tmux paste-buffer"</pre>
+
+<div class="callout callout-tip">
+  <strong>Reload config without restarting.</strong> After editing <code>~/.tmux.conf</code>, apply changes in a live session with <code>Ctrl+b :</code> then type <code>source-file ~/.tmux.conf</code>.
+</div>
+
+<!-- ── Exit Copy Mode ─────────────────────────────────────────────── -->
+<h2>Exit Copy Mode Without Copying</h2>
+
+<p>Press <code>q</code> or <code>Escape</code>.</p>
+
+<!-- ── Related ────────────────────────────────────────────────────── -->
+<h2>Related</h2>
+
+<ul>
+  <li><a href="https://github.com/vfarcic/dot-agent-deck/issues/96">vfarcic/dot-agent-deck#96</a> — mouse capture breaks GNOME Terminal copy/paste</li>
+  <li><a href="https://github.com/vfarcic/dot-agent-deck/issues/98">vfarcic/dot-agent-deck#98</a> — testing the tmux workaround</li>
+  <li>Shell alias: <code>agent-deck='tmux new-session -s agent-deck dot-agent-deck'</code></li>
+</ul>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a>
+</p>
+
+</div>
+</body>
+</html>
