@@ -117,7 +117,8 @@
 <h2>One-Time Setup</h2>
 
 <p>Enable vi-style copy mode permanently by adding to <code>~/.tmux.conf</code>:</p>
-<pre>set -g mode-keys vi
+<pre># ~/.tmux.conf
+set -g mode-keys vi
 set -g focus-events on
 bind P run "xclip -selection clipboard -o | tmux load-buffer - &amp;&amp; tmux paste-buffer"</pre>
 
