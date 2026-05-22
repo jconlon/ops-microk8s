@@ -53,13 +53,19 @@ spec:
     config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
 
   # Mounts kafka-connect-secret at /opt/kafka/external-configuration/connect-secret/
+  # so FileConfigProvider can read credentials from files.
   # Create with: teller run --config teller/.teller-kafka-connect.yml -- bash -c '...'
   # See teller/.teller-kafka-connect.yml for instructions.
-  externalConfiguration:
-    volumes:
-      - name: connect-secret
-        secret:
-          secretName: kafka-connect-secret
+  template:
+    pod:
+      volumes:
+        - name: connect-secret
+          secret:
+            secretName: kafka-connect-secret
+    connectContainer:
+      volumeMounts:
+        - name: connect-secret
+          mountPath: /opt/kafka/external-configuration/connect-secret
 
   resources:
     requests:
