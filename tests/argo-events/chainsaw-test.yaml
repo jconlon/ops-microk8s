@@ -150,7 +150,7 @@ spec:
               STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
                 -X POST http://192.168.0.221:12000/push \
                 -H 'Content-Type: application/json' \
-                -d '{"repo":"test","commit":"abc123"}' 2>/dev/null)
+                -d '{"repo":"test","commit":"abc123","image":"test:latest","service":"health-check","spec-repo-url":"","spec-manifest":""}' 2>/dev/null)
               [ "$STATUS" = "200" ] || { echo "Expected 200, got: $STATUS"; exit 1; }
               echo "Webhook endpoint returned 200"
 
@@ -169,7 +169,7 @@ spec:
               COMMIT=$(date +%s)
               curl -sf -X POST http://192.168.0.221:12000/push \
                 -H 'Content-Type: application/json' \
-                -d "{\"repo\":\"https://github.com/jconlon/test\",\"commit\":\"${COMMIT}\",\"image\":\"registry.verticon.com/library/test:${COMMIT}\",\"spec-repo-url\":\"\",\"spec-manifest\":\"\"}" \
+                -d "{\"repo\":\"https://github.com/jconlon/test\",\"commit\":\"${COMMIT}\",\"image\":\"registry.verticon.com/library/test:${COMMIT}\",\"service\":\"git-push-test\",\"spec-repo-url\":\"\",\"spec-manifest\":\"\"}" \
                 > /dev/null 2>&1
 
               # Poll for a new workflow (up to 60s)
