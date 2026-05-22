@@ -1,0 +1,78 @@
+---
+# JDBC Source Connector — polls v_freshrss_entries view on the PostgreSQL read
+# replica using timestamp+incrementing watermark and routes all records to
+# freshrss.articles.raw via a RegexRouter SMT.
+#
+# Prerequisites:
+#   - kafka-connect-secret must exist in kafka-system (see teller/.teller-kafka-connect.yml)
+#   - v_freshrss_entries view must exist in the freshrss database
+#   - Topic freshrss.articles.raw must exist (or auto-create enabled)
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: freshrss-jdbc-source
+  namespace: kafka-system
+  labels:
+    strimzi.io/cluster: kafka-connect
+spec:
+  class: io.confluent.connect.jdbc.JdbcSourceConnector
+  tasksMax: 1
+  config:
+    connection.url: "jdbc:postgresql://production-postgresql-ro.postgresql-system.svc.cluster.local:5432/freshrss"
+    connection.user: "freshrss"
+    connection.password: "${file:/opt/kafka/external-configuration/connect-secret/DB_PASSWORD:DB_PASSWORD}"
+    mode: "timestamp+incrementing"
+    timestamp.column.name: "added_date"
+    incrementing.column.name: "id"
+    table.whitelist: "v_freshrss_entries"
+    topic.prefix: ""
+    poll.interval.ms: "60000"
+    batch.max.rows: "500"
+    # Route v_freshrss_entries → freshrss.articles.raw
+    transforms: "topicRoute"
+    transforms.topicRoute.type: "org.apache.kafka.connect.transforms.RegexRouter"
+    transforms.topicRoute.regex: ".*"
+    transforms.topicRoute.replacement: "freshrss.articles.raw"
+    key.converter: "org.apache.kafka.connect.storage.StringConverter"
+    value.converter: "io.confluent.connect.avro.AvroConverter"
+    value.converter.schema.registry.url: "http://schema-registry.kafka-system.svc:8081"
+
+---
+# S3 Sink Connector — consumes atom.entries Avro records and writes to Ceph RGW
+# with time-based partitioning: atom-entries/year=YYYY/month=MM/day=dd/
+#
+# Prerequisites:
+#   - kafka-connect-secret must contain AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+#   - S3 bucket atom-entries must exist in Ceph RGW (s3.verticon.com)
+#   - Topic atom.entries must exist and contain Avro-serialized records
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: atom-entries-s3-sink
+  namespace: kafka-system
+  labels:
+    strimzi.io/cluster: kafka-connect
+spec:
+  class: io.confluent.connect.s3.S3SinkConnector
+  tasksMax: 1
+  config:
+    topics: "atom.entries"
+    s3.region: "us-east-1"
+    s3.bucket.name: "atom-entries"
+    s3.endpoint: "https://s3.verticon.com"
+    s3.path.style.access: "true"
+    aws.access.key.id: "${file:/opt/kafka/external-configuration/connect-secret/AWS_ACCESS_KEY_ID:AWS_ACCESS_KEY_ID}"
+    aws.secret.access.key: "${file:/opt/kafka/external-configuration/connect-secret/AWS_SECRET_ACCESS_KEY:AWS_SECRET_ACCESS_KEY}"
+    storage.class: "io.confluent.connect.s3.storage.S3Storage"
+    format.class: "io.confluent.connect.s3.format.avro.AvroFormat"
+    flush.size: "1000"
+    rotate.schedule.interval.ms: "3600000"
+    partitioner.class: "io.confluent.connect.storage.partitioner.TimeBasedPartitioner"
+    path.format: "'year'=YYYY/'month'=MM/'day'=dd"
+    locale: "en_US"
+    timezone: "UTC"
+    timestamp.extractor: "RecordField"
+    timestamp.field: "added_date"
+    schema.compatibility: "FULL"
+    value.converter: "io.confluent.connect.avro.AvroConverter"
+    value.converter.schema.registry.url: "http://schema-registry.kafka-system.svc:8081"

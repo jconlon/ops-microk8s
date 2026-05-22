@@ -1,0 +1,69 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  name: kafka-connect
+  namespace: kafka-system
+  annotations:
+    # Enable KafkaConnector CRs to manage connectors declaratively
+    strimzi.io/use-connector-resources: "true"
+spec:
+  version: 3.8.0
+  replicas: 2
+  bootstrapServers: kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092
+
+  # Strimzi builds a custom image with the listed plugins and pushes to Harbor.
+  # The build runs as a Pod in kafka-system using kaniko; re-triggers when
+  # the plugins list changes.
+  build:
+    output:
+      type: docker
+      image: registry.verticon.com/library/kafka-connect:latest
+      pushSecret: harbor-credentials
+    plugins:
+      - name: kafka-connect-jdbc
+        artifacts:
+          - type: zip
+            url: https://d1i4a15mxbxib1.cloudfront.net/api/plugins/confluentinc/kafka-connect-jdbc/versions/10.7.6/confluentinc-kafka-connect-jdbc-10.7.6.zip
+          # PostgreSQL JDBC driver (not bundled in the connector zip)
+          - type: jar
+            url: https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar
+      - name: kafka-connect-s3
+        artifacts:
+          - type: zip
+            url: https://d1i4a15mxbxib1.cloudfront.net/api/plugins/confluentinc/kafka-connect-s3/versions/10.5.17/confluentinc-kafka-connect-s3-10.5.17.zip
+      - name: kafka-connect-avro-converter
+        artifacts:
+          - type: zip
+            url: https://d1i4a15mxbxib1.cloudfront.net/api/plugins/confluentinc/kafka-connect-avro-converter/versions/7.7.1/confluentinc-kafka-connect-avro-converter-7.7.1.zip
+
+  config:
+    group.id: kafka-connect-cluster
+    offset.storage.topic: kafka-connect-cluster-offsets
+    config.storage.topic: kafka-connect-cluster-configs
+    status.storage.topic: kafka-connect-cluster-status
+    offset.storage.replication.factor: "3"
+    config.storage.replication.factor: "3"
+    status.storage.replication.factor: "3"
+    # Default converters — overridden per-connector where needed
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    value.converter: io.confluent.connect.avro.AvroConverter
+    value.converter.schema.registry.url: http://schema-registry.kafka-system.svc:8081
+    # FileConfigProvider — reads credentials from mounted secret files
+    config.providers: file
+    config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
+
+  # Mounts kafka-connect-secret at /opt/kafka/external-configuration/connect-secret/
+  # Create with: teller run --config teller/.teller-kafka-connect.yml -- bash -c '...'
+  # See teller/.teller-kafka-connect.yml for instructions.
+  externalConfiguration:
+    volumes:
+      - name: connect-secret
+        secret:
+          secretName: kafka-connect-secret
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
