@@ -20,7 +20,7 @@ spec:
   config:
     connection.url: "jdbc:postgresql://production-postgresql-ro.postgresql-system.svc.cluster.local:5432/freshrss"
     connection.user: "freshrss"
-    connection.password: "${file:/opt/kafka/external-configuration/connect-secret/DB_PASSWORD:DB_PASSWORD}"
+    connection.password: "${file:/mnt/connect-secret/DB_PASSWORD:DB_PASSWORD}"
     mode: "timestamp+incrementing"
     timestamp.column.name: "added_date"
     incrementing.column.name: "id"
@@ -57,8 +57,8 @@ spec:
   tasksMax: 1
   config:
     topics: "atom.entries"
-    aws.access.key.id: "${file:/opt/kafka/external-configuration/connect-secret/AWS_ACCESS_KEY_ID:AWS_ACCESS_KEY_ID}"
-    aws.secret.access.key: "${file:/opt/kafka/external-configuration/connect-secret/AWS_SECRET_ACCESS_KEY:AWS_SECRET_ACCESS_KEY}"
+    aws.access.key.id: "${file:/mnt/connect-secret/AWS_ACCESS_KEY_ID:AWS_ACCESS_KEY_ID}"
+    aws.secret.access.key: "${file:/mnt/connect-secret/AWS_SECRET_ACCESS_KEY:AWS_SECRET_ACCESS_KEY}"
     aws.s3.bucket.name: "atom-entries"
     aws.s3.region: "us-east-1"
     aws.s3.endpoint: "https://s3.verticon.com"

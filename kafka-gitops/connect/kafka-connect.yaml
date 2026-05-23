@@ -80,7 +80,7 @@ spec:
     connectContainer:
       volumeMounts:
         - name: connect-secret
-          mountPath: /opt/kafka/external-configuration/connect-secret
+          mountPath: /mnt/connect-secret
 
   resources:
     requests:
