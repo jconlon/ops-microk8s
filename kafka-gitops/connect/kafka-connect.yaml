@@ -52,10 +52,10 @@ spec:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter.schemas.enable: "false"
-    # DirectoryConfigProvider — reads Kubernetes-mounted secret files from a directory.
-    # Each secret key becomes a file; ${directory:/mnt/connect-secret:KEY} reads the file.
-    config.providers: directory
-    config.providers.directory.class: org.apache.kafka.common.config.provider.DirectoryConfigProvider
+    # EnvVarConfigProvider (Strimzi-bundled) — resolves ${env:KEY} from pod env vars.
+    # Env vars are available at validation time unlike file-based providers.
+    config.providers: env
+    config.providers.env.class: io.strimzi.kafka.EnvVarConfigProvider
 
   # Mounts kafka-connect-secret at /opt/kafka/external-configuration/connect-secret/
   # so FileConfigProvider can read credentials from files.
@@ -72,15 +72,23 @@ spec:
                     operator: NotIn
                     values:
                       - tuna
-    pod:
-      volumes:
-        - name: connect-secret
-          secret:
-            secretName: kafka-connect-secret
     connectContainer:
-      volumeMounts:
-        - name: connect-secret
-          mountPath: /mnt/connect-secret
+      env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kafka-connect-secret
+              key: DB_PASSWORD
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kafka-connect-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kafka-connect-secret
+              key: AWS_SECRET_ACCESS_KEY
 
   resources:
     requests:
