@@ -52,25 +52,22 @@ spec:
           echo "Both worker pods running ($RUNNING/2)"
 
   - name: avro-converter-plugin-loaded
-    description: Avro converter plugin JARs are present in /opt/kafka/plugins/kafka-connect-avro-converter/
+    description: AvroConverter plugin directory has all 8 JARs and worker registered the converter class
     try:
     - script:
         content: |
-          JARS=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
-            ls /opt/kafka/plugins/kafka-connect-avro-converter/ 2>/dev/null)
-          [ -n "$JARS" ] || { echo "Plugin directory empty or missing"; exit 1; }
-          echo "$JARS" | grep -q "kafka-connect-avro-converter" || {
-            echo "kafka-connect-avro-converter JAR missing. Found: $JARS"; exit 1; }
-          echo "$JARS" | grep -q "kafka-connect-avro-data" || {
-            echo "kafka-connect-avro-data JAR missing. Found: $JARS"; exit 1; }
-          echo "$JARS" | grep -q "kafka-schema-registry-client" || {
-            echo "kafka-schema-registry-client JAR missing. Found: $JARS"; exit 1; }
-          echo "$JARS" | grep -q "kafka-schema-converter" || {
-            echo "kafka-schema-converter JAR missing. Found: $JARS"; exit 1; }
-          echo "$JARS" | grep -q "avro-" || {
-            echo "avro JAR missing. Found: $JARS"; exit 1; }
-          echo "Avro converter plugin JARs confirmed:"
-          echo "$JARS"
+          # Strimzi stores plugin JARs with hash-based filenames — check count not names
+          COUNT=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+            ls /opt/kafka/plugins/kafka-connect-avro-converter/ 2>/dev/null | wc -l)
+          [ "$COUNT" -ge 8 ] || {
+            echo "Expected >= 8 JARs in avro-converter plugin dir, got: $COUNT"; exit 1; }
+          echo "Avro converter plugin dir has $COUNT JARs"
+
+          # Verify the worker startup log registered io.confluent.connect.avro.AvroConverter
+          kubectl logs -n kafka-system kafka-connect-connect-0 2>/dev/null \
+            | grep -q "io.confluent.connect.avro.AvroConverter" || {
+            echo "AvroConverter not found in worker startup log"; exit 1; }
+          echo "AvroConverter registered in worker log"
 
   - name: freshrss-jdbc-source-running
     description: freshrss-jdbc-source connector is Ready and RUNNING
