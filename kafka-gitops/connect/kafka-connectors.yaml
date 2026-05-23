@@ -25,6 +25,7 @@ spec:
     timestamp.column.name: "added_date"
     incrementing.column.name: "id"
     table.whitelist: "v_freshrss_entries"
+    table.types: "TABLE,VIEW"
     topic.prefix: ""
     poll.interval.ms: "60000"
     batch.max.rows: "500"
