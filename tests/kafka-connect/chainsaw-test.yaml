@@ -3,7 +3,7 @@ kind: Test
 metadata:
   name: kafka-connect-healthy
 spec:
-  description: Kafka Connect cluster is ready and both connectors (freshrss-jdbc-source, atom-entries-s3-sink) are RUNNING
+  description: Kafka Connect cluster is ready, Avro converter plugin is loaded, and both connectors are RUNNING with correct converter config
   concurrent: false
   timeouts:
     assert: 5m
@@ -51,6 +51,25 @@ spec:
           [ "$RUNNING" -eq 2 ] || { echo "Expected 2 running pods, got: $RUNNING"; exit 1; }
           echo "Both worker pods running ($RUNNING/2)"
 
+  - name: avro-converter-plugin-loaded
+    description: Avro converter plugin JARs are present in /opt/kafka/plugins/kafka-connect-avro-converter/
+    try:
+    - script:
+        content: |
+          JARS=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+            ls /opt/kafka/plugins/kafka-connect-avro-converter/ 2>/dev/null)
+          [ -n "$JARS" ] || { echo "Plugin directory empty or missing"; exit 1; }
+          echo "$JARS" | grep -q "kafka-connect-avro-converter" || {
+            echo "kafka-connect-avro-converter JAR missing. Found: $JARS"; exit 1; }
+          echo "$JARS" | grep -q "kafka-connect-avro-data" || {
+            echo "kafka-connect-avro-data JAR missing. Found: $JARS"; exit 1; }
+          echo "$JARS" | grep -q "kafka-schema-registry-client" || {
+            echo "kafka-schema-registry-client JAR missing. Found: $JARS"; exit 1; }
+          echo "$JARS" | grep -q "avro-" || {
+            echo "avro JAR missing. Found: $JARS"; exit 1; }
+          echo "Avro converter plugin JARs confirmed:"
+          echo "$JARS"
+
   - name: freshrss-jdbc-source-running
     description: freshrss-jdbc-source connector is Ready and RUNNING
     try:
@@ -77,8 +96,27 @@ spec:
           [ "$STATE" = "RUNNING" ] || { echo "Connector state not RUNNING: $STATE"; exit 1; }
           echo "atom-entries-s3-sink: Ready=$READY state=$STATE"
 
+  - name: connector-converter-config
+    description: atom-entries-s3-sink uses AvroConverter; freshrss-jdbc-source uses JsonConverter
+    try:
+    - script:
+        content: |
+          SINK_CFG=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+            curl -sf http://localhost:8083/connectors/atom-entries-s3-sink/config 2>/dev/null)
+          echo "$SINK_CFG" | grep -q '"value.converter":"io.confluent.connect.avro.AvroConverter"' || {
+            echo "atom-entries-s3-sink not using AvroConverter. Config: $SINK_CFG"; exit 1; }
+          echo "$SINK_CFG" | grep -q '"value.converter.schema.registry.url"' || {
+            echo "atom-entries-s3-sink missing schema.registry.url. Config: $SINK_CFG"; exit 1; }
+          echo "atom-entries-s3-sink: value.converter=AvroConverter, schema.registry.url present"
+
+          SRC_CFG=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+            curl -sf http://localhost:8083/connectors/freshrss-jdbc-source/config 2>/dev/null)
+          echo "$SRC_CFG" | grep -q '"value.converter":"org.apache.kafka.connect.json.JsonConverter"' || {
+            echo "freshrss-jdbc-source not using JsonConverter. Config: $SRC_CFG"; exit 1; }
+          echo "freshrss-jdbc-source: value.converter=JsonConverter"
+
   - name: connect-rest-api-reachable
-    description: Connect REST API lists both connectors
+    description: Connect REST API lists both connectors as RUNNING
     try:
     - script:
         content: |
