@@ -35,9 +35,24 @@ spec:
         artifacts:
           - type: zip
             url: https://github.com/Aiven-Open/cloud-storage-connectors-for-apache-kafka/releases/download/v3.4.2/s3-sink-connector-for-apache-kafka-3.4.2.zip
-      # TODO: add Avro converter with full dependency set (tracked in GitHub issue)
-      # kafka-connect-avro-converter is a thin JAR requiring many transitive deps;
-      # ship JSON converter for now and add Avro support as a follow-up.
+      # Confluent Avro converter — bundled with all transitive deps as separate JARs
+      # because the kafka-connect-avro-converter dist is a thin wrapper (~9KB) with
+      # no bundled dependencies. avro-1.11.3 sourced from Maven Central; remainder
+      # from packages.confluent.io/maven/ (all confirmed 200).
+      - name: kafka-connect-avro-converter
+        artifacts:
+          - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-connect-avro-converter/7.7.1/kafka-connect-avro-converter-7.7.1.jar
+          - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-connect-avro-data/7.7.1/kafka-connect-avro-data-7.7.1.jar
+          - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-avro-serializer/7.7.1/kafka-avro-serializer-7.7.1.jar
+          - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/7.7.1/kafka-schema-registry-client-7.7.1.jar
+          - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-schema-serializer/7.7.1/kafka-schema-serializer-7.7.1.jar
+          - type: jar
+            url: https://repo1.maven.org/maven2/org/apache/avro/avro/1.11.3/avro-1.11.3.jar
 
   config:
     group.id: kafka-connect-cluster
