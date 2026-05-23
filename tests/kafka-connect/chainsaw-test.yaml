@@ -1,0 +1,99 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: kafka-connect-healthy
+spec:
+  description: Kafka Connect cluster is ready and both connectors (freshrss-jdbc-source, atom-entries-s3-sink) are RUNNING
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 60s
+
+  steps:
+
+  - name: argocd-app-synced
+    description: kafka-connect ArgoCD application is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: kafka-connect
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: kafkaconnect-cr-ready
+    description: KafkaConnect CR is Ready with 2 replicas
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get kafkaconnect kafka-connect -n kafka-system \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+          REPLICAS=$(kubectl get kafkaconnect kafka-connect -n kafka-system \
+            -o jsonpath='{.status.replicas}' 2>/dev/null)
+          [ "$READY" = "True" ] || { echo "KafkaConnect not Ready: $READY"; exit 1; }
+          [ "$REPLICAS" = "2" ] || { echo "Expected 2 replicas, got: $REPLICAS"; exit 1; }
+          echo "KafkaConnect Ready, replicas: $REPLICAS"
+
+  - name: worker-pods-running
+    description: Both Connect worker pods are Running
+    try:
+    - script:
+        content: |
+          RUNNING=$(kubectl get pods -n kafka-system \
+            -l strimzi.io/name=kafka-connect-connect \
+            --no-headers 2>/dev/null | grep -c "Running")
+          [ "$RUNNING" -eq 2 ] || { echo "Expected 2 running pods, got: $RUNNING"; exit 1; }
+          echo "Both worker pods running ($RUNNING/2)"
+
+  - name: freshrss-jdbc-source-running
+    description: freshrss-jdbc-source connector is Ready and RUNNING
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get kafkaconnector freshrss-jdbc-source -n kafka-system \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+          STATE=$(kubectl get kafkaconnector freshrss-jdbc-source -n kafka-system \
+            -o jsonpath='{.status.connectorStatus.connector.state}' 2>/dev/null)
+          [ "$READY" = "True" ] || { echo "Connector not Ready: $READY"; exit 1; }
+          [ "$STATE" = "RUNNING" ] || { echo "Connector state not RUNNING: $STATE"; exit 1; }
+          echo "freshrss-jdbc-source: Ready=$READY state=$STATE"
+
+  - name: atom-entries-s3-sink-running
+    description: atom-entries-s3-sink connector is Ready and RUNNING
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get kafkaconnector atom-entries-s3-sink -n kafka-system \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+          STATE=$(kubectl get kafkaconnector atom-entries-s3-sink -n kafka-system \
+            -o jsonpath='{.status.connectorStatus.connector.state}' 2>/dev/null)
+          [ "$READY" = "True" ] || { echo "Connector not Ready: $READY"; exit 1; }
+          [ "$STATE" = "RUNNING" ] || { echo "Connector state not RUNNING: $STATE"; exit 1; }
+          echo "atom-entries-s3-sink: Ready=$READY state=$STATE"
+
+  - name: connect-rest-api-reachable
+    description: Connect REST API lists both connectors
+    try:
+    - script:
+        content: |
+          CONNECTORS=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+            curl -sf http://localhost:8083/connectors 2>/dev/null)
+          echo "$CONNECTORS" | grep -q "freshrss-jdbc-source" || {
+            echo "freshrss-jdbc-source missing from REST API: $CONNECTORS"; exit 1; }
+          echo "$CONNECTORS" | grep -q "atom-entries-s3-sink" || {
+            echo "atom-entries-s3-sink missing from REST API: $CONNECTORS"; exit 1; }
+          echo "REST API lists both connectors: $CONNECTORS"
+
+          for CONN in freshrss-jdbc-source atom-entries-s3-sink; do
+            STATUS=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
+              curl -sf "http://localhost:8083/connectors/$CONN/status" 2>/dev/null)
+            echo "$STATUS" | grep -q '"state":"RUNNING"' || {
+              echo "$CONN REST state not RUNNING: $STATUS"; exit 1; }
+            echo "$CONN REST state: RUNNING"
+          done

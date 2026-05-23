@@ -385,6 +385,10 @@ music-docs:
 test-freshrss:
     chainsaw test tests/freshrss
 
+# Run Kafka Connect chainsaw tests
+test-kafka-connect:
+    chainsaw test tests/kafka-connect
+
 # Open the PostgreSQL databases reference in a browser
 postgresql-docs:
     xdg-open docs/postgresql.html
