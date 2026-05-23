@@ -52,9 +52,10 @@ spec:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter.schemas.enable: "false"
-    # FileConfigProvider — reads credentials from mounted secret files
-    config.providers: file
-    config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider
+    # DirectoryConfigProvider — reads Kubernetes-mounted secret files from a directory.
+    # Each secret key becomes a file; ${directory:/mnt/connect-secret:KEY} reads the file.
+    config.providers: directory
+    config.providers.directory.class: org.apache.kafka.common.config.provider.DirectoryConfigProvider
 
   # Mounts kafka-connect-secret at /opt/kafka/external-configuration/connect-secret/
   # so FileConfigProvider can read credentials from files.
