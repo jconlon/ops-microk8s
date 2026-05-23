@@ -35,11 +35,9 @@ spec:
         artifacts:
           - type: zip
             url: https://github.com/Aiven-Open/cloud-storage-connectors-for-apache-kafka/releases/download/v3.4.2/s3-sink-connector-for-apache-kafka-3.4.2.zip
-      # Confluent Avro converter — served from packages.confluent.io/maven/
-      - name: kafka-connect-avro-converter
-        artifacts:
-          - type: jar
-            url: https://packages.confluent.io/maven/io/confluent/kafka-connect-avro-converter/7.7.1/kafka-connect-avro-converter-7.7.1.jar
+      # TODO: add Avro converter with full dependency set (tracked in GitHub issue)
+      # kafka-connect-avro-converter is a thin JAR requiring many transitive deps;
+      # ship JSON converter for now and add Avro support as a follow-up.
 
   config:
     group.id: kafka-connect-cluster
@@ -49,10 +47,11 @@ spec:
     offset.storage.replication.factor: "3"
     config.storage.replication.factor: "3"
     status.storage.replication.factor: "3"
-    # Default converters — overridden per-connector where needed
+    # Default converters — use built-in JSON to keep worker startup simple.
+    # Individual connectors override with Avro once Avro deps are fully bundled.
     key.converter: org.apache.kafka.connect.storage.StringConverter
-    value.converter: io.confluent.connect.avro.AvroConverter
-    value.converter.schema.registry.url: http://schema-registry.kafka-system.svc:8081
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter.schemas.enable: "false"
     # FileConfigProvider — reads credentials from mounted secret files
     config.providers: file
     config.providers.file.class: org.apache.kafka.common.config.provider.FileConfigProvider

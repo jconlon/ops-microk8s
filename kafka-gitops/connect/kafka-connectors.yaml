@@ -34,8 +34,8 @@ spec:
     transforms.topicRoute.regex: ".*"
     transforms.topicRoute.replacement: "freshrss.articles.raw"
     key.converter: "org.apache.kafka.connect.storage.StringConverter"
-    value.converter: "io.confluent.connect.avro.AvroConverter"
-    value.converter.schema.registry.url: "http://schema-registry.kafka-system.svc:8081"
+    value.converter: "org.apache.kafka.connect.json.JsonConverter"
+    value.converter.schemas.enable: "false"
 
 ---
 # S3 Sink Connector — consumes atom.entries Avro records and writes to Ceph RGW
@@ -63,10 +63,10 @@ spec:
     aws.s3.region: "us-east-1"
     aws.s3.endpoint: "https://s3.verticon.com"
     aws.s3.path.style.access.enabled: "true"
-    format.output.type: "avro"
+    format.output.type: "json"
     file.compression.type: "none"
     file.name.prefix: ""
     file.name.template: "{{topic}}/year={{_time:YYYY}}/month={{_time:MM}}/day={{_time:dd}}/{{partition}}-{{start_offset}}"
     key.converter: "org.apache.kafka.connect.storage.StringConverter"
-    value.converter: "io.confluent.connect.avro.AvroConverter"
-    value.converter.schema.registry.url: "http://schema-registry.kafka-system.svc:8081"
+    value.converter: "org.apache.kafka.connect.json.JsonConverter"
+    value.converter.schemas.enable: "false"
