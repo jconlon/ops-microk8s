@@ -26,6 +26,7 @@ spec:
     incrementing.column.name: "entry_id"
     table.whitelist: "v_freshrss_entries"
     table.types: "TABLE,VIEW"
+    validate.non.null: "false"
     topic.prefix: ""
     poll.interval.ms: "60000"
     batch.max.rows: "500"
