@@ -3,7 +3,7 @@ kind: Test
 metadata:
   name: kafka-connect-healthy
 spec:
-  description: Kafka Connect cluster is ready, Avro converter plugin is loaded, and both connectors are RUNNING with correct converter config
+  description: Kafka Connect cluster is ready, Avro converter plugin is loaded, and both connectors are RUNNING with AvroConverter + Schema Registry
   concurrent: false
   timeouts:
     assert: 5m
@@ -111,9 +111,11 @@ spec:
 
           SRC_CFG=$(kubectl exec -n kafka-system kafka-connect-connect-0 -- \
             curl -sf http://localhost:8083/connectors/freshrss-jdbc-source/config 2>/dev/null)
-          echo "$SRC_CFG" | grep -q '"value.converter":"org.apache.kafka.connect.json.JsonConverter"' || {
-            echo "freshrss-jdbc-source not using JsonConverter. Config: $SRC_CFG"; exit 1; }
-          echo "freshrss-jdbc-source: value.converter=JsonConverter"
+          echo "$SRC_CFG" | grep -q '"value.converter":"io.confluent.connect.avro.AvroConverter"' || {
+            echo "freshrss-jdbc-source not using AvroConverter. Config: $SRC_CFG"; exit 1; }
+          echo "$SRC_CFG" | grep -q '"value.converter.schema.registry.url"' || {
+            echo "freshrss-jdbc-source missing schema.registry.url. Config: $SRC_CFG"; exit 1; }
+          echo "freshrss-jdbc-source: value.converter=AvroConverter, schema.registry.url present"
 
   - name: connect-rest-api-reachable
     description: Connect REST API lists both connectors as RUNNING

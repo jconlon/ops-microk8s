@@ -34,8 +34,8 @@ spec:
     transforms.topicRoute.regex: ".*"
     transforms.topicRoute.replacement: "freshrss.articles.raw"
     key.converter: "org.apache.kafka.connect.storage.StringConverter"
-    value.converter: "org.apache.kafka.connect.json.JsonConverter"
-    value.converter.schemas.enable: "false"
+    value.converter: "io.confluent.connect.avro.AvroConverter"
+    value.converter.schema.registry.url: "http://192.168.0.214:8081"
 
 ---
 # S3 Sink Connector — consumes atom.entries Avro records and writes to Ceph RGW
