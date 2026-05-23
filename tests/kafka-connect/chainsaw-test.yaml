@@ -65,6 +65,8 @@ spec:
             echo "kafka-connect-avro-data JAR missing. Found: $JARS"; exit 1; }
           echo "$JARS" | grep -q "kafka-schema-registry-client" || {
             echo "kafka-schema-registry-client JAR missing. Found: $JARS"; exit 1; }
+          echo "$JARS" | grep -q "kafka-schema-converter" || {
+            echo "kafka-schema-converter JAR missing. Found: $JARS"; exit 1; }
           echo "$JARS" | grep -q "avro-" || {
             echo "avro JAR missing. Found: $JARS"; exit 1; }
           echo "Avro converter plugin JARs confirmed:"

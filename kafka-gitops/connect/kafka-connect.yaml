@@ -46,6 +46,8 @@ spec:
           - type: jar
             url: https://packages.confluent.io/maven/io/confluent/kafka-connect-avro-data/7.7.1/kafka-connect-avro-data-7.7.1.jar
           - type: jar
+            url: https://packages.confluent.io/maven/io/confluent/kafka-schema-converter/7.7.1/kafka-schema-converter-7.7.1.jar
+          - type: jar
             url: https://packages.confluent.io/maven/io/confluent/kafka-avro-serializer/7.7.1/kafka-avro-serializer-7.7.1.jar
           - type: jar
             url: https://packages.confluent.io/maven/io/confluent/kafka-schema-registry-client/7.7.1/kafka-schema-registry-client-7.7.1.jar
@@ -53,6 +55,8 @@ spec:
             url: https://packages.confluent.io/maven/io/confluent/kafka-schema-serializer/7.7.1/kafka-schema-serializer-7.7.1.jar
           - type: jar
             url: https://repo1.maven.org/maven2/org/apache/avro/avro/1.11.3/avro-1.11.3.jar
+          - type: jar
+            url: https://repo1.maven.org/maven2/org/apache/commons/commons-compress/1.26.0/commons-compress-1.26.0.jar
 
   config:
     group.id: kafka-connect-cluster
