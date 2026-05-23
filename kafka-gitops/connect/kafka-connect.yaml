@@ -11,6 +11,14 @@ spec:
   replicas: 2
   bootstrapServers: kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092
 
+  logging:
+    type: inline
+    loggers:
+      log4j.rootLogger: "INFO"
+      log4j.logger.io.aiven.connect.jdbc: "INFO"
+      log4j.logger.io.aiven.kafka.connect.s3: "INFO"
+      log4j.logger.org.apache.kafka.connect.runtime.WorkerTask: "INFO"
+
   # Strimzi builds a custom image with the listed plugins and pushes to Harbor.
   # The build runs as a Pod in kafka-system using kaniko; re-triggers when
   # the plugins list changes.
