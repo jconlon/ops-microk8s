@@ -89,16 +89,6 @@ spec:
   # Create with: teller run --config teller/.teller-kafka-connect.yml -- bash -c '...'
   # See teller/.teller-kafka-connect.yml for instructions.
   template:
-    buildPod:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: NotIn
-                    values:
-                      - tuna
     connectContainer:
       env:
         - name: DB_PASSWORD
