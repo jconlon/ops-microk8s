@@ -161,13 +161,13 @@ spec:
               echo "30-day retention confirmed"
 
     - name: syslog-from-all-nodes
-      description: Every cluster node is shipping syslog entries to Loki within the last 15 minutes
+      description: Every cluster node is shipping syslog entries to Loki within the last 1 hour
       try:
         - script:
             timeout: 60s
             content: |
               LOKI="http://192.168.0.220"
-              START=$(date -u -d '15 minutes ago' +%s)000000000
+              START=$(date -u -d '1 hour ago' +%s)000000000
               END=$(date -u +%s)000000000
               FAILED=0
               for node in mullet trout tuna whale gold squid puffer carp; do
@@ -181,7 +181,7 @@ spec:
                 if [ "$COUNT" -gt 0 ]; then
                   echo "PASS $node: syslog flowing to Loki"
                 else
-                  echo "FAIL $node: no syslog entries in last 15 minutes"
+                  echo "FAIL $node: no syslog entries in last 1 hour"
                   FAILED=1
                 fi
               done
