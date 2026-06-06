@@ -18,6 +18,14 @@ configuration:
   # Annotate nodes being rebooted for visibility
   annotateNodes: true
 
+# Memory limit to contain the kured memory leak (issue #101).
+# OOMKill + DaemonSet restart is preferable to nodes swapping.
+resources:
+  limits:
+    memory: 64Mi
+  requests:
+    memory: 16Mi
+
 # Run on all nodes including control plane
 tolerations:
   - key: node-role.kubernetes.io/control-plane
