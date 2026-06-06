@@ -88,6 +88,17 @@ monitoring:
     labels:
       release: prometheus-stack
 
+# Chunks cache (Memcached) — chart default is 9830Mi which is excessive for this cluster.
+# Reduced to 2GiB; allocatedMemory must stay below the memory limit.
+chunksCache:
+  allocatedMemory: 2048
+  resources:
+    limits:
+      memory: 2500Mi
+    requests:
+      cpu: 500m
+      memory: 2500Mi
+
 # Disable built-in tests (they require kubectl exec access we don't need)
 test:
   enabled: false
