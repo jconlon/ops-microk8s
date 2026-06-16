@@ -131,7 +131,27 @@ Follow these steps in order to safely shut down the cluster:
 
 ### Phase 1: Application Shutdown
 
-#### 1.1 Scale Down Non-Critical Workloads (Optional)
+#### 1.1 Gracefully Stop Kafka (REQUIRED — do NOT skip)
+
+> **Critical**: Kafka uses KRaft (Raft-based metadata consensus). If Kafka brokers are killed abruptly (SIGKILL via node reboot), the KRaft metadata log is left in an inconsistent mid-write state. Recovery requires deleting all broker PVCs and restarting from scratch (all topic data lost).
+
+```bash
+# Gracefully delete Kafka broker pods — sends SIGTERM so brokers flush and checkpoint cleanly
+# Do NOT use --force --grace-period=0 here
+kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system
+
+# Wait for pods to terminate (Strimzi will not recreate them while reconciliation is paused)
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true
+kubectl wait --for=delete pod/kafka-kafka-0 pod/kafka-kafka-1 pod/kafka-kafka-2 -n kafka-system --timeout=120s
+
+# Verify brokers are stopped
+kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka
+```
+
+**Expected Output**: No kafka-kafka-* pods.
+
+#### 1.2 Scale Down Non-Critical Workloads (Optional)
 
 ```bash
 # Pause ArgoCD auto-sync to prevent reconciliation during maintenance
@@ -141,7 +161,7 @@ devbox run -- argocd app set <app-name> --sync-policy none
 kubectl patch application <app-name> -n argocd -p '{"spec":{"syncPolicy":null}}'
 ```
 
-#### 1.2 Cordon All Nodes
+#### 1.3 Cordon All Nodes
 
 Prevent new pods from being scheduled:
 
@@ -200,6 +220,8 @@ kubectl get pods -n postgresql-system -w
 ### Phase 3: Node Shutdown Sequence
 
 Drain and shutdown nodes one at a time, starting with worker nodes:
+
+> **Note**: SSH keys are not available in Claude Code sessions. When Claude guides a shutdown, it will copy each `ssh <node> sudo shutdown -h now` command to the clipboard via `xclip` for you to paste and run in your terminal.
 
 #### 3.1 Drain Worker Nodes First
 
@@ -428,7 +450,25 @@ kubectl patch cluster production-postgresql -n postgresql-system \
 - All pods: `Running`
 - Continuous archiving: `"status": "True"`
 
-#### 5.2 Verify Database Connectivity
+#### 5.2 Resume Kafka (if stopped before shutdown)
+
+```bash
+# Resume Strimzi reconciliation (paused during shutdown)
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation-
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation-
+
+# Wait for all 3 brokers to reach Ready
+kubectl wait --for=condition=Ready pod/kafka-kafka-0 pod/kafka-kafka-1 pod/kafka-kafka-2 -n kafka-system --timeout=300s
+
+# Verify cluster is healthy
+kubectl get pods -n kafka-system
+```
+
+**Expected Output**: All 3 kafka-kafka-* pods `1/1 Running`. Downstream services (kafka-entity-operator, kafka-connect, schema-registry, argo-events) self-recover within 2-5 minutes.
+
+> **Note**: If Kafka brokers fail to form quorum (CrashLoopBackOff due to KRaft metadata corruption from an unclean shutdown), all topic data must be treated as lost. Recovery: delete all 3 broker PVCs (`kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system`), force-delete the broker pods, and resume Strimzi reconciliation. Strimzi will provision fresh empty PVCs and brokers will start clean.
+
+#### 5.3 Verify Database Connectivity
 
 ```bash
 # Get the cluster connection details
@@ -441,7 +481,7 @@ kubectl run -it --rm psql-test --image=postgres:17 --restart=Never -- \
 
 **Expected Output**: Connection successful, version information displayed.
 
-#### 5.3 Check Monitoring Stack
+#### 5.4 Check Monitoring Stack
 
 ```bash
 # Check Prometheus pods
@@ -456,7 +496,7 @@ kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80 &
 # Open http://localhost:3000 in browser
 ```
 
-#### 5.4 Check ArgoCD
+#### 5.5 Check ArgoCD
 
 ```bash
 # Login to ArgoCD
@@ -671,6 +711,35 @@ kubectl rollout restart deployment argocd-server -n argocd
 kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 ```
 
+### Kafka KRaft Metadata Corruption
+
+**Symptom**: All 3 Kafka broker pods in CrashLoopBackOff after a node restart. Logs show `OffsetOutOfRangeException` or brokers stuck in election livelock (`voteStates={0=GRANTED, 1=UNRECORDED, 2=UNRECORDED}`) with no leader forming.
+
+**Root cause**: Kafka brokers received SIGKILL (not SIGTERM) during node shutdown, leaving the KRaft metadata log (`__cluster_metadata-0`) in an inconsistent mid-write state.
+
+**Recovery** (all Kafka topic data is lost — treat as disposable):
+
+```bash
+# 1. Pause Strimzi to prevent interference
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true
+
+# 2. Force-delete broker pods and all 3 data PVCs
+kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system --force --grace-period=0
+kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system
+
+# 3. Resume Strimzi reconciliation — Strimzi provisions fresh empty PVCs and restarts brokers
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation-
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation-
+
+# 4. Monitor recovery (expect 2 restart cycles before all 3 reach 1/1 Ready, ~3-5 minutes)
+kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka -w
+```
+
+**Expected recovery time**: 3-5 minutes after step 3.
+
+**Prevention**: Always run Section 1.1 (Gracefully Stop Kafka) before any node shutdown.
+
 ### General Recovery Steps
 
 #### If Cluster Fails to Come Up Cleanly
@@ -746,6 +815,8 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 | Date | Changes | Performed By |
 |------|---------|--------------|
+| 2026-06-16 | Cluster startup after 2026-06-13 shutdown. All 8 nodes came up; Ceph HEALTH_OK after `noout` cleared; PostgreSQL recovered (primary on mullet). **Kafka KRaft recovery required**: Kafka brokers were killed by SIGKILL during the June 13 shutdown (nodes rebooted without draining Kafka first). The KRaft metadata log was left in a corrupt mid-write state causing `OffsetOutOfRangeException` on all 3 brokers. All Kafka topic data was disposable; recovery: deleted all 3 broker PVCs and force-deleted broker pods, then resumed Strimzi reconciliation — brokers provisioned fresh PVCs and formed quorum cleanly. Total Kafka recovery time: ~3 hours of troubleshooting + 10 minutes to execute. **Root cause**: Kafka was not gracefully stopped before node shutdown. Added mandatory Kafka pre-shutdown step (Section 1.1) to prevent recurrence. | jconlon / Claude Code |
+| 2026-06-13 | Graceful cluster shutdown — all nodes except mullet (trout, tuna, whale, gold, squid, puffer, carp). Pre-shutdown checks passed: Ceph HEALTH_OK, PostgreSQL healthy (primary on trout), continuous archiving active, last backup completed 25 min prior. Ceph `noout` flag set before shutdown. Nodes cordoned via kubectl then shut down via SSH (commands copied to clipboard — SSH keys not available in Claude session). K8s API became temporarily unresponsive after whale (control plane) was shut down without drain; expected behavior with dqlite HA when a member leaves abruptly. Trout (last non-mullet node) shut down directly without drain since API was unavailable. Mullet remained up throughout. **NOTE**: Kafka was NOT explicitly stopped before node shutdown — this caused KRaft metadata corruption requiring full recovery on 2026-06-16. | jconlon / Claude Code |
 | 2025-11-03 | Initial document creation | Claude Code |
 
 ---
