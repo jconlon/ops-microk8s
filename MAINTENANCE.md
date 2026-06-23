@@ -753,6 +753,56 @@ kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka -w
 
 **Prevention**: Always run Section 1.1 (Gracefully Stop Kafka) before any node shutdown.
 
+### Kafka Connect Internal Topics — cleanup.policy=delete
+
+**Symptom**: After a full Kafka PVC/PV wipe and recovery, `kafka-connect-connect-0` enters CrashLoopBackOff with:
+```
+ConfigException: Topic 'kafka-connect-cluster-offsets' supplied via the 'offset.storage.topic' property is required to have 'cleanup.policy=compact'... but found the topic currently has 'cleanup.policy=delete'.
+```
+Or the connector `atom-entries-s3-sink` shows `READY=False` with task error:
+```
+ConnectException: Failed to start task atom-entries-s3-sink-0 since it is not a recognizable type (source or sink)
+```
+
+**Root cause**: When Kafka's PVCs are wiped (during KRaft recovery), all internal topics are lost. Kafka Connect recreates them on startup but uses the Kafka broker default `cleanup.policy=delete` instead of the required `compact`. The `delete` policy can also corrupt task config records after many crash-loop restarts (records are deleted before compaction).
+
+**Fix** — alter all three internal topics to `compact`, then let Connect restart:
+
+```bash
+# Alter all three Connect internal topics to compact policy
+kubectl exec -n kafka-system kafka-kafka-0 -- /opt/kafka/bin/kafka-configs.sh \
+  --bootstrap-server localhost:9092 \
+  --entity-type topics --entity-name kafka-connect-cluster-offsets \
+  --alter --add-config 'cleanup.policy=compact'
+
+kubectl exec -n kafka-system kafka-kafka-0 -- /opt/kafka/bin/kafka-configs.sh \
+  --bootstrap-server localhost:9092 \
+  --entity-type topics --entity-name kafka-connect-cluster-configs \
+  --alter --add-config 'cleanup.policy=compact'
+
+kubectl exec -n kafka-system kafka-kafka-0 -- /opt/kafka/bin/kafka-configs.sh \
+  --bootstrap-server localhost:9092 \
+  --entity-type topics --entity-name kafka-connect-cluster-status \
+  --alter --add-config 'cleanup.policy=compact'
+
+# Verify
+kubectl exec -n kafka-system kafka-kafka-0 -- /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --describe \
+  --topic kafka-connect-cluster-offsets
+# Configs should include: cleanup.policy=compact
+
+# Connect pods will self-restart and recover; wait for 1/1 Running
+kubectl wait --for=condition=Ready pod/kafka-connect-connect-0 pod/kafka-connect-connect-1 \
+  -n kafka-system --timeout=180s
+
+# Verify connectors are Ready
+kubectl get kafkaconnector -n kafka-system
+```
+
+> **Do NOT delete the internal topics** to fix this. Deleting them while Connect is running causes Connect to immediately recreate them with `delete` policy, creating a loop. Alter in-place instead.
+
+**Expected recovery time**: ~2 minutes after altering topics.
+
 ### General Recovery Steps
 
 #### If Cluster Fails to Come Up Cleanly
@@ -828,6 +878,7 @@ kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka -w
 
 | Date | Changes | Performed By |
 |------|---------|--------------|
+| 2026-06-23 | **Post-recovery follow-up**: `just test` revealed `kafka-connect-healthy` failing — `kafka-connect-connect-0` in CrashLoopBackOff (43 restarts). Root cause: Kafka Connect internal topics (`kafka-connect-cluster-offsets`, `configs`, `status`) were recreated with `cleanup.policy=delete` after the June 23 Kafka PVC/PV wipe. Connect requires `compact` and refuses to start with `delete`. Also: `atom-entries-s3-sink` task 0 failed with "not a recognizable type (source or sink)" due to corrupted task config record from crash-loop cycling on the delete-policy topic. Fix: altered all three topics to `cleanup.policy=compact` via `kafka-configs.sh` on the broker; both Connect pods reached 1/1 Running, both connectors `READY=True`. **Do not delete internal topics to fix** — Connect immediately recreates them with delete policy. | jconlon / Claude Code |
 | 2026-06-23 | Graceful cluster shutdown and restart due to lab A/C failure. Pre-shutdown: Ceph HEALTH_OK, PostgreSQL healthy (primary on mullet, 3/3 instances), continuous archiving active, on-demand backup triggered and completed. Kafka gracefully stopped first (SIGTERM + Strimzi reconciliation paused) — no KRaft corruption. Ceph `noout` set. All nodes drained and shut down via SSH (commands clipboard-copied — no SSH keys in session). PDB-blocked pods (Ceph mgr, PostgreSQL replicas, Prometheus, AlertManager) were force-deleted to unblock drains; all had Ceph storage already offline so no data risk. Mullet kept running (control plane + Claude Code host). **Restart**: All 8 nodes came up Ready. Ceph HEALTH_OK after `noout` cleared (~2 min recovery). PostgreSQL 3/3 healthy. **Kafka recovery required**: KRaft election livelock on fresh PVCs (`voteStates={0=GRANTED,1=REJECTED}`) — root cause: `reclaimPolicy: Retain` left orphaned Released PVs from multiple recovery rounds; new PVCs entered WaitForFirstConsumer deadlock with stale PVs. Fix: deleted all Kafka PVCs, force-removed `pvc-protection` finalizers, deleted all 9 orphaned Kafka PVs, then resumed Strimzi. Brokers formed clean quorum on fresh PVCs in ~1 min. **Lesson**: Add PV cleanup step to Kafka recovery procedure — Retain policy requires manual PV deletion after PVC wipe. | jconlon / Claude Code |
 | 2026-06-16 | Cluster startup after 2026-06-13 shutdown. All 8 nodes came up; Ceph HEALTH_OK after `noout` cleared; PostgreSQL recovered (primary on mullet). **Kafka KRaft recovery required**: Kafka brokers were killed by SIGKILL during the June 13 shutdown (nodes rebooted without draining Kafka first). The KRaft metadata log was left in a corrupt mid-write state causing `OffsetOutOfRangeException` on all 3 brokers. All Kafka topic data was disposable; recovery: deleted all 3 broker PVCs and force-deleted broker pods, then resumed Strimzi reconciliation — brokers provisioned fresh PVCs and formed quorum cleanly. Total Kafka recovery time: ~3 hours of troubleshooting + 10 minutes to execute. **Root cause**: Kafka was not gracefully stopped before node shutdown. Added mandatory Kafka pre-shutdown step (Section 1.1) to prevent recurrence. | jconlon / Claude Code |
 | 2026-06-13 | Graceful cluster shutdown — all nodes except mullet (trout, tuna, whale, gold, squid, puffer, carp). Pre-shutdown checks passed: Ceph HEALTH_OK, PostgreSQL healthy (primary on trout), continuous archiving active, last backup completed 25 min prior. Ceph `noout` flag set before shutdown. Nodes cordoned via kubectl then shut down via SSH (commands copied to clipboard — SSH keys not available in Claude session). K8s API became temporarily unresponsive after whale (control plane) was shut down without drain; expected behavior with dqlite HA when a member leaves abruptly. Trout (last non-mullet node) shut down directly without drain since API was unavailable. Mullet remained up throughout. **NOTE**: Kafka was NOT explicitly stopped before node shutdown — this caused KRaft metadata corruption requiring full recovery on 2026-06-16. | jconlon / Claude Code |
