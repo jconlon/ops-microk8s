@@ -466,7 +466,7 @@ kubectl get pods -n kafka-system
 
 **Expected Output**: All 3 kafka-kafka-* pods `1/1 Running`. Downstream services (kafka-entity-operator, kafka-connect, schema-registry, argo-events) self-recover within 2-5 minutes.
 
-> **Note**: If Kafka brokers fail to form quorum (CrashLoopBackOff due to KRaft metadata corruption from an unclean shutdown), all topic data must be treated as lost. Recovery: delete all 3 broker PVCs (`kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system`), force-delete the broker pods, and resume Strimzi reconciliation. Strimzi will provision fresh empty PVCs and brokers will start clean.
+> **Note**: If Kafka brokers fail to form quorum (CrashLoopBackOff due to KRaft metadata corruption from an unclean shutdown), all topic data must be treated as lost. See the full recovery procedure in the [Kafka KRaft Metadata Corruption](#kafka-kraft-metadata-corruption) troubleshooting section — **PV cleanup is required** in addition to PVC deletion.
 
 #### 5.3 Verify Database Connectivity
 
@@ -728,6 +728,17 @@ kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reco
 kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system --force --grace-period=0
 kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system
 
+# 2a. Remove pvc-protection finalizers if PVCs are stuck Terminating
+for pvc in $(kubectl get pvc -n kafka-system -o name 2>/dev/null); do
+  kubectl patch $pvc -n kafka-system -p '{"metadata":{"finalizers":[]}}' --type=merge
+done
+
+# 2b. REQUIRED: delete all Released PVs for Kafka — rook-ceph-block uses reclaimPolicy: Retain,
+# so deleted PVCs leave orphaned Released PVs. New PVCs cannot bind (WaitForFirstConsumer
+# deadlock) until these are removed. Run after every PVC wipe.
+kubectl get pv | grep kafka-system
+kubectl delete pv $(kubectl get pv --no-headers | grep kafka-system | awk '{print $1}')
+
 # 3. Resume Strimzi reconciliation — Strimzi provisions fresh empty PVCs and restarts brokers
 kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation-
 kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation-
@@ -737,6 +748,8 @@ kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka -w
 ```
 
 **Expected recovery time**: 3-5 minutes after step 3.
+
+> **Warning**: Skipping step 2b causes new PVCs to enter a `WaitForFirstConsumer` deadlock where the CSI provisioner cannot bind new PVCs because stale Released PVs with the same RBD image IDs are still registered. Multiple recovery rounds compound the problem (9 orphaned PVs observed in practice). Always check `kubectl get pv | grep kafka-system` before resuming Strimzi.
 
 **Prevention**: Always run Section 1.1 (Gracefully Stop Kafka) before any node shutdown.
 
