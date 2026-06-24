@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: apicurio
+  namespace: postgresql-system
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: apicurio
+spec:
+  cluster:
+    name: production-postgresql
+  databaseReclaimPolicy: retain
+  ensure: present
+  name: apicurio
+  owner: apicurio

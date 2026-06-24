@@ -86,6 +86,11 @@ spec:
         login: true
         passwordSecret:
           name: harbor-role-password
+      - name: apicurio
+        ensure: present
+        login: true
+        passwordSecret:
+          name: apicurio-role-password
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:

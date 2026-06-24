@@ -1,0 +1,21 @@
+---
+# External LoadBalancer exposing the Apicurio Registry ccompat API.
+# The operator creates an internal ClusterIP service; this adds an external
+# MetalLB address so connectors and streams apps can reach /apis/ccompat/v7.
+# Port 8080 is the Apicurio app port (operator-managed pods use app=apicurio-registry).
+apiVersion: v1
+kind: Service
+metadata:
+  name: apicurio-registry-external
+  namespace: apicurio-registry
+  annotations:
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.223"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: apicurio-registry

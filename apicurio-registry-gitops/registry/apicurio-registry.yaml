@@ -1,0 +1,16 @@
+apiVersion: registry.apicur.io/v1
+kind: ApicurioRegistry3
+metadata:
+  name: apicurio-registry
+  namespace: apicurio-registry
+spec:
+  app:
+    storage:
+      type: postgresql
+      sql:
+        dataSource:
+          url: jdbc:postgresql://production-postgresql-rw.postgresql-system.svc.cluster.local:5432/apicurio
+          username: apicurio
+          password:
+            name: apicurio-db-credentials
+            key: password
