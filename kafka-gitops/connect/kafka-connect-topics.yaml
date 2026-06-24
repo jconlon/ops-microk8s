@@ -1,0 +1,49 @@
+---
+# Strimzi-managed KafkaTopic CRs for Kafka Connect internal topics.
+# Pins cleanup.policy=compact so these topics are always created correctly,
+# even after a full Kafka PVC/PV wipe during KRaft recovery.
+# Without these CRs, Connect recreates the topics with the broker default
+# cleanup.policy=delete, causing CrashLoopBackOff on startup.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: kafka-connect-cluster-offsets
+  namespace: kafka-system
+  labels:
+    strimzi.io/cluster: kafka
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: "2"
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: kafka-connect-cluster-configs
+  namespace: kafka-system
+  labels:
+    strimzi.io/cluster: kafka
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: "2"
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: kafka-connect-cluster-status
+  namespace: kafka-system
+  labels:
+    strimzi.io/cluster: kafka
+spec:
+  partitions: 1
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: "2"
