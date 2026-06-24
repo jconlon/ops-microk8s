@@ -1,0 +1,149 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: kafka-healthy
+spec:
+  description: Kafka KRaft cluster is healthy — brokers ready, quorum formed, produce/consume works, Connect internal topics have cleanup.policy=compact, schema registry reachable
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 60s
+
+  steps:
+
+  - name: kafka-cluster-argocd-app-synced
+    description: kafka-cluster ArgoCD application is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: kafka-cluster
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: kafka-cr-ready
+    description: Kafka CR reports Ready=True
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get kafka kafka -n kafka-system \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+          [ "$READY" = "True" ] || { echo "Kafka CR not Ready: $READY"; exit 1; }
+          echo "Kafka CR Ready=True"
+
+  - name: broker-pods-ready
+    description: All 3 broker pods are 1/1 Running
+    try:
+    - script:
+        content: |
+          for broker in kafka-kafka-0 kafka-kafka-1 kafka-kafka-2; do
+            STATUS=$(kubectl get pod $broker -n kafka-system \
+              -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+            [ "$STATUS" = "True" ] || { echo "$broker not Ready: $STATUS"; exit 1; }
+            echo "$broker: Ready"
+          done
+
+  - name: kraft-quorum-healthy
+    description: KRaft quorum has an elected leader with all 3 voters registered
+    try:
+    - script:
+        content: |
+          OUTPUT=$(kubectl exec -n kafka-system kafka-kafka-0 -- \
+            /opt/kafka/bin/kafka-metadata-quorum.sh \
+            --bootstrap-server localhost:9092 describe --status 2>/dev/null)
+          echo "$OUTPUT"
+
+          LEADER=$(echo "$OUTPUT" | awk '/^LeaderId:/ {print $2}')
+          VOTERS=$(echo "$OUTPUT" | awk '/^CurrentVoters:/ {print $2}')
+
+          [ -n "$LEADER" ] && [ "$LEADER" != "-1" ] || {
+            echo "No KRaft leader elected (LeaderId=$LEADER)"; exit 1; }
+          echo "$VOTERS" | grep -q "0" || { echo "Voter 0 missing from quorum: $VOTERS"; exit 1; }
+          echo "$VOTERS" | grep -q "1" || { echo "Voter 1 missing from quorum: $VOTERS"; exit 1; }
+          echo "$VOTERS" | grep -q "2" || { echo "Voter 2 missing from quorum: $VOTERS"; exit 1; }
+          echo "KRaft quorum: leader=$LEADER voters=$VOTERS"
+
+  - name: produce-consume-round-trip
+    description: Produce a message to a test topic and consume it back
+    try:
+    - script:
+        timeout: 30s
+        content: |
+          TOPIC="chainsaw-kafka-health-$$"
+          cleanup() {
+            kubectl exec -n kafka-system kafka-kafka-0 -- \
+              /opt/kafka/bin/kafka-topics.sh \
+              --bootstrap-server localhost:9092 \
+              --delete --if-exists --topic "$TOPIC" 2>/dev/null
+          }
+          trap cleanup EXIT
+
+          kubectl exec -n kafka-system kafka-kafka-0 -- \
+            /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server localhost:9092 \
+            --create --if-not-exists \
+            --topic "$TOPIC" \
+            --partitions 1 --replication-factor 3 2>/dev/null \
+            || { echo "Failed to create test topic"; exit 1; }
+
+          PAYLOAD="chainsaw-health-check-$(date +%s)"
+          echo "$PAYLOAD" | kubectl exec -i -n kafka-system kafka-kafka-0 -- \
+            /opt/kafka/bin/kafka-console-producer.sh \
+            --bootstrap-server localhost:9092 \
+            --topic "$TOPIC" 2>/dev/null \
+            || { echo "Produce failed"; exit 1; }
+
+          RECEIVED=$(kubectl exec -n kafka-system kafka-kafka-0 -- \
+            /opt/kafka/bin/kafka-console-consumer.sh \
+            --bootstrap-server localhost:9092 \
+            --topic "$TOPIC" \
+            --from-beginning \
+            --max-messages 1 \
+            --timeout-ms 10000 2>/dev/null)
+
+          [ "$RECEIVED" = "$PAYLOAD" ] || {
+            echo "Consume mismatch. Expected: '$PAYLOAD' Got: '$RECEIVED'"; exit 1; }
+          echo "Produce/consume round-trip OK: '$RECEIVED'"
+
+  - name: connect-internal-topics-compact
+    description: Kafka Connect internal topics have cleanup.policy=compact (guards against post-recovery drift — issue #105)
+    try:
+    - script:
+        content: |
+          FAIL=0
+          for topic in kafka-connect-cluster-offsets kafka-connect-cluster-configs kafka-connect-cluster-status; do
+            POLICY=$(kubectl exec -n kafka-system kafka-kafka-0 -- \
+              /opt/kafka/bin/kafka-topics.sh \
+              --bootstrap-server localhost:9092 \
+              --describe --topic "$topic" 2>/dev/null \
+              | grep "^Topic:" | grep -o 'cleanup\.policy=[^,]*' | cut -d= -f2)
+            if [ "$POLICY" = "compact" ]; then
+              echo "PASS $topic: cleanup.policy=compact"
+            else
+              echo "FAIL $topic: cleanup.policy=${POLICY:-missing} (expected compact)"
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+  - name: schema-registry-healthy
+    description: Schema Registry pod is Running and /subjects endpoint responds
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get pods -n kafka-system \
+            -l app.kubernetes.io/name=schema-registry \
+            --no-headers 2>/dev/null | awk '{print $2}')
+          [ "$READY" = "1/1" ] || { echo "Schema Registry pod not ready: $READY"; exit 1; }
+          echo "Schema Registry pod: $READY"
+
+          SUBJECTS=$(curl -sf http://192.168.0.214:8081/subjects 2>/dev/null)
+          echo "$SUBJECTS" | grep -qE '^\[' || {
+            echo "Schema Registry /subjects did not return JSON array: $SUBJECTS"; exit 1; }
+          echo "Schema Registry /subjects OK: $SUBJECTS"
