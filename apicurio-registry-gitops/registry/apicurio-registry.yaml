@@ -10,7 +10,6 @@ spec:
       dataSource:
         url: jdbc:postgresql://production-postgresql-rw.postgresql-system.svc.cluster.local:5432/apicurio
         userName: apicurio
-  deployment:
     env:
       - name: REGISTRY_DATASOURCE_PASSWORD
         valueFrom:
