@@ -80,7 +80,14 @@ Projects may open issues here when they need cluster-level support (secrets, sto
 - **Kafka**: Strimzi operator, 3-broker KRaft cluster (no ZooKeeper), `kafka-system` namespace
   - External (MetalLB): `192.168.0.213:9094` — use IP, not DNS (broker reconnect requires it)
   - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
-  - Schema Registry: running in `kafka-system`, backed by PostgreSQL
+  - Confluent Schema Registry (legacy, to be deprecated): `192.168.0.214:8081`, running in `kafka-system`
+- **Apicurio Registry**: v2.6.4.Final replacing Confluent Schema Registry; `apicurio-registry` namespace
+  - REST API: `http://192.168.0.223:8080/apis/registry/v2`
+  - Confluent-compatible endpoint (for pipeline cutover): `http://192.168.0.223:8080/apis/ccompat/v6`
+  - UI: `http://192.168.0.223:8080/ui`
+  - Backed by `production-postgresql/apicurio` database; credentials via `teller/.teller-apicurio.yml`
+  - Operator: `quay.io/apicurio/apicurio-registry-operator:1.1.3` (v2, UBI8 — v3 requires x86-64-v3 CPU, incompatible with cluster nodes)
+  - Phase 2 pipeline cutover tracked in: freshrss#59, freshrss-streams#12
 - **Loki**: Grafana Loki log aggregation at 192.168.0.220 (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80
 - **Argo Workflows**: CI/CD engine at https://workflows.verticon.com (192.168.0.209:2746); `argo-workflows` namespace
   - `image-build-push` ClusterWorkflowTemplate — builds images via Kaniko and pushes to Harbor; callable from any namespace
@@ -151,12 +158,15 @@ kafkactl create topic <topic-name> --partitions 3 --replication-factor 3
 kafkactl produce <topic-name> --value "hello"
 kafkactl consume <topic-name> --from-beginning
 
-# Schema Registry — external: https://192.168.0.214:8081
+# Confluent Schema Registry (legacy) — external: http://192.168.0.214:8081
 curl -s http://192.168.0.214:8081/subjects | jq
 curl -s http://192.168.0.214:8081/subjects/<subject>/versions/latest | jq
-
-# Check Schema Registry pod
 kubectl get pods -n kafka-system -l app=schema-registry
+
+# Apicurio Registry v2 — external: http://192.168.0.223:8080
+curl -s http://192.168.0.223:8080/apis/registry/v2/system/info | jq
+curl -s http://192.168.0.223:8080/apis/ccompat/v6/subjects | jq   # Confluent-compatible
+kubectl get pods -n apicurio-registry
 ```
 
 ### Monitoring Stack
@@ -215,6 +225,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Loki**: http://loki.verticon.com (192.168.0.220:80)
 - **Ceph RGW (S3)**: https://s3.verticon.com (192.168.0.204:80) — path-style access; use `MC_HOST_ceph` in devbox shell
 - **iDRAC Syslog**: each iDRAC sends UDP syslog to its own node's LAN IP:514 → rsyslog receives and writes to `/var/log/syslog` → Promtail ships to Loki. Queryable via `{job="syslog", node="puffer"} \|= "iDRAC"`. rsyslog config: `/etc/rsyslog.d/10-idrac.conf` on each Dell R320 node.
+- **Apicurio Registry**: http://192.168.0.223:8080 (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
 
 ## File Structure
 
@@ -320,8 +331,8 @@ _Project-specific instructions and facts—use only within this repository:_
 - Always login to ArgoCD server at the start of all sessions.
 - All argocd commands use the `ops argocd` wrapper: e.g. `ops argocd list-app`
 - **For checking cluster state, prefer `just` recipes and chainsaw tests over raw kubectl:**
-  - `just test` — run all e2e health checks (nodes, ceph, gpu, postgresql, argocd)
-  - `just test-suite <suite>` — run a single suite: `cluster`, `storage`, `gpu`, `postgresql`, `argocd`
+  - `just test` — run all e2e health checks (nodes, ceph, gpu, postgresql, argocd, kafka, apicurio, etc.)
+  - `just test-suite <suite>` — run a single suite: `cluster`, `storage`, `gpu`, `postgresql`, `argocd`, `kafka`, `kafka-connect`, `apicurio`, `loki`, `harbor`, `freshrss`, `vllm`
   - `just node-status` — node uptime + reboot-required
   - `just ceph-status` — Ceph cluster health
   - `just pg-status` — CloudNativePG cluster status
@@ -337,7 +348,7 @@ _Project-specific instructions and facts—use only within this repository:_
 - The `kubectl cnpg` plugin is available for CloudNativePG management. Example: `kubectl cnpg status production-postgresql -n postgresql-system`
 - For available scripts and usage, read `scripts/README.md` at session start.
 - To connect to the FreshRSS database use: `ops freshrss psql`
-- Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory.
+- Cluster teller configs are in `teller/` directory (not in ~/dotfiles). Use `teller/` prefix for all cluster K8s secret operations. Run from ops-microk8s directory. Configs: `.teller-freshrss.yml`, `.teller-postgresql.yml`, `.teller-apicurio.yml`.
 - NEVER run `helm repo add` or `helm repo update` locally. Helm charts are managed entirely by ArgoCD using `repoURL` and `chart` fields in ArgoCD Application manifests. There is no need to add repos to the local Helm installation.
 
 ---
