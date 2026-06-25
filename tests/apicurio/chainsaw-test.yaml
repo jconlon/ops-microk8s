@@ -1,0 +1,98 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: apicurio-registry-healthy
+spec:
+  description: Apicurio Registry v2 is healthy — operator running, registry pod ready, REST API and Confluent-compatible endpoint responding
+  concurrent: false
+  timeouts:
+    assert: 3m
+    exec: 30s
+
+  steps:
+
+  - name: argocd-operator-app-synced
+    description: apicurio-registry-operator ArgoCD app is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: apicurio-registry-operator
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: argocd-registry-app-synced
+    description: apicurio-registry ArgoCD app is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: apicurio-registry
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: operator-pod-ready
+    description: Apicurio Registry operator pod is 1/1 Running
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get pods -n apicurio-registry \
+            -l name=apicurio-registry-operator \
+            --no-headers 2>/dev/null | awk '{print $2}')
+          [ "$READY" = "1/1" ] || { echo "Operator pod not ready: $READY"; exit 1; }
+          echo "Operator pod: $READY"
+
+  - name: registry-cr-exists
+    description: ApicurioRegistry CR exists in apicurio-registry namespace
+    try:
+    - script:
+        content: |
+          kubectl get apicurioregistry apicurio-registry -n apicurio-registry \
+            -o jsonpath='{.metadata.name}' 2>/dev/null \
+            | grep -q "apicurio-registry" \
+            || { echo "ApicurioRegistry CR not found"; exit 1; }
+          echo "ApicurioRegistry CR: present"
+
+  - name: registry-pod-ready
+    description: Apicurio Registry application pod is 1/1 Running
+    try:
+    - script:
+        content: |
+          READY=$(kubectl get pods -n apicurio-registry \
+            -l app=apicurio-registry \
+            --no-headers 2>/dev/null | awk '{print $2}')
+          [ "$READY" = "1/1" ] || { echo "Registry pod not ready: $READY"; exit 1; }
+          echo "Registry pod: $READY"
+
+  - name: api-system-info
+    description: Registry v2 REST API responds with version info at /apis/registry/v2/system/info
+    try:
+    - script:
+        content: |
+          RESPONSE=$(curl -sf http://192.168.0.223:8080/apis/registry/v2/system/info 2>/dev/null)
+          echo "$RESPONSE" | grep -q '"version"' \
+            || { echo "Unexpected response: $RESPONSE"; exit 1; }
+          VERSION=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
+          echo "Apicurio Registry version: $VERSION"
+
+  - name: ccompat-endpoint-ready
+    description: Confluent-compatible API at /apis/ccompat/v6/subjects responds with a JSON array (required for Phase 2 pipeline cutover — freshrss#59, freshrss-streams#12)
+    try:
+    - script:
+        content: |
+          RESPONSE=$(curl -sf http://192.168.0.223:8080/apis/ccompat/v6/subjects 2>/dev/null)
+          echo "$RESPONSE" | grep -qE '^\[' \
+            || { echo "ccompat /subjects did not return JSON array: $RESPONSE"; exit 1; }
+          echo "Confluent-compatible API OK: $RESPONSE"
