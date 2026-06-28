@@ -32,6 +32,6 @@ spec:
             - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
               value: "kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092"
             - name: KAFKA_CLUSTERS_0_SCHEMAREGISTRY
-              value: "http://schema-registry.kafka-system.svc:8081"
+              value: "http://apicurio-registry-service.apicurio-registry.svc:8080/apis/ccompat/v6"
             - name: DYNAMIC_CONFIG_ENABLED
               value: "true"
