@@ -18,21 +18,29 @@ prometheus:
     resources:
       limits:
         cpu: 2000m
-        memory: 8Gi
+        memory: 6Gi
       requests:
-        cpu: 1000m
-        memory: 4Gi
+        cpu: 500m
+        memory: 2Gi
 
-    # Retention policy - keep within 90Gi of 100Gi allocation
-    retention: 30d
-    retentionSize: 90GB
+    # Retention policy - keep within 40Gi of 100Gi allocation
+    retention: 15d
+    retentionSize: 40GB
 
     # Additional configuration for better performance
     walCompression: true
     enableFeatures:
       - exemplar-storage
       - memory-snapshot-on-shutdown
-    
+
+    # Limit max TSDB block size to reduce compaction memory spikes
+    # and cap query sample count to prevent runaway queries
+    additionalArgs:
+      - name: storage.tsdb.max-block-duration
+        value: 2h
+      - name: query.max-samples
+        value: "50000000"
+
     # Additional scrape configs (empty but required for some configurations)
     additionalScrapeConfigs: []
 
