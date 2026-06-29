@@ -158,11 +158,6 @@ kafkactl create topic <topic-name> --partitions 3 --replication-factor 3
 kafkactl produce <topic-name> --value "hello"
 kafkactl consume <topic-name> --from-beginning
 
-# Confluent Schema Registry (legacy) — external: http://192.168.0.214:8081
-curl -s http://192.168.0.214:8081/subjects | jq
-curl -s http://192.168.0.214:8081/subjects/<subject>/versions/latest | jq
-kubectl get pods -n kafka-system -l app=schema-registry
-
 # Apicurio Registry v2 — external: http://192.168.0.223:8080
 curl -s http://192.168.0.223:8080/apis/registry/v2/system/info | jq
 curl -s http://192.168.0.223:8080/apis/ccompat/v6/subjects | jq   # Confluent-compatible
@@ -287,6 +282,40 @@ ops-microk8s/
 2. **Volume mount failures**: Verify Ceph cluster health
 3. **Storage provisioning issues**: Ensure storage class and block pool exist
 4. **Network connectivity**: Verify MetalLB IP range doesn't conflict with PiHole
+
+### KRaft Election Storm Recovery
+
+Symptoms: all 3 broker pods crash-loop with `Shutting down because we were unable to register with the controller quorum`, `kafka-metadata-quorum.sh describe --status` hangs or times out, election epoch in the tens of thousands.
+
+Root cause: diverged `lastOffsetEpoch` across brokers causes a three-way vote-split livelock — no broker can win a majority. Pod restarts do not fix this; the metadata log divergence persists on the PVCs.
+
+**Recovery procedure** (all topic data is lost — disposable by design):
+
+```bash
+# 1. Pause Strimzi reconciliation (prevents it from fighting PVC deletion)
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true --overwrite
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true --overwrite
+
+# 2. Delete broker pods so PVC protection finalizers are released
+kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system
+
+# 3. Delete the PVCs
+kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system
+
+# 4. Wait for PVs to become Released, then delete them (reclaimPolicy:Retain deadlock)
+kubectl get pv | grep kafka   # confirm Released
+kubectl delete pv <pvc-46f...> <pvc-5d7...> <pvc-d2c...>
+
+# 5. Resume Strimzi reconciliation — it provisions fresh PVCs and formats KRaft storage
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation-
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation-
+
+# 6. Verify clean quorum (LeaderEpoch should be low, MaxFollowerLag=0)
+kubectl exec -n kafka-system kafka-kafka-0 -- \
+  /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server localhost:9092 describe --status
+```
+
+After recovery: KafkaTopic CRs are reconciled by Strimzi (topics recreated). KafkaConnector CRs are reconciled (connectors restart from scratch). Connect internal topic `cleanup.policy=compact` is preserved automatically by Strimzi.
 
 ### Useful Commands
 
