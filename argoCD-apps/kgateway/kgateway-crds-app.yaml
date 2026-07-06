@@ -8,8 +8,12 @@ metadata:
 spec:
   project: default
   source:
+    # cr.kgateway.dev stores each chart at its own full OCI path (confirmed via
+    # `helm pull` — the repoURL+chart split ArgoCD uses for shared namespaces
+    # like registry-1.docker.io/bitnamicharts does not apply here). Use the
+    # path-based OCI form instead: full chart path in repoURL, path: . as root.
     repoURL: oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
-    chart: kgateway-crds
+    path: .
     targetRevision: "v2.3.5"
   destination:
     server: https://kubernetes.default.svc

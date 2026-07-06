@@ -8,8 +8,11 @@ metadata:
 spec:
   project: default
   sources:
+    # See kgateway-crds-app.yaml comment: cr.kgateway.dev charts use the
+    # path-based OCI form (full chart path in repoURL + path: .), not the
+    # repoURL+chart split used for shared-namespace registries.
     - repoURL: oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
-      chart: kgateway
+      path: .
       targetRevision: "v2.3.5"
       helm:
         valueFiles:
