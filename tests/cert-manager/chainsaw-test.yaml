@@ -1,0 +1,45 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: cert-manager-healthy
+spec:
+  description: cert-manager is deployed and the HTTP-01 ClusterIssuer is Ready
+  concurrent: false
+  timeouts:
+    assert: 5m
+  steps:
+    - name: cert-manager-apps-synced
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: cert-manager
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+                health:
+                  status: Healthy
+    - name: cert-manager-pods-running
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: cert-manager
+                namespace: cert-manager
+              status:
+                (availableReplicas >= `1`): true
+    - name: cluster-issuer-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: ClusterIssuer
+              metadata:
+                name: letsencrypt-http01
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"

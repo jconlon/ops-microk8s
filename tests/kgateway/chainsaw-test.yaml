@@ -1,0 +1,52 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: kgateway-healthy
+spec:
+  description: kgateway controller, GatewayClass, and shared Gateway are healthy
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 60s
+  steps:
+    - name: kgateway-apps-synced
+      try:
+        - assert:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: kgateway
+                namespace: argocd
+              status:
+                sync:
+                  status: Synced
+                health:
+                  status: Healthy
+    - name: gatewayclass-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: GatewayClass
+              metadata:
+                name: kgateway
+              status:
+                (conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: gateway-programmed-with-metallb-ip
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: Gateway
+              metadata:
+                name: cluster-gateway
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Programmed'].status | [0]): "True"
+        - script:
+            content: |
+              IP=$(kubectl get gateway cluster-gateway -n kgateway-system \
+                -o jsonpath='{.status.addresses[0].value}')
+              [ "$IP" = "192.168.0.224" ] || { echo "Expected 192.168.0.224, got: $IP"; exit 1; }
+              echo "Gateway IP confirmed: $IP"

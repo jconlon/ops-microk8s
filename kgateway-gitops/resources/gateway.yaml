@@ -1,0 +1,45 @@
+# Shared Gateway — one MetalLB IP fronts every HTTPRoute-migrated service.
+# Replaces the one-MetalLB-IP-per-service Caddy pattern.
+#
+# Confirmed pattern (Envoy Gateway docs — kgateway is Envoy-based, same model):
+# there is no single generic HTTPS listener with SNI fan-out across arbitrary
+# certs. Instead:
+#   - ONE shared "http" listener (port 80, all namespaces) is used by
+#     cert-manager's HTTP-01 solver for every hostname — this is the only
+#     truly shared TLS-adjacent piece, and it's what keeps this a single IP.
+#   - ONE HTTPS listener PER HOSTNAME is added here as each service migrates
+#     (Task 4 adds the first, Task 5 adds the rest) — each with its own
+#     `hostname:` and its own `certificateRefs` Secret, populated by a
+#     per-hostname cert-manager `Certificate` resource (see Task 4).
+# This mirrors Caddy's per-hostname Caddyfile blocks structurally — just
+# declared as Gateway listener entries instead of implied by Caddy automatic HTTPS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cluster-gateway
+  namespace: kgateway-system
+  annotations:
+    # MetalLB pins this Gateway's Service to .224 (next free IP after Apicurio's .223).
+    metallb.universe.tf/loadBalancerIPs: "192.168.0.224"
+spec:
+  gatewayClassName: kgateway
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+    # Per-hostname HTTPS listeners are appended below by Task 4 / Task 5,
+    # e.g.:
+    # - name: https-pgadmin
+    #   protocol: HTTPS
+    #   port: 443
+    #   hostname: "pgadmin.verticon.com"
+    #   tls:
+    #     mode: Terminate
+    #     certificateRefs:
+    #       - name: pgadmin-tls
+    #   allowedRoutes:
+    #     namespaces:
+    #       from: All
