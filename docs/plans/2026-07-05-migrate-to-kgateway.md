@@ -165,7 +165,7 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
     source:
       repoURL: oci://cr.kgateway.dev/kgateway-dev/charts/kgateway-crds
       chart: kgateway-crds
-      targetRevision: "<KGW_VERSION>"
+      targetRevision: "v2.3.5"
     destination:
       server: https://kubernetes.default.svc
       namespace: kgateway-system
@@ -198,7 +198,7 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
     sources:
       - repoURL: oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
         chart: kgateway
-        targetRevision: "<KGW_VERSION>"
+        targetRevision: "v2.3.5"
         helm:
           valueFiles:
             - $values/kgateway-gitops/helm/kgateway-values.yaml
@@ -316,7 +316,7 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
     sources:
       - repoURL: https://charts.jetstack.io
         chart: cert-manager
-        targetRevision: "v1.17.0"
+        targetRevision: "v1.20.3"
         helm:
           valueFiles:
             - $values/cert-manager-gitops/helm/cert-manager-values.yaml
@@ -341,7 +341,7 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
           maxDuration: 3m
   ```
 
-  > `v1.17.0` is confirmed current in cert-manager's own Gateway API documentation as of this plan. Re-check https://cert-manager.io/docs/releases/ before applying if this plan is executed much later.
+  > `v1.20.3` confirmed as the latest stable (non-prerelease) release via `gh api repos/cert-manager/cert-manager/releases` on 2026-07-05 (the earlier `v1.17.0` placeholder was stale — cert-manager's Gateway API support docs happened to be version-pinned to an older release). Re-check https://cert-manager.io/docs/releases/ before applying if this plan is executed much later.
 
 - [ ] **Step 4: Verify file syntax and commit**
 
@@ -932,4 +932,4 @@ Identical to the trap documented in the argo-events plan, and it affects **both*
 Use the plural `metallb.universe.tf/loadBalancerIPs` (confirmed cluster-wide convention, e.g. `argo-events`, `loki`, `apicurio-registry`) — the singular `loadBalancerIP` is deprecated and may be silently ignored.
 
 ### Chart version pinning
-Both `kgateway`'s chart version and cert-manager's `v1.17.0` need re-verification against current releases if this plan is executed significantly later than 2026-07-05 — do not blindly apply the versions written here without checking release pages first.
+Both `kgateway`'s chart version (`v2.3.5`, confirmed 2026-07-05) and cert-manager's (`v1.20.3`, confirmed 2026-07-05) need re-verification against current releases if this plan is executed significantly later — do not blindly apply the versions written here without checking release pages first.
