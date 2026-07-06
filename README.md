@@ -782,6 +782,7 @@ Caddy no longer fronts any cluster service as of this second migration wave — 
 | Kafka UI       | https://kafka.verticon.com         |
 | Ceph RGW (S3)  | https://s3.verticon.com            |
 | Apicurio (schema-registry) | https://schema-registry.verticon.com |
+| vLLM (OpenAI API) | https://vllm.verticon.com — net-new, never had a Caddy entry |
 
 **Via Caddy on mullet** (static file server, no Kubernetes backend — can't move to kgateway):
 
@@ -796,7 +797,6 @@ Caddy no longer fronts any cluster service as of this second migration wave — 
 | --------------------- | ------------- |
 | PostgreSQL (primary)  | 192.168.0.210 |
 | PostgreSQL (readonly) | 192.168.0.211 |
-| vLLM (OpenAI API)     | 192.168.0.218 |
 | Kafka (external broker) | 192.168.0.213 |
 
 ---

@@ -99,7 +99,7 @@ Projects may open issues here when they need cluster-level support (secrets, sto
   - `kubectl get eventbus,eventsource,sensor -n argo-events` — check resource status
 - **kgateway**: Envoy-based Gateway API implementation, `kgateway-system` namespace — fronts all HTTP(S) ingress traffic, replacing the old per-service MetalLB IP + Caddy pattern (issue #108)
   - Shared `Gateway` (`cluster-gateway`) on a single MetalLB IP `192.168.0.224` — one HTTP listener (port 80, redirect-only, not used for ACME) + one HTTPS listener per migrated hostname (SNI-routed)
-  - Migrated (all 15 in-scope HTTP(S) services): pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events, ArgoCD, FreshRSS, Wallabag, Hasura, Kafka UI, Ceph RGW/S3, Apicurio — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`. Not migrated: mullet's own static-file sites (no K8s backend) and PostgreSQL/raw-TCP Kafka (non-HTTP).
+  - 16 services total: 15 migrated off Caddy (pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events, ArgoCD, FreshRSS, Wallabag, Hasura, Kafka UI, Ceph RGW/S3, Apicurio) plus vLLM (net-new — never had a Caddy entry) — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`. Not on kgateway: mullet's own static-file sites (no K8s backend) and PostgreSQL/raw-TCP Kafka (non-HTTP, would need Gateway API's experimental `TCPRoute`).
   - **cert-manager** (`cert-manager` namespace) issues real Let's Encrypt certs per hostname via **DNS-01 through Cloudflare** (not HTTP-01 — `*.verticon.com` resolves to private LAN IPs, so Let's Encrypt can never reach the cluster directly for an HTTP-01 challenge); `ClusterIssuer letsencrypt-http01` uses a Cloudflare API token scoped to `Zone:DNS:Edit` on `verticon.com` (separate from Caddy's own token, bootstrapped via `teller/.teller-cert-manager.yml`, see issue #109)
   - Caddy on mullet is no longer used for any of these hostnames — see "Adding a New DNS Name" in README.md for the current (kgateway) procedure
   - `kubectl get gateway,httproute -A` / `kubectl get certificate -n kgateway-system` — check resource status
@@ -234,6 +234,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Kafka UI**: https://kafka.verticon.com
 - **Ceph RGW (S3)**: https://s3.verticon.com — path-style access; use `MC_HOST_ceph` in devbox shell
 - **Apicurio Registry**: https://schema-registry.verticon.com (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
+- **vLLM (OpenAI API)**: https://vllm.verticon.com — net-new addition (vLLM never had a Caddy entry or hostname before; not a migration cutover)
 
 **Legacy Caddy path (mullet)**: Caddy still runs on mullet, but only for its own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`) — no Kubernetes backend to route to, so these can't move to kgateway without a redesign. Everything else has been migrated.
 
