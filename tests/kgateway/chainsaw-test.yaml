@@ -154,3 +154,69 @@ spec:
               [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                 { echo "Expected 200/302, got: $STATUS"; exit 1; }
               echo "AlertManager reachable via Gateway: $STATUS"
+    - name: grafana-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: grafana-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: grafana-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: grafana
+                namespace: monitoring
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: grafana-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve grafana.verticon.com:443:192.168.0.224 \
+                https://grafana.verticon.com)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "Grafana reachable via Gateway: $STATUS"
+    - name: loki-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: loki-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: loki-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: loki
+                namespace: loki
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: loki-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve loki.verticon.com:443:192.168.0.224 \
+                https://loki.verticon.com/ready)
+              [ "$STATUS" = "200" ] || \
+                { echo "Expected 200, got: $STATUS"; exit 1; }
+              echo "Loki reachable via Gateway: $STATUS"

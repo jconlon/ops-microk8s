@@ -73,3 +73,25 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-grafana
+      protocol: HTTPS
+      port: 443
+      hostname: "grafana.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: grafana-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-loki
+      protocol: HTTPS
+      port: 443
+      hostname: "loki.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: loki-tls
+      allowedRoutes:
+        namespaces:
+          from: All
