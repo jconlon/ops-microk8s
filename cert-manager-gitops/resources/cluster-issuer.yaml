@@ -1,7 +1,13 @@
+# DNS-01 via Cloudflare — HTTP-01 cannot work here (*.verticon.com resolves
+# publicly to private LAN IPs; see docs/plans/2026-07-05-migrate-to-kgateway.md
+# Architectural Decisions). Matches what Caddy already does on mullet via its
+# own (separate) Cloudflare token. Requires cloudflare-api-token-secret in the
+# cert-manager namespace — bootstrap via teller, see scripts/README.md
+# "cert-manager Cloudflare DNS-01 token bootstrap" / issue #109.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: letsencrypt-http01
+  name: letsencrypt-http01   # name kept as-is to avoid renaming a resource other manifests reference
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
@@ -9,9 +15,8 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-http01-account-key
     solvers:
-      - http01:
-          gatewayHTTPRoute:
-            parentRefs:
-              - kind: Gateway
-                name: cluster-gateway
-                namespace: kgateway-system
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token

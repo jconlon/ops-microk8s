@@ -1,0 +1,20 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      CLOUDFLARE_API_TOKEN:
+        path: projects/1000827005146/secrets/cert-manager-dns01-verticon/versions/latest
+
+# Creates the cloudflare-api-token-secret K8s secret cert-manager's
+# ClusterIssuer references for its dns01.cloudflare solver (issue #109).
+#
+# Token scope: Zone:DNS:Edit on the verticon.com zone only — separate from
+# Caddy's own Cloudflare token so the two can be rotated/revoked independently.
+#
+# Usage (run from ops-microk8s/ directory):
+#   teller run --config teller/.teller-cert-manager.yml -- bash -c '
+#     kubectl create secret generic cloudflare-api-token-secret \
+#       -n cert-manager \
+#       --from-literal=api-token="$CLOUDFLARE_API_TOKEN" \
+#       --dry-run=client -o yaml | kubectl apply -f -
+#   '

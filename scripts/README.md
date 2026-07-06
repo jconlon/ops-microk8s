@@ -259,6 +259,7 @@ Run all teller commands from the `ops-microk8s` root directory within a devbox s
 | `teller/.teller-postgresql.yml` | PostgreSQL backup S3 credentials (`ceph-s3-credentials`) |
 | `teller/.teller-argo-workflows.yml` | Argo Workflows Harbor robot account credentials |
 | `teller/.teller-hasura.yml` | Hasura K8s secrets (`hasura-role-password`, `hasura-credentials`) |
+| `teller/.teller-cert-manager.yml` | Cloudflare API token for cert-manager's DNS-01 `ClusterIssuer` (`cloudflare-api-token-secret`) |
 
 > **Note:** Machine-local teller configs (restic, gitlab) remain in `~/dotfiles`. Only cluster K8s secret configs belong here.
 
@@ -391,6 +392,25 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
   --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -'
 ```
+
+---
+
+### cert-manager Cloudflare DNS-01 token bootstrap (issue #109)
+
+> **Prerequisites:** Create a Cloudflare API token scoped to `Zone:DNS:Edit` on the `verticon.com` zone only (separate from Caddy's own token — see issue #109 for the dashboard steps), and add it to Google Secret Manager as `cert-manager-dns01-verticon` before running.
+>
+> **Why this exists:** `*.verticon.com` DNS records resolve publicly to private LAN IPs, so cert-manager's `ClusterIssuer` cannot use HTTP-01 (Let's Encrypt can never reach the cluster) — it needs the same DNS-01 mechanism Caddy already uses. See `docs/plans/2026-07-05-migrate-to-kgateway.md`'s Architectural Decisions for the full explanation.
+
+```bash
+teller run --config teller/.teller-cert-manager.yml -- bash -c '
+  kubectl create secret generic cloudflare-api-token-secret \
+    -n cert-manager \
+    --from-literal=api-token="$CLOUDFLARE_API_TOKEN" \
+    --dry-run=client -o yaml | kubectl apply -f -
+'
+```
+
+Once the secret exists, `cert-manager-gitops/resources/cluster-issuer.yaml`'s `dns01.cloudflare.apiTokenSecretRef` solver can resolve it, and any pending `Certificate` (e.g. `pgadmin-tls`) should issue within a minute or two.
 
 ---
 
