@@ -1,0 +1,18 @@
+# Backend confirmed via `kubectl get svc -n argo-events`: git-push-eventsource-lb, port 12000.
+# POST-only webhook receiver at /push — no GET/root response expected.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: events
+  namespace: argo-events
+spec:
+  parentRefs:
+    - name: cluster-gateway
+      namespace: kgateway-system
+      sectionName: https-events
+  hostnames:
+    - "events.verticon.com"
+  rules:
+    - backendRefs:
+        - name: git-push-eventsource-lb
+          port: 12000

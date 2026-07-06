@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: events-tls
+  namespace: kgateway-system
+spec:
+  secretName: events-tls
+  dnsNames:
+    - events.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

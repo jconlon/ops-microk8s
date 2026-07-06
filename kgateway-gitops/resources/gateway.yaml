@@ -106,3 +106,25 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-workflows
+      protocol: HTTPS
+      port: 443
+      hostname: "workflows.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: workflows-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-events
+      protocol: HTTPS
+      port: 443
+      hostname: "events.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: events-tls
+      allowedRoutes:
+        namespaces:
+          from: All

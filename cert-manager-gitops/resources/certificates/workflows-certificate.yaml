@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: workflows-tls
+  namespace: kgateway-system
+spec:
+  secretName: workflows-tls
+  dnsNames:
+    - workflows.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

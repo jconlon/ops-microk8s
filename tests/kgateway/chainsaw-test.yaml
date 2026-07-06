@@ -257,3 +257,73 @@ spec:
               [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                 { echo "Expected 200/302, got: $STATUS"; exit 1; }
               echo "Harbor registry reachable via Gateway: $STATUS"
+    - name: workflows-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: workflows-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: workflows-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: workflows
+                namespace: argo-workflows
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: workflows-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve workflows.verticon.com:443:192.168.0.224 \
+                https://workflows.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "Argo Workflows reachable via Gateway: $STATUS"
+    - name: events-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: events-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: events-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: events
+                namespace: argo-events
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: events-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              # POST-only webhook endpoint (no GET/root response expected) —
+              # same request shape as tests/argo-events/chainsaw-test.yaml.
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                -X POST --resolve events.verticon.com:443:192.168.0.224 \
+                -H 'Content-Type: application/json' \
+                -d '{"repo":"test","commit":"abc123"}' \
+                https://events.verticon.com/push)
+              [ "$STATUS" = "200" ] || \
+                { echo "Expected 200, got: $STATUS"; exit 1; }
+              echo "Argo Events webhook reachable via Gateway: $STATUS"
