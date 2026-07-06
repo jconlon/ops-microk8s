@@ -235,3 +235,16 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-vllm
+      protocol: HTTPS
+      port: 443
+      hostname: "vllm.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: vllm-tls
+            kind: Secret
+            group: ""
+      allowedRoutes:
+        namespaces:
+          from: All

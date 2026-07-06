@@ -559,3 +559,39 @@ spec:
               [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                 { echo "Expected 200/302, got: $STATUS"; exit 1; }
               echo "schema-registry reachable via Gateway: $STATUS"
+    - name: vllm-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: vllm-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: vllm-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: vllm
+                namespace: vllm
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: vllm-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              # root path returns 404 (confirmed directly against the backend Service,
+              # not a routing issue — vLLM's API server doesn't serve a root index).
+              # /health is the correct check, same lesson as Loki's /ready earlier.
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve vllm.verticon.com:443:192.168.0.224 \
+                https://vllm.verticon.com/health)
+              [ "$STATUS" = "200" ] || \
+                { echo "Expected 200, got: $STATUS"; exit 1; }
+              echo "vLLM reachable via Gateway: $STATUS"
