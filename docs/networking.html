@@ -168,11 +168,14 @@
 
 <div class="callout callout-tip">
   <strong>Update (issue #108):</strong> the migration from one-MetalLB-IP-per-service + Caddy to a
-  single shared <strong>kgateway</strong> (Gateway API) IP is complete for all in-scope HTTP(S)
-  services (15 total). Caddy on mullet no longer fronts any cluster service — it now only serves its
-  own static-file sites (<code>mullet.verticon.com</code>/<code>.lab</code>), which have no
-  Kubernetes backend and can't move to kgateway without a redesign. New HTTP(S) services should
-  always use the kgateway path — see "Which path does a service use?" below.
+  single shared <strong>kgateway</strong> (Gateway API) IP is complete — 15 services migrated off
+  Caddy plus vLLM added net-new, 16 total. Caddy on mullet no longer fronts any cluster service —
+  it now only serves its own static-file sites (<code>mullet.verticon.com</code>/<code>.lab</code>).
+  Those are intentionally out of scope, not pending: they don't use a MetalLB IP, aren't part of
+  the IP-exhaustion problem this migration solved, and moving plain static files to kgateway would
+  mean standing up a whole new in-cluster file-serving service for no operational benefit. New
+  HTTP(S) cluster services should always use the kgateway path — see "Which path does a service
+  use?" below.
 </div>
 
 <!-- ── Overview ───────────────────────────────────────────────────── -->
@@ -227,8 +230,11 @@ Static files on mullet's local disk (no Kubernetes involved at all)
 </div>
 <p>
   This is the only remaining use of Caddy — serving its own static sites directly from mullet's
-  filesystem. There's no Kubernetes Service for these, so there's nothing for an <code>HTTPRoute</code>
-  to route to; migrating them would mean first standing up an in-cluster static-file service.
+  filesystem. <strong>Intentionally out of scope, not pending work:</strong> these never consumed a
+  MetalLB IP (they're served from mullet's own host IP), so they were never part of the
+  IP-exhaustion problem this migration solved. There's no Kubernetes Service for them either, so
+  moving them to kgateway would mean standing up a whole new in-cluster static-file service first —
+  real new infrastructure for content that already works fine, with no operational upside.
 </p>
 
 <!-- ── Components ─────────────────────────────────────────────────── -->
@@ -237,10 +243,10 @@ Static files on mullet's local disk (no Kubernetes involved at all)
 <h3>Cloudflare DNS</h3>
 <p>
   DNS records are managed at <strong>dash.cloudflare.com → verticon.com → DNS → Records</strong>.
-  Every service has an <strong>A record</strong> set to <strong>DNS-only</strong> (grey cloud —
-  proxying disabled), pointing at either <code>192.168.0.224</code> (kgateway — all 15 in-scope
-  HTTP(S) services) or mullet's LAN IP (Caddy — only its own static-file sites now). Cloudflare
-  proxying is intentionally off for both paths.
+  Every cluster service's <strong>A record</strong> is set to <strong>DNS-only</strong> (grey cloud
+  — proxying disabled), pointing at <code>192.168.0.224</code> (kgateway — all 16 HTTP(S) cluster
+  services). Mullet's own static-file sites still point at mullet's LAN IP via Caddy — by design,
+  not because they're waiting to be migrated. Cloudflare proxying is intentionally off for both.
 </p>
 <p>
   Cloudflare is also the <strong>ACME DNS provider</strong> for both kgateway/cert-manager and Caddy —
@@ -439,7 +445,7 @@ listener, etc.), or an HTTP(S) service that for some reason still needs the old 
   </tbody>
 </table>
 
-<h3>Via Caddy on mullet (static sites only — no cluster service)</h3>
+<h3>Via Caddy on mullet (mullet's own static sites — intentionally out of scope, not a cluster service)</h3>
 <table>
   <thead><tr><th>Hostname</th><th>Purpose</th></tr></thead>
   <tbody>

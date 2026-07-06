@@ -99,7 +99,7 @@ Projects may open issues here when they need cluster-level support (secrets, sto
   - `kubectl get eventbus,eventsource,sensor -n argo-events` — check resource status
 - **kgateway**: Envoy-based Gateway API implementation, `kgateway-system` namespace — fronts all HTTP(S) ingress traffic, replacing the old per-service MetalLB IP + Caddy pattern (issue #108)
   - Shared `Gateway` (`cluster-gateway`) on a single MetalLB IP `192.168.0.224` — one HTTP listener (port 80, redirect-only, not used for ACME) + one HTTPS listener per migrated hostname (SNI-routed)
-  - 16 services total: 15 migrated off Caddy (pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events, ArgoCD, FreshRSS, Wallabag, Hasura, Kafka UI, Ceph RGW/S3, Apicurio) plus vLLM (net-new — never had a Caddy entry) — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`. Not on kgateway: mullet's own static-file sites (no K8s backend) and PostgreSQL/raw-TCP Kafka (non-HTTP, would need Gateway API's experimental `TCPRoute`).
+  - 16 services total: 15 migrated off Caddy (pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events, ArgoCD, FreshRSS, Wallabag, Hasura, Kafka UI, Ceph RGW/S3, Apicurio) plus vLLM (net-new — never had a Caddy entry) — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`. **Intentionally out of scope, not pending**: mullet's own static-file sites (no K8s backend, never used a MetalLB IP, no benefit to migrating) and PostgreSQL/raw-TCP Kafka (different protocol entirely — `HTTPRoute` doesn't apply; would need Gateway API's experimental `TCPRoute`, a separate decision).
   - **cert-manager** (`cert-manager` namespace) issues real Let's Encrypt certs per hostname via **DNS-01 through Cloudflare** (not HTTP-01 — `*.verticon.com` resolves to private LAN IPs, so Let's Encrypt can never reach the cluster directly for an HTTP-01 challenge); `ClusterIssuer letsencrypt-http01` uses a Cloudflare API token scoped to `Zone:DNS:Edit` on `verticon.com` (separate from Caddy's own token, bootstrapped via `teller/.teller-cert-manager.yml`, see issue #109)
   - Caddy on mullet is no longer used for any of these hostnames — see "Adding a New DNS Name" in README.md for the current (kgateway) procedure
   - `kubectl get gateway,httproute -A` / `kubectl get certificate -n kgateway-system` — check resource status
@@ -218,7 +218,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 
 ### Service Access
 
-**Fronted by kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed, real Let's Encrypt certs via DNS-01 — see kgateway entry above). All in-scope HTTP(S) cluster services now use this path — Caddy on mullet no longer fronts any cluster service (see "Legacy Caddy path" below):
+**Fronted by kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed, real Let's Encrypt certs via DNS-01 — see kgateway entry above). Every HTTP(S) cluster service uses this path — Caddy on mullet no longer fronts any cluster service (see mullet's own static sites below, which are a separate, intentionally-out-of-scope case):
 - **ArgoCD**: https://argocd.verticon.com
 - **Argo Workflows**: https://workflows.verticon.com — CI pipeline UI
 - **Argo Events Webhook**: https://events.verticon.com/push — CI trigger endpoint
@@ -236,7 +236,7 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Apicurio Registry**: https://schema-registry.verticon.com (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
 - **vLLM (OpenAI API)**: https://vllm.verticon.com — net-new addition (vLLM never had a Caddy entry or hostname before; not a migration cutover)
 
-**Legacy Caddy path (mullet)**: Caddy still runs on mullet, but only for its own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`) — no Kubernetes backend to route to, so these can't move to kgateway without a redesign. Everything else has been migrated.
+**Caddy on mullet (mullet's own static sites — not a cluster service)**: Caddy still runs on mullet, but only for `mullet.verticon.com`/`mullet.verticon.lab`, which are plain static files served from mullet's local disk. This is intentionally out of scope, not pending: these never used a MetalLB IP (so they were never part of the IP-exhaustion problem #108 solved), and there's no Kubernetes Service for them to route to — migrating would mean standing up a new in-cluster static-file service for no operational benefit.
 
 **Not fronted by either** (raw TCP, not HTTP): PostgreSQL (`postgresql.verticon.com`, `192.168.0.211`) and Kafka's external broker listener (`192.168.0.213:9094`) — Gateway API's experimental `TCPRoute` channel could handle these but that's a separate, not-yet-made decision.
 

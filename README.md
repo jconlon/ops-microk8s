@@ -759,7 +759,7 @@ Two gotchas found the hard way during the migration (see the plan doc's Task 5 g
 
 Services that aren't plain HTTP(S) — PostgreSQL and Kafka's external broker listener are the remaining examples — are out of scope for kgateway `HTTPRoute`; they keep their own dedicated MetalLB IP, with DNS (if any) pointing directly at that IP. No Caddy or Gateway is involved. Gateway API has an experimental `TCPRoute`/`TLSRoute` channel for this; adopting it is a separate, future decision. (Ceph RGW/S3 is HTTP-based and has already been migrated to kgateway — see the table below.)
 
-Caddy no longer fronts any cluster service as of this second migration wave — it's kept running only for mullet's own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`), which have no Kubernetes backend to route to and can't move to kgateway without a redesign.
+Caddy no longer fronts any cluster service — it's kept running only for mullet's own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`). This is intentionally out of scope, not pending work: these sites never consumed a MetalLB IP (so they were never part of the IP-exhaustion problem this migration solved), and there's no Kubernetes Service for them to route to — moving them to kgateway would mean standing up a new in-cluster static-file service for no operational benefit.
 
 ### Existing service hostnames
 
@@ -784,7 +784,7 @@ Caddy no longer fronts any cluster service as of this second migration wave — 
 | Apicurio (schema-registry) | https://schema-registry.verticon.com |
 | vLLM (OpenAI API) | https://vllm.verticon.com — net-new, never had a Caddy entry |
 
-**Via Caddy on mullet** (static file server, no Kubernetes backend — can't move to kgateway):
+**Via Caddy on mullet** (mullet's own static sites — intentionally out of scope, not a cluster service):
 
 | Hostname                | Purpose |
 | ------------------------ | ------- |
