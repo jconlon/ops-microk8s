@@ -10,10 +10,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-prometheus
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "prometheus.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: prometheus-kube-prometheus-prometheus
           port: 80
           kind: Service

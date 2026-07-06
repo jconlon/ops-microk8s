@@ -10,10 +10,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-loki
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "loki.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: loki-gateway
           port: 80
           kind: Service

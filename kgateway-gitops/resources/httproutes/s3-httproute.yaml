@@ -10,10 +10,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-s3
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "s3.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: rook-ceph-rgw-external
           port: 80
           kind: Service

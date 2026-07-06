@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-registry
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "registry.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: harbor
           port: 80
           kind: Service

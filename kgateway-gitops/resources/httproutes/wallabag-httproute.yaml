@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-wallabag
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "wallabag.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: wallabag
           port: 80
           kind: Service

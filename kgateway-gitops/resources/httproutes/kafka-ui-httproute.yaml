@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-kafka
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "kafka.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: kafka-ui
           port: 80
           kind: Service

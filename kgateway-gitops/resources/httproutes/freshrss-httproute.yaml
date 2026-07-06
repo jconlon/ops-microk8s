@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-freshrss
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "freshrss.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: freshrss
           port: 80
           kind: Service

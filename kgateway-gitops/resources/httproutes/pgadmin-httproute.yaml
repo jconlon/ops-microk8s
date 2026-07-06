@@ -12,10 +12,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-pgadmin
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "pgadmin.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: pgadmin
           port: 80
           kind: Service

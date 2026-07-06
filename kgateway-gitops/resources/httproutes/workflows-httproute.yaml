@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-workflows
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "workflows.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: argo-workflows-server
           port: 2746
           kind: Service

@@ -10,10 +10,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-alertmanager
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "alertmanager.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: alertmanager-kube-promethe-alertmanager
           port: 80
           kind: Service

@@ -10,10 +10,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-schema-registry
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "schema-registry.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: apicurio-registry-external
           port: 8080
           kind: Service

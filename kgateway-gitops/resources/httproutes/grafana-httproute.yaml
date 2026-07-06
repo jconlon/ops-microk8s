@@ -9,10 +9,16 @@ spec:
     - name: cluster-gateway
       namespace: kgateway-system
       sectionName: https-grafana
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - "grafana.verticon.com"
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+      backendRefs:
         - name: grafana
           port: 80
           kind: Service
