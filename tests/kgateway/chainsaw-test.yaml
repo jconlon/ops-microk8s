@@ -71,17 +71,20 @@ spec:
                 name: pgadmin
                 namespace: postgresql-system
               status:
-                parents:
-                  - conditions:
-                      - type: Accepted
-                        status: "True"
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
     - name: pgadmin-reachable-via-gateway
       try:
         - script:
             timeout: 30s
             content: |
+              # --resolve (not -H "Host:") is required — kgateway routes HTTPS
+              # listeners by TLS SNI, which -H alone does not set (confirmed
+              # empirically: -H "Host:" against the raw IP gets "Connection
+              # reset by peer" during the TLS handshake, before HTTP is even
+              # reached). --resolve sets both the connection target and SNI.
               STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
-                -H "Host: pgadmin.verticon.com" https://192.168.0.224)
+                --resolve pgadmin.verticon.com:443:192.168.0.224 \
+                https://pgadmin.verticon.com)
               [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                 { echo "Expected 200/302, got: $STATUS"; exit 1; }
               echo "pgAdmin reachable via Gateway: $STATUS"

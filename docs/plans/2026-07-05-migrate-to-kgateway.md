@@ -822,19 +822,28 @@ Confirm both chainsaw suites are green — `Gateway` `Programmed: True` with IP 
                 kind: HTTPRoute
                 metadata:
                   name: pgadmin
-                  namespace: pgadmin
+                  namespace: postgresql-system   # pgAdmin's real namespace — see Step 2
                 status:
-                  parents:
-                    - conditions:
-                        - type: Accepted
-                          status: "True"
+                  # A literal-list assertion here (parents: [{conditions: [{type: Accepted, ...}]}])
+                  # can never match: the real object's parents[0].conditions has TWO entries
+                  # (Accepted, ResolvedRefs) plus sibling fields (controllerName, parentRef) —
+                  # confirmed empirically (this literal form timed out for 5m against a working
+                  # HTTPRoute before being caught and rewritten to the JMESPath filter below,
+                  # matching the GatewayClass/Gateway assertions above).
+                  (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
       - name: pgadmin-reachable-via-gateway
         try:
           - script:
               timeout: 30s
               content: |
+                # --resolve (not -H "Host:") is required — kgateway routes HTTPS
+                # listeners by TLS SNI, which -H alone does not set (confirmed
+                # empirically: -H "Host:" against the raw IP gets "Connection
+                # reset by peer" during the TLS handshake, before HTTP is even
+                # reached). --resolve sets both the connection target and SNI.
                 STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
-                  -H "Host: pgadmin.verticon.com" https://192.168.0.224)
+                  --resolve pgadmin.verticon.com:443:192.168.0.224 \
+                  https://pgadmin.verticon.com)
                 [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                   { echo "Expected 200/302, got: $STATUS"; exit 1; }
                 echo "pgAdmin reachable via Gateway: $STATUS"
@@ -861,6 +870,10 @@ Verify pgAdmin in a real browser through the new path (e.g. a temporary `/etc/ho
 ## Task 5: Migrate remaining HTTP(S) services (wave by wave)
 
 Repeat the Task 4 pattern once per service — for each hostname, add: (1) a `Certificate` in `cert-manager-gitops/resources/certificates/`, (2) an `https-<service>` listener on the shared Gateway referencing that Certificate's Secret, (3) an `HTTPRoute` in `kgateway-gitops/resources/httproutes/` with `sectionName: https-<service>`, (4) matching chainsaw assertions (Certificate Ready, HTTPRoute Accepted, reachability). Do not enumerate every file here — each is a small, independently-committable change of the same shape as pgAdmin's.
+
+**Two gotchas hit and fixed during Task 4 — apply the same fix for every subsequent service, don't repeat the mistake:**
+1. **`HTTPRoute` acceptance assertion:** use `(parents[0].conditions[?type == 'Accepted'].status | [0]): "True"`, not a literal `parents: [{conditions: [{type: Accepted, ...}]}]` list — the real object's `conditions` array always has 2+ entries (`Accepted`, `ResolvedRefs`) plus sibling fields, so a literal-list assertion times out against a perfectly healthy resource.
+2. **Reachability `curl` probes:** use `--resolve <hostname>:443:192.168.0.224 https://<hostname>`, not `-H "Host: <hostname>" https://192.168.0.224` — kgateway routes HTTPS listeners by TLS SNI, which `-H` never sets. The latter gets "Connection reset by peer" during the TLS handshake, before HTTP is even reached, even when everything is actually working correctly.
 
 **Suggested wave order (lowest → highest risk):**
 

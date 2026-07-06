@@ -90,14 +90,14 @@
 
 ### T6 — pgAdmin HTTPRoute accepted and reachable via the shared Gateway (POC)
 
-- **Name:** POC: `pgadmin` `HTTPRoute` is `Accepted`; a `Host`-header probe to `192.168.0.224` returns the pgAdmin login page
+- **Name:** POC: `pgadmin` `HTTPRoute` is `Accepted`; a probe with correct SNI to `192.168.0.224` returns the pgAdmin login page
 - **Type:** scenario
 - **Disposition:** new
 - **Harness:** Chainsaw `tests/kgateway/chainsaw-test.yaml`
 - **Preconditions:** T3 and T5 passed. `pgadmin-httproute.yaml` applied (Task 4). `directory.recurse: true` set on `kgateway-resources-app`.
-- **Actions:** (a) Assert `Certificate` `pgadmin-tls` has `status.conditions[type=Ready].status: "True"`. (b) Assert `HTTPRoute` `pgadmin` has `status.parents[].conditions[type=Accepted].status: "True"`. (c) Script: `curl -sk -H "Host: pgadmin.verticon.com" https://192.168.0.224` returns HTTP 200 or 302.
+- **Actions:** (a) Assert `Certificate` `pgadmin-tls` has `status.conditions[type=Ready].status: "True"`. (b) Assert `HTTPRoute` `pgadmin` has `(parents[0].conditions[?type == 'Accepted'].status | [0]): "True"` (a literal-list assertion form doesn't work — see Interactions). (c) Script: `curl -sk --resolve pgadmin.verticon.com:443:192.168.0.224 https://pgadmin.verticon.com` returns HTTP 200 or 302 (`-H "Host:"` alone is insufficient — see Interactions).
 - **Expected outcome:** All three pass. This is the primary acceptance gate for the entire POC — the full chain (ACME DNS-01 solve via Cloudflare → Certificate issued → Gateway's `https-pgadmin` listener terminates TLS with that cert → HTTPRoute → backend Service → pgAdmin pod) must work end-to-end.
-- **Interactions:** Exercises HTTPRoute backendRef resolution, Gateway API's `directory.recurse: true` requirement on both `kgateway-resources-app` and `cert-manager-resources-app` (silent-failure risk if missing — same trap as argo-events), and the confirmed per-hostname listener+Certificate pattern from the plan's Architectural Decisions (this test is the first live proof of it working, not just a documented assumption).
+- **Interactions:** Exercises HTTPRoute backendRef resolution, Gateway API's `directory.recurse: true` requirement on both `kgateway-resources-app` and `cert-manager-resources-app` (silent-failure risk if missing — same trap as argo-events), and the confirmed per-hostname listener+Certificate pattern from the plan's Architectural Decisions (this test is the first live proof of it working, not just a documented assumption). Two assertion/probe gotchas found and fixed while running this test for real: (1) `status.parents[].conditions[]` always has 2+ entries (`Accepted`, `ResolvedRefs`) plus sibling fields, so a literal-list chainsaw assertion times out against a healthy resource — needs the JMESPath filter form instead; (2) kgateway routes HTTPS listeners by TLS SNI, so `curl -H "Host:"` against the raw IP gets a TLS-level connection reset before HTTP is reached — `--resolve` is required to set both the connection target and SNI correctly.
 
 ---
 
