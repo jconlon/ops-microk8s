@@ -234,6 +234,104 @@
 </div>
 <p class="subtitle">Infrastructure configuration and documentation for the Verticon MicroK8s cluster</p>
 
+<!-- ── Quick Connect ──────────────────────────────────────────────── -->
+<h2>Quick Connect</h2>
+<p style="font-size:0.88rem; color:var(--muted); margin-bottom:1rem;">
+  All 16 services below are fronted by kgateway (Gateway API) with automatic Let's Encrypt TLS via cert-manager.
+</p>
+
+<table class="ep-table">
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Link</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>ArgoCD</strong></td>
+      <td><a href="https://argocd.verticon.com" target="_blank" rel="noopener">argocd.verticon.com</a></td>
+      <td>GitOps dashboard — sync status, rollback history</td>
+    </tr>
+    <tr>
+      <td><strong>Argo Workflows</strong></td>
+      <td><a href="https://workflows.verticon.com" target="_blank" rel="noopener">workflows.verticon.com</a></td>
+      <td>CI/CD pipeline UI — kaniko builds, run history</td>
+    </tr>
+    <tr>
+      <td><strong>Argo Events Webhook</strong></td>
+      <td><a href="https://events.verticon.com/push" target="_blank" rel="noopener">events.verticon.com/push</a></td>
+      <td>CI trigger endpoint (HTTP POST, not browsable)</td>
+    </tr>
+    <tr>
+      <td><strong>Grafana</strong></td>
+      <td><a href="https://grafana.verticon.com" target="_blank" rel="noopener">grafana.verticon.com</a></td>
+      <td>Dashboards — metrics, logs, alerts</td>
+    </tr>
+    <tr>
+      <td><strong>Prometheus</strong></td>
+      <td><a href="https://prometheus.verticon.com" target="_blank" rel="noopener">prometheus.verticon.com</a></td>
+      <td>Raw PromQL query interface</td>
+    </tr>
+    <tr>
+      <td><strong>AlertManager</strong></td>
+      <td><a href="https://alertmanager.verticon.com" target="_blank" rel="noopener">alertmanager.verticon.com</a></td>
+      <td>Alert routing, grouping, and silencing</td>
+    </tr>
+    <tr>
+      <td><strong>Harbor</strong></td>
+      <td><a href="https://registry.verticon.com" target="_blank" rel="noopener">registry.verticon.com</a></td>
+      <td>Container image registry</td>
+    </tr>
+    <tr>
+      <td><strong>Kafka UI</strong></td>
+      <td><a href="https://kafka.verticon.com" target="_blank" rel="noopener">kafka.verticon.com</a></td>
+      <td>Topics, consumer groups, messages</td>
+    </tr>
+    <tr>
+      <td><strong>Apicurio Registry</strong></td>
+      <td><a href="https://schema-registry.verticon.com" target="_blank" rel="noopener">schema-registry.verticon.com</a></td>
+      <td>Avro/Protobuf schema registry</td>
+    </tr>
+    <tr>
+      <td><strong>Loki</strong></td>
+      <td><a href="https://loki.verticon.com" target="_blank" rel="noopener">loki.verticon.com</a></td>
+      <td>LogQL HTTP API (query via Grafana Explore)</td>
+    </tr>
+    <tr>
+      <td><strong>FreshRSS</strong></td>
+      <td><a href="https://freshrss.verticon.com" target="_blank" rel="noopener">freshrss.verticon.com</a></td>
+      <td>RSS feed aggregator and reader</td>
+    </tr>
+    <tr>
+      <td><strong>Wallabag</strong></td>
+      <td><a href="https://wallabag.verticon.com" target="_blank" rel="noopener">wallabag.verticon.com</a></td>
+      <td>Read-later and article archiving</td>
+    </tr>
+    <tr>
+      <td><strong>pgAdmin</strong></td>
+      <td><a href="https://pgadmin.verticon.com" target="_blank" rel="noopener">pgadmin.verticon.com</a></td>
+      <td>PostgreSQL administration UI</td>
+    </tr>
+    <tr>
+      <td><strong>Hasura</strong></td>
+      <td><a href="https://hasura.verticon.com" target="_blank" rel="noopener">hasura.verticon.com</a></td>
+      <td>GraphQL console and API</td>
+    </tr>
+    <tr>
+      <td><strong>Ceph S3 / RGW</strong></td>
+      <td><a href="https://s3.verticon.com" target="_blank" rel="noopener">s3.verticon.com</a></td>
+      <td>S3-compatible object storage API</td>
+    </tr>
+    <tr>
+      <td><strong>vLLM</strong></td>
+      <td><a href="https://vllm.verticon.com" target="_blank" rel="noopener">vllm.verticon.com</a></td>
+      <td>OpenAI-compatible LLM inference API</td>
+    </tr>
+  </tbody>
+</table>
+
 <!-- ── About ──────────────────────────────────────────────────────── -->
 <h2>About this repository</h2>
 
