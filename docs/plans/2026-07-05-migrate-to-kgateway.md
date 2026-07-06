@@ -2,15 +2,18 @@
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Follow this repo's App-of-Apps / chainsaw conventions exactly — see `argoCD-apps/harbor-apps.yaml` and `docs/plans/2026-04-27-deploy-argo-events.md` for the canonical pattern this plan reuses.
 
-**Goal:** Replace the manually-managed Caddy reverse proxy on `mullet` with a GitOps-managed Gateway API implementation. Deploy **kgateway** (CNCF sandbox, Envoy-based Gateway API implementation, formerly Gloo Gateway) and **cert-manager** via ArgoCD, stand up a single shared `Gateway` behind one MetalLB IP with automated Let's Encrypt HTTP-01 certificates, migrate one low-risk HTTP(S) service as a proof of concept, then migrate the rest of the cluster's HTTP(S) services onto `HTTPRoute` objects, and finally cut DNS over and decommission the Caddyfile. Issue: [#108](https://github.com/jconlon/ops-microk8s/issues/108).
+> **Correction (2026-07-06):** this plan originally specified HTTP-01 for ACME. That's wrong — `*.verticon.com` DNS records resolve publicly to private LAN IPs (confirmed via `dig @1.1.1.1`/`dig @8.8.8.8`), so Let's Encrypt's validators can never open a connection to any of these hostnames, no matter what IP they point to. Caddy already works around this via DNS-01 (`dns.providers.cloudflare` module, confirmed on mullet via `caddy list-modules`). All HTTP-01 references below have been corrected to DNS-01. See issue [#109](https://github.com/jconlon/ops-microk8s/issues/109) for the Cloudflare API token bootstrap this now depends on.
 
-**Architecture:** kgateway installs as two Helm charts — `kgateway-crds` (Gateway API + kgateway CRDs) and `kgateway` (controller + default `GatewayClass` named `kgateway`) — in the `kgateway-system` namespace. cert-manager installs via its standard Jetstack Helm chart into `cert-manager`, with `config.enableGatewayAPI=true` so it can solve ACME HTTP-01 challenges through a `Gateway`/`HTTPRoute` instead of an `Ingress`. A single cluster-wide `Gateway` resource (`kgateway-gitops/resources/gateway.yaml`) listens on 80/443 and gets one MetalLB IP, `192.168.0.224`. A `ClusterIssuer` references that `Gateway` for HTTP-01 solving. Each migrated service gets its own `HTTPRoute` attached to that one `Gateway`, replacing its dedicated MetalLB IP + Caddyfile block. Everything follows the existing App-of-Apps pattern (parent `Application` → per-component child `Application`s, sync waves separating CRD/controller install from CRD-instance resources) exactly as `argo-events-apps`/`harbor-apps` do today.
+**Goal:** Replace the manually-managed Caddy reverse proxy on `mullet` with a GitOps-managed Gateway API implementation. Deploy **kgateway** (CNCF sandbox, Envoy-based Gateway API implementation, formerly Gloo Gateway) and **cert-manager** via ArgoCD, stand up a single shared `Gateway` behind one MetalLB IP with automated Let's Encrypt DNS-01 (Cloudflare) certificates, migrate one low-risk HTTP(S) service as a proof of concept, then migrate the rest of the cluster's HTTP(S) services onto `HTTPRoute` objects, and finally cut DNS over and decommission the Caddyfile. Issue: [#108](https://github.com/jconlon/ops-microk8s/issues/108).
+
+**Architecture:** kgateway installs as two Helm charts — `kgateway-crds` (Gateway API + kgateway CRDs) and `kgateway` (controller + default `GatewayClass` named `kgateway`, confirmed auto-created by the chart) — in the `kgateway-system` namespace. cert-manager installs via its standard Jetstack Helm chart into `cert-manager`. A single cluster-wide `Gateway` resource (`kgateway-gitops/resources/gateway.yaml`) listens on 80/443 and gets one MetalLB IP, `192.168.0.224` — the port-80 listener is retained for HTTP→HTTPS redirects but is no longer part of the ACME flow. A `ClusterIssuer` uses DNS-01 via Cloudflare (matching what Caddy already does) to issue certs, independent of the Gateway entirely. Each migrated service gets its own `HTTPRoute` attached to that one `Gateway`, replacing its dedicated MetalLB IP + Caddyfile block. Everything follows the existing App-of-Apps pattern (parent `Application` → per-component child `Application`s, sync waves separating CRD/controller install from CRD-instance resources) exactly as `argo-events-apps`/`harbor-apps` do today.
 
 **Tech Stack:**
 - kgateway Helm charts `kgateway-crds` + `kgateway`, OCI registry `oci://cr.kgateway.dev/kgateway-dev/charts/...`
-- Gateway API CRDs: `GatewayClass`, `Gateway`, `HTTPRoute` (installed by `kgateway-crds`)
-- cert-manager Helm chart `cert-manager` at `https://charts.jetstack.io`, with Gateway API support enabled
+- Gateway API CRDs: `GatewayClass`, `Gateway`, `HTTPRoute` (installed separately — the upstream v1.6.0 standard-channel bundle, vendored into this repo; `kgateway-crds` only installs kgateway's own extension CRDs, confirmed via `helm template`)
+- cert-manager Helm chart `cert-manager` at `https://charts.jetstack.io`
 - cert-manager CRDs: `ClusterIssuer`, `Certificate` (installed by the chart, `installCRDs: true`)
+- Cloudflare API token (DNS-01 solver), bootstrapped via `teller` — see issue #109
 - MetalLB LoadBalancer IP `192.168.0.224` for the shared Gateway
 - Chainsaw for e2e testing; `just` for status/test recipes
 
@@ -30,11 +33,14 @@
 | `kgateway-gitops/resources/gateway.yaml` | Shared `Gateway` (HTTP+HTTPS listeners, MetalLB `.224`) |
 | `kgateway-gitops/resources/httproutes/pgadmin-httproute.yaml` | POC `HTTPRoute` for pgAdmin |
 | `kgateway-gitops/resources/httproutes/<service>-httproute.yaml` | One per migrated service (Task 5, added incrementally) |
-| `cert-manager-gitops/helm/cert-manager-values.yaml` | cert-manager Helm values (`enableGatewayAPI: true`) |
+| `cert-manager-gitops/helm/cert-manager-values.yaml` | cert-manager Helm values |
 | `argoCD-apps/cert-manager-apps.yaml` | App-of-Apps parent → `argoCD-apps/cert-manager/` |
 | `argoCD-apps/cert-manager/cert-manager-app.yaml` | Wave 1 — cert-manager controller + CRDs |
 | `argoCD-apps/cert-manager/cert-manager-resources-app.yaml` | Wave 2 — `ClusterIssuer` |
-| `cert-manager-gitops/resources/cluster-issuer.yaml` | Let's Encrypt `ClusterIssuer`, HTTP-01 via `gatewayHTTPRoute` |
+| `cert-manager-gitops/resources/cluster-issuer.yaml` | Let's Encrypt `ClusterIssuer`, DNS-01 via `dns01.cloudflare` |
+| `cert-manager-gitops/resources/certificates/` | Per-hostname `Certificate` resources |
+| `kgateway-gitops/crds/gateway-api-standard-install.yaml` | Vendored upstream Gateway API core CRDs (v1.6.0) |
+| `argoCD-apps/kgateway/gateway-api-crds-app.yaml` | Wave 0 — installs the vendored CRDs above |
 | `tests/kgateway/chainsaw-test.yaml` | kgateway + Gateway + HTTPRoute health/reachability tests |
 | `tests/cert-manager/chainsaw-test.yaml` | cert-manager health + ClusterIssuer readiness tests |
 
@@ -53,8 +59,12 @@
 
 ## Architectural Decisions
 
-### ACME challenge type: HTTP-01, not DNS-01
-`*.verticon.com` A records already point directly at mullet's public IP with Cloudflare proxying disabled ("DNS only"), so HTTP-01 challenge traffic reaches the cluster directly without needing a Cloudflare API token. DNS-01 would require bootstrapping a new `teller` config and GSM secret for a Cloudflare API token for no immediate benefit (no wildcard cert need today). Deferred to a follow-on issue if wildcard certs become necessary.
+### ACME challenge type: DNS-01 via Cloudflare, not HTTP-01
+Confirmed empirically while debugging a stuck `pgadmin-tls` Certificate during Task 4: `*.verticon.com` DNS records resolve **publicly** to private LAN IPs (`dig @1.1.1.1 pgadmin.verticon.com` and `dig @8.8.8.8 pgadmin.verticon.com` both return `192.168.0.101`, mullet's LAN IP — not a real public address). HTTP-01 requires Let's Encrypt to open an actual connection to whatever IP the domain currently resolves to; since that will always be a private LAN address in this cluster's design, **no DNS answer could ever make HTTP-01 succeed** — cutting DNS over to the Gateway's IP in Task 6 wouldn't fix it either, since `192.168.0.224` is exactly as unreachable from the internet as mullet's IP is. This is not a sequencing problem, it's a fundamental incompatibility.
+
+Caddy already solves this correctly: it has the `dns.providers.cloudflare` module built in (confirmed via `caddy list-modules` on mullet) and uses **DNS-01** — proving domain ownership by publishing a `_acme-challenge.<host>` TXT record via the Cloudflare API, which Let's Encrypt verifies with a plain DNS lookup (no connection to the domain required at all). cert-manager's `ClusterIssuer` needs the same mechanism: a `dns01.cloudflare` solver referencing a Cloudflare API token (`Zone:DNS:Edit` on `verticon.com`, separate from Caddy's own token) stored as a Kubernetes Secret. Bootstrapping that token is tracked in issue [#109](https://github.com/jconlon/ops-microk8s/issues/109) — Task 3 cannot reach a Ready `ClusterIssuer` until it's resolved.
+
+One consequence: the Gateway's shared plain HTTP listener (port 80), originally built to serve HTTP-01 challenge responses, is **no longer needed for certificate issuance**. It's retained for HTTP→HTTPS redirect traffic (a separate, still-useful concern), but ACME no longer depends on it at all.
 
 ### One shared Gateway, one shared MetalLB IP (`192.168.0.224`)
 Today every service gets its own MetalLB IP (`.201`–`.223` allocated, pool is `.200`–`.230` — nearly half consumed). kgateway's `HTTPRoute` model lets many hostnames share one `Gateway`/one LoadBalancer Service, the same way Caddy shares one host IP for many `Caddyfile` blocks today. `192.168.0.224` is the next free IP in the pool.
@@ -67,23 +77,21 @@ Each gets its own App-of-Apps parent (`kgateway-apps`, `cert-manager-apps`) with
 
 ### Sync waves
 - **kgateway**: wave 1 (`kgateway-crds`) → wave 2 (`kgateway` controller) → wave 3 (`kgateway-resources`: `Gateway` + `HTTPRoute`s). CRDs must exist before the controller starts; the controller must be running and the `GatewayClass` `Accepted` before any `Gateway`/`HTTPRoute` is applied.
-- **cert-manager**: wave 1 (`cert-manager` chart, CRDs + controller together — `installCRDs: true`) → wave 2 (`cert-manager-resources`: `ClusterIssuer`). The `ClusterIssuer`'s `gatewayHTTPRoute` solver references the kgateway `Gateway`, so cert-manager's `ClusterIssuer` should not be applied until kgateway's `Gateway` exists (cross-app ordering handled by Checkpoint A below, not by ArgoCD sync-wave alone since these are two separate App-of-Apps trees).
+- **cert-manager**: wave 1 (`cert-manager` chart, CRDs + controller together — `installCRDs: true`) → wave 2 (`cert-manager-resources`: `ClusterIssuer`). With the DNS-01 solver, the `ClusterIssuer` has no dependency on the kgateway `Gateway` at all — its only real dependency is the Cloudflare API token Secret existing (issue #109) before `cert-manager-resources` can reach `Ready`.
 
 ### kgateway chart version: pin to a stable release at implementation time
 The only version confirmed via current docs is the rolling `v2.4.0-main` build tag, which is **not** appropriate for a production cluster. Before Task 1, check https://github.com/kgateway-dev/kgateway/releases for the latest stable tag and pin both `kgateway-crds` and `kgateway` charts to it (same version for both, per kgateway's own compatibility expectation).
 
-### GatewayClass: verify whether the `kgateway` chart creates it automatically
-kgateway's own examples reference `gatewayClassName: kgateway` as an existing class, but the chart's own test fixtures show a separate "setup" step adding `GatewayClass`/`GatewayParameters`. **Verify after Task 1** with `kubectl get gatewayclass` — if `kgateway` is not present, add an explicit `GatewayClass` manifest (controller name `kgateway.dev/kgateway-controller` or the value documented in the pinned release's install guide) to `kgateway-resources-app` in Task 3.
+### GatewayClass auto-creation (confirmed during implementation)
+**Resolved:** the `kgateway` controller chart does auto-create the default `kgateway` `GatewayClass` — no `GatewayClass` manifest exists anywhere in this repo, and `kubectl get gatewayclass` showed `kgateway` `Accepted: True` immediately after the `kgateway` chart (Task 1, wave 2) synced.
 
-### cert-manager Gateway API support must be explicitly enabled
-The Jetstack Helm chart does not solve ACME challenges via Gateway API by default — it requires:
-```yaml
-config:
-  apiVersion: controller.config.cert-manager.io/v1alpha1
-  kind: ControllerConfiguration
-  enableGatewayAPI: true
-```
-Gateway API CRDs (installed by kgateway's `kgateway-crds` chart) must exist **before** cert-manager starts, or cert-manager must be restarted after they're installed. This is why cert-manager's Task 2 has no hard ArgoCD dependency on kgateway's CRDs being installed first in this plan — but operationally, Task 1 should complete before Task 2 starts, even though they're drawn as parallel in the dependency graph (parallel = no manifest cross-reference, not "any order is safe").
+### Core Gateway API CRDs are NOT installed by kgateway-crds (discovered during implementation)
+`kgateway-crds` only installs kgateway's own extension CRDs (`gateway.kgateway.dev` group — `TrafficPolicy`, `Backend`, `GatewayParameters`, etc.), confirmed via `helm template` and via `kubectl get crd` after deploying it. The core Gateway API CRDs (`GatewayClass`, `Gateway`, `HTTPRoute`, `ReferenceGrant`, etc. — `gateway.networking.k8s.io` group) are a separate upstream project with no Helm chart of its own; they must be installed from the static manifest bundle at `https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.0/standard-install.yaml`. Vendored into this repo as `kgateway-gitops/crds/gateway-api-standard-install.yaml` and deployed as a new wave-0 `gateway-api-crds` app (ahead of `kgateway-crds`, wave 1) — see Task 1.
+
+**Important:** this bundle's CRD annotations exceed the 262144-byte client-side-apply limit — the ArgoCD app deploying it **must** use `ServerSideApply=true` (upstream's own install instructions say `kubectl apply --server-side` for the same reason).
+
+### cert-manager Gateway API support is not needed (superseded — see ACME challenge type above)
+The Jetstack Helm chart's `config.enableGatewayAPI: true` only matters for a `gatewayHTTPRoute` ACME solver, which this plan no longer uses (DNS-01 via Cloudflare has no dependency on Gateway API at all). The value can be left enabled or disabled with no effect on cert issuance; this plan leaves it enabled since it was already applied before the DNS-01 correction and removing it would require an extra Helm upgrade for no benefit.
 
 ### Migration is incremental and reversible
 Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRoute` is validated side-by-side with the existing Caddy route (different IP, same hostname resolved manually) before any DNS record changes. DNS cutover is the single, easily-revertible last step (Task 6) — reverting means pointing the A record back at mullet's IP.
@@ -267,8 +275,11 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
   `cert-manager-gitops/helm/cert-manager-values.yaml`:
   ```yaml
   # cert-manager — automated TLS certificate issuance.
-  # enableGatewayAPI is REQUIRED for the ClusterIssuer's gatewayHTTPRoute solver
-  # (Task 3) to work — without it, cert-manager only supports Ingress-based solving.
+  # NOTE: ClusterIssuer uses DNS-01 via Cloudflare, not HTTP-01/gatewayHTTPRoute —
+  # see this plan's Architectural Decisions (*.verticon.com resolves to private LAN
+  # IPs, so HTTP-01 can never succeed here). enableGatewayAPI below is not required
+  # for DNS-01 issuance; harmless to leave enabled, only relevant if a
+  # gatewayHTTPRoute solver is added later.
   installCRDs: true
   config:
     apiVersion: controller.config.cert-manager.io/v1alpha1
@@ -387,9 +398,9 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
   # Confirmed pattern (Envoy Gateway docs — kgateway is Envoy-based, same model):
   # there is no single generic HTTPS listener with SNI fan-out across arbitrary
   # certs. Instead:
-  #   - ONE shared "http" listener (port 80, all namespaces) is used by
-  #     cert-manager's HTTP-01 solver for every hostname — this is the only
-  #     truly shared TLS-adjacent piece, and it's what keeps this a single IP.
+  #   - ONE shared "http" listener (port 80, all namespaces) — NOT used for ACME
+  #     (cert-manager uses DNS-01 via Cloudflare; see Architectural Decisions).
+  #     Retained for HTTP->HTTPS redirect traffic instead.
   #   - ONE HTTPS listener PER HOSTNAME is added here as each service migrates
   #     (Task 4 adds the first, Task 5 adds the rest) — each with its own
   #     `hostname:` and its own `certificateRefs` Secret, populated by a
@@ -401,11 +412,18 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
   metadata:
     name: cluster-gateway
     namespace: kgateway-system
-    annotations:
-      # MetalLB pins this Gateway's Service to .224 (next free IP after Apicurio's .223).
-      metallb.universe.tf/loadBalancerIPs: "192.168.0.224"
   spec:
     gatewayClassName: kgateway
+    # kgateway creates its own Service for the data plane — it does NOT copy
+    # metadata.annotations from the Gateway resource onto that Service (confirmed
+    # empirically: an annotation there was silently ignored, MetalLB auto-assigned
+    # an unrelated IP). The Gateway API spec's own infrastructure.annotations
+    # field (Support: Extended, confirmed present on the installed v1.6.0 CRDs)
+    # is what actually reaches the generated Service.
+    infrastructure:
+      annotations:
+        # MetalLB pins this Gateway's Service to .224 (next free IP after Apicurio's .223).
+        metallb.universe.tf/loadBalancerIPs: "192.168.0.224"
     listeners:
       - name: http
         protocol: HTTP
@@ -430,12 +448,14 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
 
 - [ ] **Step 3: Create the ClusterIssuer**
 
-  `cert-manager-gitops/resources/cluster-issuer.yaml`:
+  > **Correction (2026-07-06):** originally implemented with an `http01.gatewayHTTPRoute` solver (shown further down in a strikethrough-style note for the record). That cannot work — see the Architectural Decisions section on ACME challenge type. The corrected target form is below; it requires the Cloudflare API token Secret from issue [#109](https://github.com/jconlon/ops-microk8s/issues/109) to exist first. **As of this writing, the committed `cert-manager-gitops/resources/cluster-issuer.yaml` still uses the old `http01` form** (the `pgadmin-tls` Certificate is stuck `pending` as a direct result) — updating it to the form below is the first step once #109's secret lands.
+
+  `cert-manager-gitops/resources/cluster-issuer.yaml` (corrected target form):
   ```yaml
   apiVersion: cert-manager.io/v1
   kind: ClusterIssuer
   metadata:
-    name: letsencrypt-http01
+    name: letsencrypt-http01   # name kept as-is to avoid renaming a resource other manifests already reference
   spec:
     acme:
       server: https://acme-v02.api.letsencrypt.org/directory
@@ -443,12 +463,11 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
       privateKeySecretRef:
         name: letsencrypt-http01-account-key
       solvers:
-        - http01:
-            gatewayHTTPRoute:
-              parentRefs:
-                - kind: Gateway
-                  name: cluster-gateway
-                  namespace: kgateway-system
+        - dns01:
+            cloudflare:
+              apiTokenSecretRef:
+                name: cloudflare-api-token-secret
+                key: api-token
   ```
 
   > Start with the production ACME server directly since `*.verticon.com` domains are already established and not rate-limit-risk; if repeated failed attempts are expected during development, temporarily point `server` at `https://acme-staging-v02.api.letsencrypt.org/directory` and switch back before Task 4's real verification.
@@ -588,7 +607,7 @@ Caddy keeps serving 100% of production traffic through Task 5. Every new `HTTPRo
   metadata:
     name: cert-manager-healthy
   spec:
-    description: cert-manager is deployed and the HTTP-01 ClusterIssuer is Ready
+    description: cert-manager is deployed and the DNS-01 ClusterIssuer is Ready
     concurrent: false
     timeouts:
       assert: 5m
@@ -699,10 +718,10 @@ Confirm both chainsaw suites are green — `Gateway` `Programmed: True` with IP 
   `cert-manager-gitops/resources/certificates/pgadmin-certificate.yaml`:
   ```yaml
   # One Certificate per migrated hostname — cert-manager solves the ACME
-  # HTTP-01 challenge via a temporary HTTPRoute on the Gateway's shared "http"
-  # listener (per the ClusterIssuer's gatewayHTTPRoute solver), then writes the
-  # cert+key into the Secret named below. That Secret is what the Gateway's
-  # https-pgadmin listener references in Task 4 Step 4.
+  # DNS-01 challenge via the Cloudflare API (ClusterIssuer's dns01.cloudflare
+  # solver — *.verticon.com resolves to private LAN IPs, so HTTP-01 cannot
+  # work here), then writes the cert+key into the Secret named below. That
+  # Secret is what the Gateway's https-pgadmin listener references in Task 4 Step 4.
   apiVersion: cert-manager.io/v1
   kind: Certificate
   metadata:
@@ -916,14 +935,14 @@ Per issue #108's stated scope, deploying kagent itself is tracked in a separate 
 
 ## Tricky Boundaries and Risk Notes
 
-### GatewayClass auto-creation is unconfirmed
-Unlike the rest of this plan's manifests, whether the `kgateway` Helm chart creates the `kgateway` `GatewayClass` automatically is **not confirmed** from available documentation at plan-writing time. Task 1's verification step (`kubectl get gatewayclass`) is the actual gate — if absent, add an explicit `GatewayClass` manifest to `kgateway-resources-app` before proceeding to Task 3.
+### GatewayClass auto-creation — resolved (see Architectural Decisions)
+Confirmed during implementation: the `kgateway` chart auto-creates the `kgateway` `GatewayClass`. No further action needed.
 
-### cert-manager Gateway API support requires CRD ordering
-Gateway API CRDs (from `kgateway-crds`, Task 1) must exist before cert-manager starts with `enableGatewayAPI: true`, or cert-manager needs a restart after they appear. Since this plan runs Task 1 before Task 2 in practice (even though they're architecturally independent), this should not bite — but if cert-manager's controller logs show it isn't recognizing `gatewayHTTPRoute` solvers, restart the `cert-manager` Deployment as the first diagnostic step.
+### cert-manager `enableGatewayAPI` CRD-ordering crash loop (confirmed, hit in practice)
+This one really happened, independent of the HTTP-01/DNS-01 correction: with `config.enableGatewayAPI: true` set, cert-manager's controller refuses to start at all if the core Gateway API CRDs aren't present yet — `"the Gateway API CRDs do not seem to be present, but ExperimentalGatewayAPISupport is set to true"` — and crash-loops rather than waiting/retrying. This was hit directly during Task 3 bootstrap (the `gateway-api-crds` wave-0 app synced a few seconds after the `cert-manager` pod's first start attempt). Fix was simply `kubectl delete pod -n cert-manager -l app.kubernetes.io/component=controller` once the CRDs existed — the next restart succeeds. If `enableGatewayAPI` is ever removed (see the note in Task 2 — it's not needed for DNS-01), this failure mode goes away entirely.
 
-### TLS certificate wiring pattern (confirmed)
-Per Envoy Gateway's own docs (kgateway is Envoy-based, same Gateway API model): there is **no single generic HTTPS listener with SNI fan-out across arbitrary certs**. The confirmed, standard pattern — used from Task 4 onward — is one HTTPS listener **per hostname** on the shared `Gateway`, each with its own `tls.certificateRefs` pointing at a Secret populated by its own per-hostname `Certificate` resource. The one truly shared piece is the plain HTTP listener (port 80), which cert-manager's `gatewayHTTPRoute` HTTP-01 solver uses for every hostname's challenge. This is why the shared-Gateway/shared-IP benefit is real (one MetalLB IP, one Service) even though the per-hostname listener/Certificate/HTTPRoute triplet still has to be declared once per service — structurally similar to Caddy's per-hostname blocks, just GitOps-explicit instead of automatic.
+### TLS certificate wiring pattern (confirmed, listener part still applies — solver part corrected)
+Per Envoy Gateway's own docs (kgateway is Envoy-based, same Gateway API model): there is **no single generic HTTPS listener with SNI fan-out across arbitrary certs**. The confirmed, standard pattern — used from Task 4 onward — is one HTTPS listener **per hostname** on the shared `Gateway`, each with its own `tls.certificateRefs` pointing at a Secret populated by its own per-hostname `Certificate` resource. This part is unaffected by the DNS-01 correction. What's no longer true: the plain HTTP listener (port 80) does **not** serve any ACME purpose now — DNS-01 issuance never touches the Gateway at all. That listener is retained only for HTTP→HTTPS redirect traffic, a separate concern from certificate issuance.
 
 ### `directory.recurse: true` silent-failure trap (two apps affected)
 Identical to the trap documented in the argo-events plan, and it affects **both** new App-of-Apps trees starting in Task 4: `kgateway-resources-app`'s path (`kgateway-gitops/resources`) gains a `httproutes/` subdirectory, and `cert-manager-resources-app`'s path (`cert-manager-gitops/resources`) gains a `certificates/` subdirectory. Without `directory.recurse: true` on **both** apps, ArgoCD reports each `Synced`/`Healthy` while silently applying zero of the subdirectory's resources. Always verify with `kubectl get httproute -A` and `kubectl get certificate -A` after any sync that's supposed to add a new route/cert.

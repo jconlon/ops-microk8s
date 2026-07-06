@@ -4,9 +4,11 @@
 # Confirmed pattern (Envoy Gateway docs — kgateway is Envoy-based, same model):
 # there is no single generic HTTPS listener with SNI fan-out across arbitrary
 # certs. Instead:
-#   - ONE shared "http" listener (port 80, all namespaces) is used by
-#     cert-manager's HTTP-01 solver for every hostname — this is the only
-#     truly shared TLS-adjacent piece, and it's what keeps this a single IP.
+#   - ONE shared "http" listener (port 80, all namespaces) — NOT used for ACME
+#     (cert-manager uses DNS-01 via Cloudflare; *.verticon.com resolves to
+#     private LAN IPs, so HTTP-01 can never work here — see
+#     docs/plans/2026-07-05-migrate-to-kgateway.md Architectural Decisions).
+#     Retained for HTTP->HTTPS redirect traffic instead.
 #   - ONE HTTPS listener PER HOSTNAME is added here as each service migrates
 #     (Task 4 adds the first, Task 5 adds the rest) — each with its own
 #     `hostname:` and its own `certificateRefs` Secret, populated by a

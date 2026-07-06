@@ -1,6 +1,8 @@
 # cert-manager — automated TLS certificate issuance.
-# enableGatewayAPI is REQUIRED for the ClusterIssuer's gatewayHTTPRoute solver
-# (Task 3) to work — without it, cert-manager only supports Ingress-based solving.
+# NOTE: ClusterIssuer uses DNS-01 via Cloudflare (see docs/plans/2026-07-05-migrate-to-kgateway.md
+# Architectural Decisions — HTTP-01 cannot work here, *.verticon.com resolves to private LAN IPs).
+# enableGatewayAPI below is not required for DNS-01 issuance; left enabled since it's already
+# applied/synced and is harmless (only relevant if a gatewayHTTPRoute solver is added later).
 installCRDs: true
 config:
   apiVersion: controller.config.cert-manager.io/v1alpha1

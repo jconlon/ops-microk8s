@@ -75,14 +75,16 @@
 
 ### T5 — ClusterIssuer letsencrypt-http01 is Ready
 
+> **Correction (2026-07-06):** the `ClusterIssuer` uses a **DNS-01** solver (Cloudflare), not `http01.gatewayHTTPRoute` as originally written here — `*.verticon.com` resolves to private LAN IPs, so HTTP-01 can never succeed (see the implementation plan's Architectural Decisions). The resource is still named `letsencrypt-http01` (kept as-is to avoid a rename) but the mechanism is DNS-01.
+
 - **Name:** `ClusterIssuer` reaches `Ready: True`
 - **Type:** integration
 - **Disposition:** new
 - **Harness:** Chainsaw `tests/cert-manager/chainsaw-test.yaml`
-- **Preconditions:** T3 passed (the `ClusterIssuer`'s `gatewayHTTPRoute` solver references `cluster-gateway`, which must exist and be Programmed first — cross-app dependency not expressible in ArgoCD sync-waves alone, so this test ordering is the actual gate).
+- **Preconditions:** T4 passed (cert-manager running). Depends on the Cloudflare API token Secret existing (issue #109) — no dependency on `cluster-gateway` at all with DNS-01.
 - **Actions:** Assert `ClusterIssuer` `letsencrypt-http01` has a `Ready` condition with status `True`.
-- **Expected outcome:** Passes within 5m. A failure here most likely means the referenced `Gateway` didn't exist when cert-manager last reconciled the issuer, or `enableGatewayAPI` wasn't actually applied (check T4's Deployment env/args).
-- **Interactions:** Exercises cert-manager's ACME account registration against Let's Encrypt's production directory and its Gateway API HTTPRoute solver wiring.
+- **Expected outcome:** Passes within 5m. A failure here most likely means the Cloudflare API token Secret is missing or has insufficient permissions (`Zone:DNS:Edit` on `verticon.com`) — check `kubectl describe clusterissuer letsencrypt-http01` for the specific ACME error.
+- **Interactions:** Exercises cert-manager's ACME account registration against Let's Encrypt's production directory and its Cloudflare DNS-01 solver wiring (creating/polling/cleaning up `_acme-challenge` TXT records via the Cloudflare API).
 
 ---
 
@@ -94,7 +96,7 @@
 - **Harness:** Chainsaw `tests/kgateway/chainsaw-test.yaml`
 - **Preconditions:** T3 and T5 passed. `pgadmin-httproute.yaml` applied (Task 4). `directory.recurse: true` set on `kgateway-resources-app`.
 - **Actions:** (a) Assert `Certificate` `pgadmin-tls` has `status.conditions[type=Ready].status: "True"`. (b) Assert `HTTPRoute` `pgadmin` has `status.parents[].conditions[type=Accepted].status: "True"`. (c) Script: `curl -sk -H "Host: pgadmin.verticon.com" https://192.168.0.224` returns HTTP 200 or 302.
-- **Expected outcome:** All three pass. This is the primary acceptance gate for the entire POC — the full chain (ACME HTTP-01 solve → Certificate issued → Gateway's `https-pgadmin` listener terminates TLS with that cert → HTTPRoute → backend Service → pgAdmin pod) must work end-to-end.
+- **Expected outcome:** All three pass. This is the primary acceptance gate for the entire POC — the full chain (ACME DNS-01 solve via Cloudflare → Certificate issued → Gateway's `https-pgadmin` listener terminates TLS with that cert → HTTPRoute → backend Service → pgAdmin pod) must work end-to-end.
 - **Interactions:** Exercises HTTPRoute backendRef resolution, Gateway API's `directory.recurse: true` requirement on both `kgateway-resources-app` and `cert-manager-resources-app` (silent-failure risk if missing — same trap as argo-events), and the confirmed per-hostname listener+Certificate pattern from the plan's Architectural Decisions (this test is the first live proof of it working, not just a documented assumption).
 
 ---
@@ -192,7 +194,7 @@
 | GatewayClass acceptance (resolves the plan's open item) | T2 |
 | Shared Gateway programmed + correct MetalLB IP | T3 |
 | cert-manager ArgoCD sync + pod health | T4 |
-| ClusterIssuer readiness (HTTP-01 via Gateway) | T5 |
+| ClusterIssuer readiness (DNS-01 via Cloudflare) | T5 |
 | POC end-to-end reachability + TLS | T6 |
 | Non-regression of existing Caddy path during POC | T7 |
 | Per-service HTTPRoute reachability (repeated) | T8 |
