@@ -18,11 +18,18 @@ kind: Gateway
 metadata:
   name: cluster-gateway
   namespace: kgateway-system
-  annotations:
-    # MetalLB pins this Gateway's Service to .224 (next free IP after Apicurio's .223).
-    metallb.universe.tf/loadBalancerIPs: "192.168.0.224"
 spec:
   gatewayClassName: kgateway
+  # kgateway creates its own Service for the data plane — it does NOT copy
+  # metadata.annotations from the Gateway resource onto that Service (confirmed
+  # empirically: an annotation there was silently ignored, MetalLB auto-assigned
+  # an unrelated IP). The Gateway API spec's own infrastructure.annotations
+  # field (Support: Extended, confirmed present on our installed v1.6.0 CRDs)
+  # is what actually reaches the generated Service.
+  infrastructure:
+    annotations:
+      # MetalLB pins this Gateway's Service to .224 (next free IP after Apicurio's .223).
+      metallb.universe.tf/loadBalancerIPs: "192.168.0.224"
   listeners:
     - name: http
       protocol: HTTP
