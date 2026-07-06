@@ -1,0 +1,9 @@
+# kgateway controller — Envoy-based Gateway API implementation.
+# Installs the default GatewayClass "kgateway" (verify after deploy — see
+# docs/plans/2026-07-05-migrate-to-kgateway.md's Architectural Decisions note
+# on GatewayClass auto-creation).
+# No AI Gateway extension enabled here — Agentgateway is a separate follow-on (issue #108 Task 7).
+
+# Defaults are sufficient for a first deployment: single replica controller,
+# standard RBAC, no AI extension. Revisit replica count if kgateway becomes
+# a single point of failure for all ingress traffic.
