@@ -99,7 +99,7 @@ Projects may open issues here when they need cluster-level support (secrets, sto
   - `kubectl get eventbus,eventsource,sensor -n argo-events` — check resource status
 - **kgateway**: Envoy-based Gateway API implementation, `kgateway-system` namespace — fronts all HTTP(S) ingress traffic, replacing the old per-service MetalLB IP + Caddy pattern (issue #108)
   - Shared `Gateway` (`cluster-gateway`) on a single MetalLB IP `192.168.0.224` — one HTTP listener (port 80, redirect-only, not used for ACME) + one HTTPS listener per migrated hostname (SNI-routed)
-  - Migrated: pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`
+  - Migrated (all 15 in-scope HTTP(S) services): pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events, ArgoCD, FreshRSS, Wallabag, Hasura, Kafka UI, Ceph RGW/S3, Apicurio — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`. Not migrated: mullet's own static-file sites (no K8s backend) and PostgreSQL/raw-TCP Kafka (non-HTTP).
   - **cert-manager** (`cert-manager` namespace) issues real Let's Encrypt certs per hostname via **DNS-01 through Cloudflare** (not HTTP-01 — `*.verticon.com` resolves to private LAN IPs, so Let's Encrypt can never reach the cluster directly for an HTTP-01 challenge); `ClusterIssuer letsencrypt-http01` uses a Cloudflare API token scoped to `Zone:DNS:Edit` on `verticon.com` (separate from Caddy's own token, bootstrapped via `teller/.teller-cert-manager.yml`, see issue #109)
   - Caddy on mullet is no longer used for any of these hostnames — see "Adding a New DNS Name" in README.md for the current (kgateway) procedure
   - `kubectl get gateway,httproute -A` / `kubectl get certificate -n kgateway-system` — check resource status
@@ -218,7 +218,8 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 
 ### Service Access
 
-**Fronted by kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed, real Let's Encrypt certs via DNS-01 — see kgateway entry above):
+**Fronted by kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed, real Let's Encrypt certs via DNS-01 — see kgateway entry above). All in-scope HTTP(S) cluster services now use this path — Caddy on mullet no longer fronts any cluster service (see "Legacy Caddy path" below):
+- **ArgoCD**: https://argocd.verticon.com
 - **Argo Workflows**: https://workflows.verticon.com — CI pipeline UI
 - **Argo Events Webhook**: https://events.verticon.com/push — CI trigger endpoint
 - **Grafana**: https://grafana.verticon.com
@@ -227,11 +228,16 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 - **Loki**: https://loki.verticon.com
 - **Harbor registry**: https://registry.verticon.com
 - **pgAdmin**: https://pgadmin.verticon.com
+- **FreshRSS**: https://freshrss.verticon.com
+- **Wallabag**: https://wallabag.verticon.com
+- **Hasura**: https://hasura.verticon.com
+- **Kafka UI**: https://kafka.verticon.com
+- **Ceph RGW (S3)**: https://s3.verticon.com — path-style access; use `MC_HOST_ceph` in devbox shell
+- **Apicurio Registry**: https://schema-registry.verticon.com (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
 
-**Still fronted by Caddy on mullet** (not yet migrated — out of scope for issue #108):
-- **Ceph RGW (S3)**: https://s3.verticon.com (192.168.0.204:80) — path-style access; use `MC_HOST_ceph` in devbox shell
-- **Apicurio Registry**: http://192.168.0.223:8080 (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
-- FreshRSS, Wallabag, Hasura, Kafka UI, Schema Registry, ArgoCD — see README.md's service hostname table
+**Legacy Caddy path (mullet)**: Caddy still runs on mullet, but only for its own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`) — no Kubernetes backend to route to, so these can't move to kgateway without a redesign. Everything else has been migrated.
+
+**Not fronted by either** (raw TCP, not HTTP): PostgreSQL (`postgresql.verticon.com`, `192.168.0.211`) and Kafka's external broker listener (`192.168.0.213:9094`) — Gateway API's experimental `TCPRoute` channel could handle these but that's a separate, not-yet-made decision.
 
 - **iDRAC Syslog**: each iDRAC sends UDP syslog to its own node's LAN IP:514 → rsyslog receives and writes to `/var/log/syslog` → Promtail ships to Loki. Queryable via `{job="syslog", node="puffer"} \|= "iDRAC"`. rsyslog config: `/etc/rsyslog.d/10-idrac.conf` on each Dell R320 node.
 

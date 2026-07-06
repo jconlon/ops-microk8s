@@ -166,11 +166,13 @@
 <h1>Networking</h1>
 <p class="subtitle">How Cloudflare DNS, kgateway (Gateway API), Caddy, and MetalLB route external traffic to cluster services</p>
 
-<div class="callout callout-note">
-  <strong>Note (issue #108):</strong> HTTP(S) ingress is being migrated from one-MetalLB-IP-per-service
-  + Caddy to a single shared <strong>kgateway</strong> (Gateway API) IP. 8 services have been cut over
-  so far — see the "Which path does a service use?" table below. New HTTP(S) services should use the
-  kgateway path; Caddy remains only for services not yet migrated and for non-HTTP protocols.
+<div class="callout callout-tip">
+  <strong>Update (issue #108):</strong> the migration from one-MetalLB-IP-per-service + Caddy to a
+  single shared <strong>kgateway</strong> (Gateway API) IP is complete for all in-scope HTTP(S)
+  services (15 total). Caddy on mullet no longer fronts any cluster service — it now only serves its
+  own static-file sites (<code>mullet.verticon.com</code>/<code>.lab</code>), which have no
+  Kubernetes backend and can't move to kgateway without a redesign. New HTTP(S) services should
+  always use the kgateway path — see "Which path does a service use?" below.
 </div>
 
 <!-- ── Overview ───────────────────────────────────────────────────── -->
@@ -187,7 +189,7 @@
   connection to a private IP no matter what the DNS record points to.
 </p>
 
-<h3>Path 1 — kgateway (current default for HTTP(S) services)</h3>
+<h3>Path 1 — kgateway (all in-scope HTTP(S) services)</h3>
 <div class="flow-box">
 Internet client
     │
@@ -207,11 +209,11 @@ Grafana Service (monitoring/grafana)
 Grafana pod (inside cluster)
 </div>
 
-<h3>Path 2 — Caddy on mullet (remaining non-migrated services)</h3>
+<h3>Path 2 — Caddy on mullet (static sites only — no cluster service uses this anymore)</h3>
 <div class="flow-box">
 Internet client
     │
-    │  DNS query: freshrss.verticon.com
+    │  DNS query: mullet.verticon.com
     ▼
 Cloudflare DNS  ──────────────────────────────  A record → mullet's LAN IP
     │
@@ -219,13 +221,15 @@ Cloudflare DNS  ─────────────────────�
     ▼
 mullet (Caddy)  ──  TLS termination (Let's Encrypt cert via Cloudflare DNS-01)
     │
-    │  HTTP reverse proxy → 192.168.0.205:80
+    │  file_server, root * /var/caddy/site
     ▼
-MetalLB VIP 192.168.0.205  ──  LoadBalancer service: freshrss/freshrss
-    │
-    ▼
-FreshRSS pod (inside cluster)
+Static files on mullet's local disk (no Kubernetes involved at all)
 </div>
+<p>
+  This is the only remaining use of Caddy — serving its own static sites directly from mullet's
+  filesystem. There's no Kubernetes Service for these, so there's nothing for an <code>HTTPRoute</code>
+  to route to; migrating them would mean first standing up an in-cluster static-file service.
+</p>
 
 <!-- ── Components ─────────────────────────────────────────────────── -->
 <h2>Components</h2>
@@ -234,8 +238,9 @@ FreshRSS pod (inside cluster)
 <p>
   DNS records are managed at <strong>dash.cloudflare.com → verticon.com → DNS → Records</strong>.
   Every service has an <strong>A record</strong> set to <strong>DNS-only</strong> (grey cloud —
-  proxying disabled), pointing at either <code>192.168.0.224</code> (kgateway, for migrated services)
-  or mullet's LAN IP (Caddy, for the rest). Cloudflare proxying is intentionally off for both paths.
+  proxying disabled), pointing at either <code>192.168.0.224</code> (kgateway — all 15 in-scope
+  HTTP(S) services) or mullet's LAN IP (Caddy — only its own static-file sites now). Cloudflare
+  proxying is intentionally off for both paths.
 </p>
 <p>
   Cloudflare is also the <strong>ACME DNS provider</strong> for both kgateway/cert-manager and Caddy —
@@ -411,7 +416,7 @@ listener, etc.), or an HTTP(S) service that for some reason still needs the old 
 <!-- ── DNS record reference ───────────────────────────────────────── -->
 <h2>Which path does a service use?</h2>
 
-<h3>Via kgateway (shared IP <code>192.168.0.224</code>)</h3>
+<h3>Via kgateway (shared IP <code>192.168.0.224</code>) — all in-scope HTTP(S) services</h3>
 <table>
   <thead><tr><th>Hostname</th><th>Service</th></tr></thead>
   <tbody>
@@ -423,20 +428,22 @@ listener, etc.), or an HTTP(S) service that for some reason still needs the old 
     <tr><td><code>registry.verticon.com</code></td><td>Harbor</td></tr>
     <tr><td><code>workflows.verticon.com</code></td><td>Argo Workflows</td></tr>
     <tr><td><code>events.verticon.com</code></td><td>Argo Events webhook</td></tr>
+    <tr><td><code>argocd.verticon.com</code></td><td>ArgoCD</td></tr>
+    <tr><td><code>freshrss.verticon.com</code></td><td>FreshRSS</td></tr>
+    <tr><td><code>wallabag.verticon.com</code></td><td>Wallabag</td></tr>
+    <tr><td><code>hasura.verticon.com</code></td><td>Hasura</td></tr>
+    <tr><td><code>kafka.verticon.com</code></td><td>Kafka UI</td></tr>
+    <tr><td><code>s3.verticon.com</code></td><td>Ceph RGW / S3</td></tr>
+    <tr><td><code>schema-registry.verticon.com</code></td><td>Apicurio Registry</td></tr>
   </tbody>
 </table>
 
-<h3>Via Caddy on mullet (dedicated MetalLB IP each)</h3>
+<h3>Via Caddy on mullet (static sites only — no cluster service)</h3>
 <table>
-  <thead><tr><th>Hostname</th><th>MetalLB IP (LAN)</th><th>Service</th></tr></thead>
+  <thead><tr><th>Hostname</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr><td><code>argocd.verticon.com</code></td><td>192.168.0.200</td><td>ArgoCD</td></tr>
-    <tr><td><code>s3.verticon.com</code></td><td>192.168.0.204</td><td>Ceph RGW / S3</td></tr>
-    <tr><td><code>freshrss.verticon.com</code></td><td>192.168.0.205</td><td>FreshRSS</td></tr>
-    <tr><td><code>kafka.verticon.com</code></td><td>192.168.0.222</td><td>Kafka UI (80; broker 9094 is raw TCP, not via Caddy)</td></tr>
-    <tr><td><code>schema-registry.verticon.com</code></td><td>192.168.0.223</td><td>Apicurio Registry</td></tr>
-    <tr><td><code>wallabag.verticon.com</code></td><td>192.168.0.215</td><td>Wallabag</td></tr>
-    <tr><td><code>hasura.verticon.com</code></td><td>192.168.0.217</td><td>Hasura</td></tr>
+    <tr><td><code>mullet.verticon.com</code></td><td>Static site (<code>/var/caddy/site</code>)</td></tr>
+    <tr><td><code>mullet.verticon.lab</code></td><td>Static site (<code>/var/caddy/html</code>, local-only)</td></tr>
   </tbody>
 </table>
 
@@ -446,7 +453,7 @@ listener, etc.), or an HTTP(S) service that for some reason still needs the old 
   <tbody>
     <tr><td>192.168.0.210</td><td>PostgreSQL (primary)</td></tr>
     <tr><td>192.168.0.211</td><td>PostgreSQL (readonly)</td></tr>
-    <tr><td>192.168.0.213</td><td>Kafka (external listener, port 9094)</td></tr>
+    <tr><td>192.168.0.213</td><td>Kafka (external broker listener, port 9094)</td></tr>
     <tr><td>192.168.0.218</td><td>vLLM (OpenAI-compatible API)</td></tr>
   </tbody>
 </table>

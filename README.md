@@ -76,7 +76,7 @@ whale    Ready    <none>   22d   v1.32.3
 
 ### Service Access
 
-Fronted by kgateway (shared MetalLB IP `192.168.0.224`, real Let's Encrypt certs via DNS-01 — see "Adding a New DNS Name for a Service" below):
+Fronted by kgateway (shared MetalLB IP `192.168.0.224`, real Let's Encrypt certs via DNS-01 — see "Adding a New DNS Name for a Service" below). This is now the path for all in-scope HTTP(S) cluster services — see the full hostname table below.
 
 - **Grafana**: https://grafana.verticon.com
 - **Prometheus**: https://prometheus.verticon.com
@@ -755,15 +755,15 @@ Two gotchas found the hard way during the migration (see the plan doc's Task 5 g
 - kgateway routes HTTPS listeners by **TLS SNI**, not just the HTTP `Host` header — `curl -H "Host: ..."` against the raw Gateway IP gets a TLS-level connection reset; use `--resolve <host>:443:192.168.0.224` instead.
 - This machine's local DNS resolver caches the old A record for its TTL after a Cloudflare change — a `curl`/`dig` run here right after a cutover may show a stale answer for up to ~1-2 minutes. Public resolvers (`dig @1.1.1.1`) reflect the change immediately; real end users are unaffected since their own resolvers aren't warmed with the stale answer.
 
-### For a non-HTTP(S) / raw TCP service (still the old procedure)
+### For a non-HTTP(S) / raw TCP service
 
-Services that aren't plain HTTP(S) (PostgreSQL, Ceph RGW/S3, Kafka's external listener, etc.) are out of scope for kgateway `HTTPRoute` — they keep their own dedicated MetalLB IP, with DNS pointing directly at that IP (no Caddy or Gateway involved). Gateway API has an experimental `TCPRoute`/`TLSRoute` channel for this; adopting it is a separate, future decision.
+Services that aren't plain HTTP(S) — PostgreSQL and Kafka's external broker listener are the remaining examples — are out of scope for kgateway `HTTPRoute`; they keep their own dedicated MetalLB IP, with DNS (if any) pointing directly at that IP. No Caddy or Gateway is involved. Gateway API has an experimental `TCPRoute`/`TLSRoute` channel for this; adopting it is a separate, future decision. (Ceph RGW/S3 is HTTP-based and has already been migrated to kgateway — see the table below.)
 
-For a new HTTP(S) service that for some reason still needs the old Caddy path (e.g. before kgateway existed), the procedure was: add a Cloudflare A record pointing at mullet's IP, add a `<service>.verticon.com { reverse_proxy ... }` block to `/etc/caddy/Caddyfile` on mullet, then `systemctl reload caddy`. As of issue #108 this is no longer the default for HTTP(S) services, but Caddy is still running for the handful of hostnames not yet migrated (see the table below).
+Caddy no longer fronts any cluster service as of this second migration wave — it's kept running only for mullet's own static-file sites (`mullet.verticon.com`, `mullet.verticon.lab`), which have no Kubernetes backend to route to and can't move to kgateway without a redesign.
 
 ### Existing service hostnames
 
-**Via kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed):
+**Via kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed) — all in-scope HTTP(S) services:
 
 | Service        | Hostname                          |
 | -------------- | ---------------------------------- |
@@ -775,27 +775,29 @@ For a new HTTP(S) service that for some reason still needs the old Caddy path (e
 | Harbor (registry) | https://registry.verticon.com   |
 | Argo Workflows | https://workflows.verticon.com     |
 | Argo Events    | https://events.verticon.com/push   |
+| ArgoCD         | https://argocd.verticon.com        |
+| FreshRSS       | https://freshrss.verticon.com      |
+| Wallabag       | https://wallabag.verticon.com      |
+| Hasura         | https://hasura.verticon.com        |
+| Kafka UI       | https://kafka.verticon.com         |
+| Ceph RGW (S3)  | https://s3.verticon.com            |
+| Apicurio (schema-registry) | https://schema-registry.verticon.com |
 
-**Via Caddy on mullet** (dedicated MetalLB IP each, not yet migrated):
+**Via Caddy on mullet** (static file server, no Kubernetes backend — can't move to kgateway):
 
-| Service          | Hostname                          | MetalLB IP    |
-| ---------------- | ---------------------------------- | ------------- |
-| FreshRSS          | https://freshrss.verticon.com     | 192.168.0.205 |
-| Kafka UI          | https://kafka.verticon.com        | 192.168.0.222 |
-| Apicurio (schema-registry) | https://schema-registry.verticon.com | 192.168.0.223 |
-| Wallabag          | https://wallabag.verticon.com     | 192.168.0.215 |
-| Ceph RGW (S3)     | https://s3.verticon.com           | 192.168.0.204 |
-| Hasura            | https://hasura.verticon.com       | 192.168.0.217 |
-| ArgoCD            | https://argocd.verticon.com       | 192.168.0.200 |
+| Hostname                | Purpose |
+| ------------------------ | ------- |
+| mullet.verticon.com      | Static site (`/var/caddy/site`) |
+| mullet.verticon.lab      | Static site (`/var/caddy/html`, local-only) |
 
-**Raw MetalLB, no hostname** (non-HTTP protocols):
+**Raw MetalLB, no hostname** (non-HTTP protocols — Gateway API's experimental `TCPRoute` could handle these, not yet adopted):
 
 | Service               | MetalLB IP    |
 | --------------------- | ------------- |
 | PostgreSQL (primary)  | 192.168.0.210 |
 | PostgreSQL (readonly) | 192.168.0.211 |
 | vLLM (OpenAI API)     | 192.168.0.218 |
-| Kafka (external)      | 192.168.0.213 |
+| Kafka (external broker) | 192.168.0.213 |
 
 ---
 
