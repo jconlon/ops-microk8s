@@ -76,10 +76,12 @@ whale    Ready    <none>   22d   v1.32.3
 
 ### Service Access
 
-- **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
-- **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
-- **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
-- **Loki**: http://loki.verticon.com (192.168.0.220:80) — log aggregation
+Fronted by kgateway (shared MetalLB IP `192.168.0.224`, real Let's Encrypt certs via DNS-01 — see "Adding a New DNS Name for a Service" below):
+
+- **Grafana**: https://grafana.verticon.com
+- **Prometheus**: https://prometheus.verticon.com
+- **AlertManager**: https://alertmanager.verticon.com
+- **Loki**: https://loki.verticon.com — log aggregation
 
 ## Setup Instructions
 
@@ -340,7 +342,7 @@ kubectl create secret generic harbor-s3-credentials \
 
 ## Argo Workflows — CI/CD Pipeline
 
-[Argo Workflows](https://argoproj.github.io/workflows/) is the cluster's CI engine, deployed in the `argo-workflows` namespace and accessible at https://workflows.verticon.com (192.168.0.209:2746).
+[Argo Workflows](https://argoproj.github.io/workflows/) is the cluster's CI engine, deployed in the `argo-workflows` namespace and accessible at https://workflows.verticon.com (via kgateway, shared MetalLB IP `192.168.0.224` — see "Adding a New DNS Name for a Service").
 
 ### image-build-push ClusterWorkflowTemplate
 
@@ -393,8 +395,7 @@ just argo-status        # Show Argo Workflows pod status
 
 [Grafana Loki](https://grafana.com/oss/loki/) is a horizontally scalable, multi-tenant log aggregation system. It is deployed in monolithic single-binary mode in the `loki` namespace, with Ceph RGW S3 as the log chunk backend.
 
-- **Service URL**: http://loki.verticon.com (Caddy proxies from mullet)
-- **Direct IP**: http://192.168.0.220
+- **Service URL**: https://loki.verticon.com (kgateway `HTTPRoute`, shared MetalLB IP `192.168.0.224` — see "Adding a New DNS Name for a Service"; no longer Caddy-fronted as of issue #108)
 - **Grafana integration**: available in the Explore tab → Loki datasource
 - **Log sources**: all 8 cluster nodes (pod logs + OS syslog + systemd journal), external machines via Promtail systemd service
 
@@ -411,23 +412,7 @@ just argo-status        # Show Argo Workflows pod status
 {job="syslog", node="gold"} |= "nvme"
 ```
 
-### Caddyfile entry (mullet)
-
-Add to `/etc/caddy/Caddyfile` on mullet:
-
-```
-loki.verticon.com {
-    reverse_proxy 192.168.0.220:80
-    request_body {
-        max_size 0
-    }
-    tls {
-        resolvers 1.1.1.1 1.0.0.1
-    }
-}
-```
-
-`max_size 0` disables Caddy's body size limit for log ingestion (Promtail external agents send bulk pushes).
+> **Note:** Caddy's `loki.verticon.com` block previously set `request_body { max_size 0 }` to disable its body size limit for bulk Promtail log pushes. kgateway (Envoy) has its own default request body size behavior which has not yet been verified against real bulk Promtail push volume — if external Promtail agents start seeing request failures, check kgateway/Envoy buffer/body-size settings first.
 
 ### External Promtail install (mudshark/oyster/minnow)
 
@@ -711,57 +696,106 @@ ops-microk8s/
 
 ## Adding a New DNS Name for a Service
 
-When deploying a new service with a MetalLB LoadBalancer IP, follow these steps to expose it at a `verticon.com` hostname.
+**As of issue #108, HTTP(S) services are exposed via kgateway (Gateway API), not Caddy.** kgateway fronts all HTTP(S) traffic behind a single shared MetalLB IP (`192.168.0.224`), routed by hostname (SNI/HTTP Host) instead of one dedicated IP + Caddyfile block per service. Real Let's Encrypt certs are issued automatically per hostname via cert-manager's DNS-01 solver (Cloudflare) — see `docs/plans/2026-07-05-migrate-to-kgateway.md` for the full architecture and rationale (HTTP-01 cannot work here: `*.verticon.com` resolves to private LAN IPs, unreachable from the public internet for ACME validation).
 
-### 1. Add DNS record in Cloudflare
+### For a new HTTP(S) service (current procedure)
 
-[Cloudflare Console](https://dash.cloudflare.com/login)
+1. **Add a `Certificate`** in `cert-manager-gitops/resources/certificates/<service>-certificate.yaml`:
+   ```yaml
+   apiVersion: cert-manager.io/v1
+   kind: Certificate
+   metadata:
+     name: <service>-tls
+     namespace: kgateway-system
+   spec:
+     secretName: <service>-tls
+     dnsNames:
+       - <service>.verticon.com
+     issuerRef:
+       name: letsencrypt-http01
+       kind: ClusterIssuer
+   ```
+2. **Add a per-hostname HTTPS listener** to the shared `Gateway` in `kgateway-gitops/resources/gateway.yaml`:
+   ```yaml
+   - name: https-<service>
+     protocol: HTTPS
+     port: 443
+     hostname: "<service>.verticon.com"
+     tls:
+       mode: Terminate
+       certificateRefs:
+         - name: <service>-tls
+     allowedRoutes:
+       namespaces:
+         from: All
+   ```
+3. **Add an `HTTPRoute`** in `kgateway-gitops/resources/httproutes/<service>-httproute.yaml`, in the **same namespace as the backend Service** (avoids needing a `ReferenceGrant`) — confirm the real Service name/namespace/port with `kubectl get svc -A | grep <service>` first, don't assume:
+   ```yaml
+   apiVersion: gateway.networking.k8s.io/v1
+   kind: HTTPRoute
+   metadata:
+     name: <service>
+     namespace: <backend-service-namespace>
+   spec:
+     parentRefs:
+       - name: cluster-gateway
+         namespace: kgateway-system
+         sectionName: https-<service>
+     hostnames:
+       - "<service>.verticon.com"
+     rules:
+       - backendRefs:
+           - name: <backend-service-name>
+             port: <backend-service-port>
+   ```
+4. **Add a Cloudflare A record** pointing at `192.168.0.224` (DNS only, not proxied) — same as before, just a different target IP.
+5. Commit and push — ArgoCD auto-syncs `kgateway-resources-app` and `cert-manager-resources-app` (both watch subdirectories, `directory.recurse: true` required). Verify: `kubectl get httproute,certificate -A` and `curl --resolve <service>.verticon.com:443:192.168.0.224 https://<service>.verticon.com/`.
 
-Add an `A` record in the Cloudflare dashboard to point to mullet's IP:
+Two gotchas found the hard way during the migration (see the plan doc's Task 5 guidance):
+- kgateway routes HTTPS listeners by **TLS SNI**, not just the HTTP `Host` header — `curl -H "Host: ..."` against the raw Gateway IP gets a TLS-level connection reset; use `--resolve <host>:443:192.168.0.224` instead.
+- This machine's local DNS resolver caches the old A record for its TTL after a Cloudflare change — a `curl`/`dig` run here right after a cutover may show a stale answer for up to ~1-2 minutes. Public resolvers (`dig @1.1.1.1`) reflect the change immediately; real end users are unaffected since their own resolvers aren't warmed with the stale answer.
 
-| Type | Name        | Content         | Proxy Status           |
-| ---- | ----------- | --------------- | ---------------------- |
-| A    | `<service>` | `192.168.0.101` | DNS only - reserved IP |
+### For a non-HTTP(S) / raw TCP service (still the old procedure)
 
-### 2. Configure Caddy reverse proxy
+Services that aren't plain HTTP(S) (PostgreSQL, Ceph RGW/S3, Kafka's external listener, etc.) are out of scope for kgateway `HTTPRoute` — they keep their own dedicated MetalLB IP, with DNS pointing directly at that IP (no Caddy or Gateway involved). Gateway API has an experimental `TCPRoute`/`TLSRoute` channel for this; adopting it is a separate, future decision.
 
-```bash
-# on mullet
-sudo vi /etc/caddy/Caddyfile
-```
-
-Add a new block:
-
-```
-<service>.verticon.com {
-    reverse_proxy 192.168.0.2xx:80
-    tls {
-        resolvers 1.1.1.1 1.0.0.1
-    }
-}
-
-```
-
-### 3. Reload Caddy
-
-```bash
-systemctl reload caddy
-```
-
-Caddy handles TLS automatically via Let's Encrypt. No restart required — `reload` is zero-downtime.
+For a new HTTP(S) service that for some reason still needs the old Caddy path (e.g. before kgateway existed), the procedure was: add a Cloudflare A record pointing at mullet's IP, add a `<service>.verticon.com { reverse_proxy ... }` block to `/etc/caddy/Caddyfile` on mullet, then `systemctl reload caddy`. As of issue #108 this is no longer the default for HTTP(S) services, but Caddy is still running for the handful of hostnames not yet migrated (see the table below).
 
 ### Existing service hostnames
 
-| Service               | Hostname                          | MetalLB IP    |
-| --------------------- | --------------------------------- | ------------- |
-| Grafana               | https://grafana.verticon.com      | 192.168.0.201 |
-| Prometheus            | https://prometheus.verticon.com   | 192.168.0.202 |
-| AlertManager          | https://alertmanager.verticon.com | 192.168.0.203 |
-| PostgreSQL (primary)  | —                                 | 192.168.0.210 |
-| PostgreSQL (readonly) | —                                 | 192.168.0.211 |
-| pgAdmin               | https://pgadmin.verticon.com      | 192.168.0.212 |
-| Harbor (registry)     | https://registry.verticon.com     | 192.168.0.219 |
-| vLLM (OpenAI API)     | —                                 | 192.168.0.218 |
+**Via kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed):
+
+| Service        | Hostname                          |
+| -------------- | ---------------------------------- |
+| pgAdmin        | https://pgadmin.verticon.com       |
+| Prometheus     | https://prometheus.verticon.com    |
+| AlertManager   | https://alertmanager.verticon.com  |
+| Grafana        | https://grafana.verticon.com       |
+| Loki           | https://loki.verticon.com          |
+| Harbor (registry) | https://registry.verticon.com   |
+| Argo Workflows | https://workflows.verticon.com     |
+| Argo Events    | https://events.verticon.com/push   |
+
+**Via Caddy on mullet** (dedicated MetalLB IP each, not yet migrated):
+
+| Service          | Hostname                          | MetalLB IP    |
+| ---------------- | ---------------------------------- | ------------- |
+| FreshRSS          | https://freshrss.verticon.com     | 192.168.0.205 |
+| Kafka UI          | https://kafka.verticon.com        | 192.168.0.222 |
+| Apicurio (schema-registry) | https://schema-registry.verticon.com | 192.168.0.223 |
+| Wallabag          | https://wallabag.verticon.com     | 192.168.0.215 |
+| Ceph RGW (S3)     | https://s3.verticon.com           | 192.168.0.204 |
+| Hasura            | https://hasura.verticon.com       | 192.168.0.217 |
+| ArgoCD            | https://argocd.verticon.com       | 192.168.0.200 |
+
+**Raw MetalLB, no hostname** (non-HTTP protocols):
+
+| Service               | MetalLB IP    |
+| --------------------- | ------------- |
+| PostgreSQL (primary)  | 192.168.0.210 |
+| PostgreSQL (readonly) | 192.168.0.211 |
+| vLLM (OpenAI API)     | 192.168.0.218 |
+| Kafka (external)      | 192.168.0.213 |
 
 ---
 

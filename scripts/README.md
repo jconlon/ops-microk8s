@@ -471,16 +471,7 @@ mc mb ceph/argo-artifacts
 > bucket must be created before any workflows are submitted; without it every workflow
 > will fail with `exit code 64: The specified bucket does not exist` (issue #58).
 
-After deploying, add DNS and Caddy proxy entry on mullet:
-
-```
-workflows.verticon.com {
-    reverse_proxy 192.168.0.209:2746
-    tls {
-        resolvers 1.1.1.1 1.0.0.1
-    }
-}
-```
+After deploying, expose it via kgateway (see README.md's "Adding a New DNS Name for a Service" — as of issue #108, no longer a Caddy proxy entry): add a `Certificate` + Gateway HTTPS listener + `HTTPRoute` for `workflows.verticon.com`, and a Cloudflare A record pointing at the shared kgateway IP `192.168.0.224`.
 
 #### Harbor robot account (for image push/pull in workflows)
 
@@ -505,19 +496,9 @@ teller run --config teller/.teller-argo-workflows.yml -- bash -c '
 
 ### Argo Events — events.verticon.com
 
-The Argo Events WebhookEventSource is exposed at https://events.verticon.com (192.168.0.221:12000).
+The Argo Events WebhookEventSource is exposed at https://events.verticon.com/push, fronted by kgateway (issue #108) rather than a dedicated Caddy proxy entry — see README.md's "Adding a New DNS Name for a Service" for the `Certificate`/`Gateway` listener/`HTTPRoute` pattern (`kgateway-gitops/resources/httproutes/events-httproute.yaml`, backend `git-push-eventsource-lb` in `argo-events`, port 12000).
 
-**Caddy entry** (mullet:/etc/caddy/Caddyfile):
-```
-events.verticon.com {
-    tls {
-        resolvers 1.1.1.1 1.0.0.1
-    }
-    reverse_proxy 192.168.0.221:12000
-}
-```
-
-**DNS**: Cloudflare A record: events.verticon.com → 192.168.0.221 (DNS only, not proxied)
+**DNS**: Cloudflare A record: events.verticon.com → 192.168.0.224 (shared kgateway IP, DNS only, not proxied)
 
 **Test**: `curl -X POST https://events.verticon.com/push -d '{"repo":"test","commit":"abc"}' -H 'Content-Type: application/json'`
 

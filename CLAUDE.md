@@ -88,15 +88,21 @@ Projects may open issues here when they need cluster-level support (secrets, sto
   - Backed by `production-postgresql/apicurio` database; credentials via `teller/.teller-apicurio.yml`
   - Operator: `quay.io/apicurio/apicurio-registry-operator:1.1.3` (v2, UBI8 — v3 requires x86-64-v3 CPU, incompatible with cluster nodes)
   - Phase 2 pipeline cutover tracked in: freshrss#59, freshrss-streams#12
-- **Loki**: Grafana Loki log aggregation at 192.168.0.220 (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80
-- **Argo Workflows**: CI/CD engine at https://workflows.verticon.com (192.168.0.209:2746); `argo-workflows` namespace
+- **Loki**: Grafana Loki log aggregation (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80; external access via https://loki.verticon.com (see kgateway entry below)
+- **Argo Workflows**: CI/CD engine at https://workflows.verticon.com; `argo-workflows` namespace
   - `image-build-push` ClusterWorkflowTemplate — builds images via Kaniko and pushes to Harbor; callable from any namespace
   - `ci-tools` image at `registry.verticon.com/library/ci-tools:latest` — contains `git`, `gh`, `yq`; source at `images/ci-tools/Dockerfile`; rebuild with `argo submit --from clusterworkflowtemplate/image-build-push -p repo-url=https://github.com/jconlon/ops-microk8s -p image=registry.verticon.com/library/ci-tools:latest -p context=images/ci-tools`
   - To build any image: `argo submit -n argo-workflows --from clusterworkflowtemplate/image-build-push -p repo-url=<repo> -p image=registry.verticon.com/<project>/<name>:<tag> -p context=<subdir>`
 - **Argo Events**: Event-driven automation companion to Argo Workflows; `argo-events` namespace
-  - WebhookEventSource at `https://events.verticon.com/push` (192.168.0.221:12000)
+  - WebhookEventSource at `https://events.verticon.com/push`
   - Triggers `git-push-build` WorkflowTemplate in `argo-workflows` on POST
   - `kubectl get eventbus,eventsource,sensor -n argo-events` — check resource status
+- **kgateway**: Envoy-based Gateway API implementation, `kgateway-system` namespace — fronts all HTTP(S) ingress traffic, replacing the old per-service MetalLB IP + Caddy pattern (issue #108)
+  - Shared `Gateway` (`cluster-gateway`) on a single MetalLB IP `192.168.0.224` — one HTTP listener (port 80, redirect-only, not used for ACME) + one HTTPS listener per migrated hostname (SNI-routed)
+  - Migrated: pgAdmin, Prometheus, AlertManager, Grafana, Loki, Harbor registry, Argo Workflows, Argo Events — each has an `HTTPRoute` in `kgateway-gitops/resources/httproutes/`
+  - **cert-manager** (`cert-manager` namespace) issues real Let's Encrypt certs per hostname via **DNS-01 through Cloudflare** (not HTTP-01 — `*.verticon.com` resolves to private LAN IPs, so Let's Encrypt can never reach the cluster directly for an HTTP-01 challenge); `ClusterIssuer letsencrypt-http01` uses a Cloudflare API token scoped to `Zone:DNS:Edit` on `verticon.com` (separate from Caddy's own token, bootstrapped via `teller/.teller-cert-manager.yml`, see issue #109)
+  - Caddy on mullet is no longer used for any of these hostnames — see "Adding a New DNS Name" in README.md for the current (kgateway) procedure
+  - `kubectl get gateway,httproute -A` / `kubectl get certificate -n kgateway-system` — check resource status
 - **Storage Classes**:
   - `rook-ceph-block` (3-way replication, default for all workloads)
 
@@ -212,15 +218,22 @@ echo 'nvme-tcp' | sudo tee -a /etc/modules-load.d/microk8s.conf
 
 ### Service Access
 
-- **Argo Workflows**: https://workflows.verticon.com (192.168.0.209:2746) — CI pipeline UI
-- **Argo Events Webhook**: https://events.verticon.com (192.168.0.221:12000) — CI trigger endpoint
-- **Grafana**: https://grafana.verticon.com (192.168.0.201:80)
-- **Prometheus**: https://prometheus.verticon.com (192.168.0.202:80)
-- **AlertManager**: https://alertmanager.verticon.com (192.168.0.203:80)
-- **Loki**: http://loki.verticon.com (192.168.0.220:80)
+**Fronted by kgateway** (shared MetalLB IP `192.168.0.224`, SNI-routed, real Let's Encrypt certs via DNS-01 — see kgateway entry above):
+- **Argo Workflows**: https://workflows.verticon.com — CI pipeline UI
+- **Argo Events Webhook**: https://events.verticon.com/push — CI trigger endpoint
+- **Grafana**: https://grafana.verticon.com
+- **Prometheus**: https://prometheus.verticon.com
+- **AlertManager**: https://alertmanager.verticon.com
+- **Loki**: https://loki.verticon.com
+- **Harbor registry**: https://registry.verticon.com
+- **pgAdmin**: https://pgadmin.verticon.com
+
+**Still fronted by Caddy on mullet** (not yet migrated — out of scope for issue #108):
 - **Ceph RGW (S3)**: https://s3.verticon.com (192.168.0.204:80) — path-style access; use `MC_HOST_ceph` in devbox shell
-- **iDRAC Syslog**: each iDRAC sends UDP syslog to its own node's LAN IP:514 → rsyslog receives and writes to `/var/log/syslog` → Promtail ships to Loki. Queryable via `{job="syslog", node="puffer"} \|= "iDRAC"`. rsyslog config: `/etc/rsyslog.d/10-idrac.conf` on each Dell R320 node.
 - **Apicurio Registry**: http://192.168.0.223:8080 (UI at /ui, REST at /apis/registry/v2, ccompat at /apis/ccompat/v6)
+- FreshRSS, Wallabag, Hasura, Kafka UI, Schema Registry, ArgoCD — see README.md's service hostname table
+
+- **iDRAC Syslog**: each iDRAC sends UDP syslog to its own node's LAN IP:514 → rsyslog receives and writes to `/var/log/syslog` → Promtail ships to Loki. Queryable via `{job="syslog", node="puffer"} \|= "iDRAC"`. rsyslog config: `/etc/rsyslog.d/10-idrac.conf` on each Dell R320 node.
 
 ## File Structure
 

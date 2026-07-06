@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Networking — DNS, Caddy &amp; Cloudflare — ops-microk8s</title>
+<title>Networking — DNS, kgateway, Caddy &amp; Cloudflare — ops-microk8s</title>
 <style>
   :root {
     --bg: #0f1117;
@@ -164,36 +164,67 @@
 
 <p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Networking</p>
 <h1>Networking</h1>
-<p class="subtitle">How Cloudflare DNS, Caddy, and MetalLB route external traffic to cluster services on mullet</p>
+<p class="subtitle">How Cloudflare DNS, kgateway (Gateway API), Caddy, and MetalLB route external traffic to cluster services</p>
+
+<div class="callout callout-note">
+  <strong>Note (issue #108):</strong> HTTP(S) ingress is being migrated from one-MetalLB-IP-per-service
+  + Caddy to a single shared <strong>kgateway</strong> (Gateway API) IP. 8 services have been cut over
+  so far — see the "Which path does a service use?" table below. New HTTP(S) services should use the
+  kgateway path; Caddy remains only for services not yet migrated and for non-HTTP protocols.
+</div>
 
 <!-- ── Overview ───────────────────────────────────────────────────── -->
 <h2>Overview</h2>
 
 <p>
-  All <code>*.verticon.com</code> hostnames resolve to <strong>mullet</strong>'s WAN IP via Cloudflare DNS.
-  Caddy runs on mullet as a TLS-terminating reverse proxy, forwarding each hostname to the
-  appropriate MetalLB LoadBalancer IP inside the cluster LAN (<code>192.168.0.x</code>).
-  Certificates are obtained automatically via the ACME DNS-01 challenge using the Cloudflare API —
-  no public HTTP exposure is required.
+  All <code>*.verticon.com</code> hostnames are real, public DNS records — but they resolve to
+  <strong>private LAN IPs</strong> (mullet's LAN IP, or the shared kgateway IP), not a public internet
+  address. This is intentional: these services are only meant to be reachable from inside the LAN
+  (or via VPN), while still using real hostnames and real Let's Encrypt certificates. Because the
+  IPs are never reachable from the public internet, certificate issuance for <strong>both</strong>
+  paths uses the ACME <strong>DNS-01</strong> challenge (proving domain ownership via a Cloudflare
+  DNS TXT record) — HTTP-01 could never succeed here, since Let's Encrypt's validators can't open a
+  connection to a private IP no matter what the DNS record points to.
 </p>
 
+<h3>Path 1 — kgateway (current default for HTTP(S) services)</h3>
 <div class="flow-box">
 Internet client
     │
     │  DNS query: grafana.verticon.com
     ▼
-Cloudflare DNS  ──────────────────────────────  A record → mullet WAN IP
+Cloudflare DNS  ──────────────────────────────  A record → 192.168.0.224 (shared kgateway IP)
+    │
+    │  HTTPS :443, SNI = grafana.verticon.com
+    ▼
+kgateway Gateway "cluster-gateway"  ──  TLS termination (Let's Encrypt cert via cert-manager DNS-01/Cloudflare)
+    │
+    │  HTTPRoute match on hostname → backend Service
+    ▼
+Grafana Service (monitoring/grafana)
+    │
+    ▼
+Grafana pod (inside cluster)
+</div>
+
+<h3>Path 2 — Caddy on mullet (remaining non-migrated services)</h3>
+<div class="flow-box">
+Internet client
+    │
+    │  DNS query: freshrss.verticon.com
+    ▼
+Cloudflare DNS  ──────────────────────────────  A record → mullet's LAN IP
     │
     │  HTTPS :443
     ▼
 mullet (Caddy)  ──  TLS termination (Let's Encrypt cert via Cloudflare DNS-01)
     │
-    │  HTTP reverse proxy → 192.168.0.201:80
+    │  HTTP reverse proxy → 192.168.0.205:80
     ▼
-MetalLB VIP 192.168.0.201  ──  LoadBalancer service: monitoring/grafana
+MetalLB VIP 192.168.0.205  ──  LoadBalancer service: freshrss/freshrss
     │
     ▼
-Grafana pod (inside cluster)
+FreshRSS pod (inside cluster)
 </div>
 
 <!-- ── Components ─────────────────────────────────────────────────── -->
@@ -202,23 +233,52 @@ Grafana pod (inside cluster)
 <h3>Cloudflare DNS</h3>
 <p>
   DNS records are managed at <strong>dash.cloudflare.com → verticon.com → DNS → Records</strong>.
-  Each service has an <strong>A record</strong> pointing to mullet's WAN IP, set to
-  <strong>DNS-only</strong> (grey cloud — proxying disabled) so that Caddy receives the raw TCP
-  connection and can terminate TLS itself. Cloudflare proxying is intentionally off: the cluster
-  services are not routed through Cloudflare's CDN/WAF layer.
+  Every service has an <strong>A record</strong> set to <strong>DNS-only</strong> (grey cloud —
+  proxying disabled), pointing at either <code>192.168.0.224</code> (kgateway, for migrated services)
+  or mullet's LAN IP (Caddy, for the rest). Cloudflare proxying is intentionally off for both paths.
 </p>
 <p>
-  Cloudflare is also used as the <strong>ACME DNS provider</strong>. Caddy calls the Cloudflare API
-  to create a temporary <code>_acme-challenge</code> TXT record to prove domain ownership during
-  certificate issuance. This avoids any requirement for port 80 to be publicly reachable.
+  Cloudflare is also the <strong>ACME DNS provider</strong> for both kgateway/cert-manager and Caddy —
+  each creates a temporary <code>_acme-challenge</code> TXT record via the Cloudflare API to prove
+  domain ownership during certificate issuance, using <strong>separate</strong> API tokens (see
+  issue #109) so they can be rotated/revoked independently.
 </p>
 
-<h3>Caddy on mullet</h3>
+<h3>kgateway (Gateway API)</h3>
+<p>
+  <a href="https://kgateway.dev">kgateway</a> (CNCF sandbox, Envoy-based, formerly Gloo Gateway) runs
+  in the <code>kgateway-system</code> namespace. A single <code>Gateway</code> resource
+  (<code>cluster-gateway</code>) holds one shared HTTP listener (port 80, redirect-only — not used
+  for ACME) plus one HTTPS listener <strong>per migrated hostname</strong> (SNI-routed, each with its
+  own <code>tls.certificateRefs</code>). One <code>HTTPRoute</code> per service attaches to the
+  matching listener and routes to that service's backend <code>Service</code>.
+</p>
+<p>
+  <strong>cert-manager</strong> (<code>cert-manager</code> namespace) issues the certificates: a
+  <code>ClusterIssuer</code> (<code>letsencrypt-http01</code> — name predates the DNS-01 correction,
+  the mechanism is DNS-01) with a <code>dns01.cloudflare</code> solver, referencing a Cloudflare API
+  token Secret (<code>cloudflare-api-token-secret</code>, bootstrapped via
+  <code>teller/.teller-cert-manager.yml</code>). One <code>Certificate</code> resource per hostname.
+</p>
+
+<table>
+  <thead><tr><th>Item</th><th>Path / command</th></tr></thead>
+  <tbody>
+    <tr><td>Gateway</td><td><code>kubectl get gateway -n kgateway-system</code></td></tr>
+    <tr><td>Routes</td><td><code>kubectl get httproute -A</code></td></tr>
+    <tr><td>Certificates</td><td><code>kubectl get certificate -n kgateway-system</code></td></tr>
+    <tr><td>ClusterIssuer</td><td><code>kubectl get clusterissuer letsencrypt-http01</code></td></tr>
+    <tr><td>Gateway manifests (git)</td><td><code>kgateway-gitops/resources/</code></td></tr>
+    <tr><td>Certificate manifests (git)</td><td><code>cert-manager-gitops/resources/certificates/</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Caddy on mullet (remaining services)</h3>
 <p>
   Caddy is installed as a systemd service on <strong>mullet</strong> (Ubuntu 22.04).
-  The configuration lives at <code>/etc/caddy/Caddyfile</code>.
-  Caddy uses the <a href="https://github.com/caddy-dns/cloudflare">caddy-dns/cloudflare</a>
-  plugin (compiled into the binary) to handle DNS-01 challenges automatically.
+  The configuration lives at <code>/etc/caddy/Caddyfile</code> — <strong>not managed by this repo's
+  GitOps</strong>. Caddy uses the <a href="https://github.com/caddy-dns/cloudflare">caddy-dns/cloudflare</a>
+  plugin (compiled into the binary) to handle its own DNS-01 challenges.
 </p>
 
 <table>
@@ -229,50 +289,77 @@ Grafana pod (inside cluster)
     <tr><td>Reload config</td><td><code>sudo systemctl reload caddy</code></td></tr>
     <tr><td>Logs</td><td><code>journalctl -u caddy -f</code></td></tr>
     <tr><td>TLS cert cache</td><td><code>/var/lib/caddy/.local/share/caddy/certificates/</code></td></tr>
-    <tr><td>Cloudflare API token</td><td><code>CLOUDFLARE_API_TOKEN</code> env var (set in caddy systemd override)</td></tr>
+    <tr><td>Cloudflare API token</td><td><code>CLOUDFLARE_API_TOKEN</code> env var (set in caddy systemd override) — separate token from cert-manager's</td></tr>
   </tbody>
 </table>
 
 <h3>MetalLB</h3>
 <p>
   MetalLB assigns each Kubernetes <code>LoadBalancer</code> service a stable IP from the pool
-  <code>192.168.0.200–192.168.0.230</code>.  These IPs are on the cluster LAN and are only reachable
+  <code>192.168.0.200–192.168.0.230</code>. These IPs are on the cluster LAN and are only reachable
   from mullet and other LAN hosts — they are never directly exposed to the internet.
-  Caddy's <code>reverse_proxy</code> directives target these IPs.
+  <code>192.168.0.224</code> is the single shared IP for the kgateway <code>Gateway</code>'s Service;
+  every other IP in the pool is still one-per-service (Caddy-fronted HTTP(S) services, or raw TCP
+  services like PostgreSQL/S3/Kafka that don't go through either proxy).
 </p>
-
-<!-- ── Caddyfile structure ─────────────────────────────────────────── -->
-<h2>Caddyfile structure</h2>
-
-<p>The global block enables the Cloudflare DNS plugin for all TLS certificates:</p>
-
-<pre>{
-    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-    debug
-}</pre>
-
-<p>Each service block follows the same pattern:</p>
-
-<pre>grafana.verticon.com {
-    reverse_proxy http://192.168.0.201:80   # MetalLB VIP for the service
-    tls {
-        resolvers 1.1.1.1 1.0.0.1           # use Cloudflare DNS to verify the DNS-01 challenge
-    }
-}</pre>
-
-<p>
-  The <code>tls { resolvers ... }</code> block tells Caddy to use Cloudflare's public resolvers
-  when verifying that the <code>_acme-challenge</code> TXT record has propagated before completing
-  the certificate request.
-</p>
-
-<div class="callout callout-note">
-  <strong>Note:</strong> The Harbor entry adds <code>request_body { max_size 0 }</code> to allow
-  unlimited image push sizes. Any service that accepts large uploads needs this override.
-</div>
 
 <!-- ── Adding a new service ───────────────────────────────────────── -->
-<h2>Adding a new service</h2>
+<h2>Adding a new service (current procedure)</h2>
+
+<p>For a new <strong>HTTP(S)</strong> service, use kgateway:</p>
+
+<ol class="step-list">
+  <li>
+    <div>
+      <strong>Confirm the backend Service.</strong> Don't assume name/namespace/port — check:<br>
+      <code>kubectl get svc -A | grep &lt;service&gt;</code>
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add a <code>Certificate</code></strong> in <code>cert-manager-gitops/resources/certificates/&lt;service&gt;-certificate.yaml</code>
+      (namespace <code>kgateway-system</code>, <code>issuerRef: letsencrypt-http01</code>).
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add an HTTPS listener</strong> to <code>kgateway-gitops/resources/gateway.yaml</code>'s
+      shared <code>Gateway</code>, named <code>https-&lt;service&gt;</code>, scoped to that hostname.
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add an <code>HTTPRoute</code></strong> in <code>kgateway-gitops/resources/httproutes/&lt;service&gt;-httproute.yaml</code>,
+      in the <strong>same namespace as the backend Service</strong> (avoids needing a <code>ReferenceGrant</code>).
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Add a Cloudflare DNS A record</strong> pointing at <code>192.168.0.224</code> (DNS
+      only, not proxied) — same dashboard steps as before, just a different target IP.
+    </div>
+  </li>
+  <li>
+    <div>
+      <strong>Commit and push.</strong> ArgoCD auto-syncs (<code>directory.recurse: true</code> is
+      required on both resources apps). Verify:<br>
+      <code>curl --resolve &lt;service&gt;.verticon.com:443:192.168.0.224 https://&lt;service&gt;.verticon.com/</code>
+    </div>
+  </li>
+</ol>
+
+<div class="callout callout-warn">
+  <strong>Two gotchas found the hard way:</strong> (1) kgateway routes HTTPS listeners by
+  <strong>TLS SNI</strong>, not the HTTP <code>Host</code> header — <code>curl -H "Host: ..."</code>
+  against the raw Gateway IP gets a TLS-level connection reset; use <code>--resolve</code> instead.
+  (2) This machine's local DNS resolver caches the old A record for its TTL after a Cloudflare
+  change — a check run here right after a cutover may show a stale answer for a minute or two.
+  Public resolvers (<code>dig @1.1.1.1</code>) reflect the change immediately; real end users are
+  unaffected since their own resolvers were never warmed with the stale answer.
+</div>
+
+<p>For a new <strong>non-HTTP(S) / raw TCP</strong> service (PostgreSQL, S3, Kafka's external
+listener, etc.), or an HTTP(S) service that for some reason still needs the old path, use Caddy:</p>
 
 <ol class="step-list">
   <li>
@@ -292,19 +379,7 @@ Grafana pod (inside cluster)
   </li>
   <li>
     <div>
-      <strong>Add a Cloudflare DNS A record.</strong><br>
-      Navigate to: <strong>dash.cloudflare.com → verticon.com → DNS → Records → Add record</strong><br><br>
-      Set the fields:<br>
-      <table style="margin-top:0.5rem; width:auto;">
-        <thead><tr><th>Field</th><th>Value</th></tr></thead>
-        <tbody>
-          <tr><td>Type</td><td><code>A</code></td></tr>
-          <tr><td>Name</td><td><code>&lt;service&gt;</code> (e.g. <code>kafka</code>)</td></tr>
-          <tr><td>IPv4 address</td><td>mullet's WAN IP</td></tr>
-          <tr><td>Proxy status</td><td><strong>DNS only</strong> (grey cloud — must not be proxied)</td></tr>
-          <tr><td>TTL</td><td>Auto</td></tr>
-        </tbody>
-      </table>
+      <strong>Add a Cloudflare DNS A record</strong> pointing at mullet's LAN IP, DNS only.
     </div>
   </li>
   <li>
@@ -334,37 +409,66 @@ Grafana pod (inside cluster)
 </ol>
 
 <!-- ── DNS record reference ───────────────────────────────────────── -->
-<h2>Cloudflare DNS records</h2>
+<h2>Which path does a service use?</h2>
 
-<p>All records are type <strong>A</strong>, pointing to mullet's WAN IP, DNS-only (not proxied).</p>
-
+<h3>Via kgateway (shared IP <code>192.168.0.224</code>)</h3>
 <table>
-  <thead>
-    <tr><th>Hostname</th><th>MetalLB IP (LAN)</th><th>Service</th></tr>
-  </thead>
+  <thead><tr><th>Hostname</th><th>Service</th></tr></thead>
+  <tbody>
+    <tr><td><code>pgadmin.verticon.com</code></td><td>pgAdmin</td></tr>
+    <tr><td><code>prometheus.verticon.com</code></td><td>Prometheus</td></tr>
+    <tr><td><code>alertmanager.verticon.com</code></td><td>AlertManager</td></tr>
+    <tr><td><code>grafana.verticon.com</code></td><td>Grafana</td></tr>
+    <tr><td><code>loki.verticon.com</code></td><td>Loki gateway</td></tr>
+    <tr><td><code>registry.verticon.com</code></td><td>Harbor</td></tr>
+    <tr><td><code>workflows.verticon.com</code></td><td>Argo Workflows</td></tr>
+    <tr><td><code>events.verticon.com</code></td><td>Argo Events webhook</td></tr>
+  </tbody>
+</table>
+
+<h3>Via Caddy on mullet (dedicated MetalLB IP each)</h3>
+<table>
+  <thead><tr><th>Hostname</th><th>MetalLB IP (LAN)</th><th>Service</th></tr></thead>
   <tbody>
     <tr><td><code>argocd.verticon.com</code></td><td>192.168.0.200</td><td>ArgoCD</td></tr>
-    <tr><td><code>grafana.verticon.com</code></td><td>192.168.0.201</td><td>Grafana</td></tr>
-    <tr><td><code>prometheus.verticon.com</code></td><td>192.168.0.202</td><td>Prometheus</td></tr>
-    <tr><td><code>alertmanager.verticon.com</code></td><td>192.168.0.203</td><td>AlertManager</td></tr>
     <tr><td><code>s3.verticon.com</code></td><td>192.168.0.204</td><td>Ceph RGW / S3</td></tr>
     <tr><td><code>freshrss.verticon.com</code></td><td>192.168.0.205</td><td>FreshRSS</td></tr>
-    <tr><td><code>workflows.verticon.com</code></td><td>192.168.0.209</td><td>Argo Workflows</td></tr>
-    <tr><td><code>pgadmin.verticon.com</code></td><td>192.168.0.212</td><td>pgAdmin</td></tr>
-    <tr><td><code>kafka.verticon.com</code></td><td>192.168.0.213 / 192.168.0.222</td><td>Kafka broker (9094) / Kafka UI (80)</td></tr>
-    <tr><td><code>schema-registry.verticon.com</code></td><td>192.168.0.214</td><td>Schema Registry</td></tr>
+    <tr><td><code>kafka.verticon.com</code></td><td>192.168.0.222</td><td>Kafka UI (80; broker 9094 is raw TCP, not via Caddy)</td></tr>
+    <tr><td><code>schema-registry.verticon.com</code></td><td>192.168.0.223</td><td>Apicurio Registry</td></tr>
     <tr><td><code>wallabag.verticon.com</code></td><td>192.168.0.215</td><td>Wallabag</td></tr>
     <tr><td><code>hasura.verticon.com</code></td><td>192.168.0.217</td><td>Hasura</td></tr>
-    <tr><td><code>registry.verticon.com</code></td><td>192.168.0.219</td><td>Harbor</td></tr>
-    <tr><td><code>loki.verticon.com</code></td><td>192.168.0.220</td><td>Loki gateway</td></tr>
-    <tr><td><code>events.verticon.com</code></td><td>192.168.0.221</td><td>Argo Events webhook</td></tr>
+  </tbody>
+</table>
+
+<h3>Raw MetalLB, no hostname (non-HTTP protocols)</h3>
+<table>
+  <thead><tr><th>MetalLB IP</th><th>Service</th></tr></thead>
+  <tbody>
+    <tr><td>192.168.0.210</td><td>PostgreSQL (primary)</td></tr>
+    <tr><td>192.168.0.211</td><td>PostgreSQL (readonly)</td></tr>
+    <tr><td>192.168.0.213</td><td>Kafka (external listener, port 9094)</td></tr>
+    <tr><td>192.168.0.218</td><td>vLLM (OpenAI-compatible API)</td></tr>
   </tbody>
 </table>
 
 <!-- ── Troubleshooting ────────────────────────────────────────────── -->
 <h2>Troubleshooting</h2>
 
-<h3>Certificate not issued / renewal failed</h3>
+<h3>kgateway: HTTPRoute not reachable</h3>
+<ul>
+  <li>Check <code>Gateway</code>, <code>HTTPRoute</code>, and <code>Certificate</code> status: <code>kubectl get gateway,httproute -A</code>, <code>kubectl get certificate -n kgateway-system</code></li>
+  <li>Test with the correct SNI, not just a <code>Host</code> header: <code>curl -v --resolve &lt;host&gt;:443:192.168.0.224 https://&lt;host&gt;/</code></li>
+  <li>Check the Certificate's ACME chain if stuck <code>pending</code>: <code>kubectl get certificaterequest,order,challenge -n kgateway-system</code></li>
+  <li>Confirm the Cloudflare API token Secret exists and has both <code>Zone:DNS:Edit</code> <em>and</em> <code>Zone:Zone:Read</code> (the latter is needed to resolve the zone name to a zone ID — easy to miss)</li>
+</ul>
+
+<h3>kgateway: local check fails right after a DNS cutover</h3>
+<ul>
+  <li>Confirm the record actually changed publicly: <code>dig @1.1.1.1 +short &lt;host&gt;</code> (bypasses any local cache)</li>
+  <li>If public DNS is correct but a local <code>curl</code>/<code>dig</code> still shows the old IP, it's local resolver cache lag (systemd-resolved) — verify against the real target with <code>--resolve</code> instead of waiting</li>
+</ul>
+
+<h3>Caddy: certificate not issued / renewal failed</h3>
 <ul>
   <li>Check Caddy logs: <code>journalctl -u caddy -f</code></li>
   <li>Confirm the <code>CLOUDFLARE_API_TOKEN</code> env var is set and the token has <strong>Zone DNS Edit</strong> permissions for <code>verticon.com</code></li>
@@ -372,7 +476,7 @@ Grafana pod (inside cluster)
   <li>Caddy caches cert failures — after fixing, run <code>sudo systemctl restart caddy</code> to retry immediately</li>
 </ul>
 
-<h3>Service unreachable after adding Caddyfile block</h3>
+<h3>Caddy: service unreachable after adding a Caddyfile block</h3>
 <ul>
   <li>Verify the MetalLB service has an external IP: <code>kubectl get svc -n &lt;ns&gt; &lt;name&gt;</code></li>
   <li>Test the LAN target directly from mullet: <code>curl -v http://192.168.0.NNN:80</code></li>
