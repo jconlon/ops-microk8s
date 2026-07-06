@@ -1,0 +1,17 @@
+# One Certificate per migrated hostname — cert-manager solves the ACME
+# HTTP-01 challenge via a temporary HTTPRoute on the Gateway's shared "http"
+# listener (per the ClusterIssuer's gatewayHTTPRoute solver), then writes the
+# cert+key into the Secret named below. That Secret is what the Gateway's
+# https-pgadmin listener references.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pgadmin-tls
+  namespace: kgateway-system
+spec:
+  secretName: pgadmin-tls
+  dnsNames:
+    - pgadmin.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

@@ -37,16 +37,15 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
-    # Per-hostname HTTPS listeners are appended below by Task 4 / Task 5,
-    # e.g.:
-    # - name: https-pgadmin
-    #   protocol: HTTPS
-    #   port: 443
-    #   hostname: "pgadmin.verticon.com"
-    #   tls:
-    #     mode: Terminate
-    #     certificateRefs:
-    #       - name: pgadmin-tls
-    #   allowedRoutes:
-    #     namespaces:
-    #       from: All
+    # Per-hostname HTTPS listeners — one added per Task 4/Task 5 service.
+    - name: https-pgadmin
+      protocol: HTTPS
+      port: 443
+      hostname: "pgadmin.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: pgadmin-tls
+      allowedRoutes:
+        namespaces:
+          from: All

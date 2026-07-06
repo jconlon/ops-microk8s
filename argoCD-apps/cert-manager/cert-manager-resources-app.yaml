@@ -11,6 +11,8 @@ spec:
     repoURL: https://github.com/jconlon/ops-microk8s
     targetRevision: migrate-to-kgateway
     path: cert-manager-gitops/resources
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
