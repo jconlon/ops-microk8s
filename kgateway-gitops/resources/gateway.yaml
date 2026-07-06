@@ -51,3 +51,25 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-prometheus
+      protocol: HTTPS
+      port: 443
+      hostname: "prometheus.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: prometheus-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-alertmanager
+      protocol: HTTPS
+      port: 443
+      hostname: "alertmanager.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: alertmanager-tls
+      allowedRoutes:
+        namespaces:
+          from: All

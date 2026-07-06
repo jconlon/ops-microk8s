@@ -88,3 +88,69 @@ spec:
               [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
                 { echo "Expected 200/302, got: $STATUS"; exit 1; }
               echo "pgAdmin reachable via Gateway: $STATUS"
+    - name: prometheus-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: prometheus-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: prometheus-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: prometheus
+                namespace: monitoring
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: prometheus-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve prometheus.verticon.com:443:192.168.0.224 \
+                https://prometheus.verticon.com)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "Prometheus reachable via Gateway: $STATUS"
+    - name: alertmanager-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: alertmanager-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: alertmanager-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: alertmanager
+                namespace: monitoring
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: alertmanager-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve alertmanager.verticon.com:443:192.168.0.224 \
+                https://alertmanager.verticon.com)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "AlertManager reachable via Gateway: $STATUS"

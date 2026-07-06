@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prometheus-tls
+  namespace: kgateway-system
+spec:
+  secretName: prometheus-tls
+  dnsNames:
+    - prometheus.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

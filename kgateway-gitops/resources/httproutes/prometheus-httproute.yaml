@@ -1,0 +1,18 @@
+# Backend confirmed via `kubectl get svc -A | grep prometheus`:
+# prometheus-kube-prometheus-prometheus, monitoring namespace, port 80 (http-web).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: cluster-gateway
+      namespace: kgateway-system
+      sectionName: https-prometheus
+  hostnames:
+    - "prometheus.verticon.com"
+  rules:
+    - backendRefs:
+        - name: prometheus-kube-prometheus-prometheus
+          port: 80
