@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: HEAD
+    targetRevision: migrate-to-kgateway
     path: argoCD-apps/kgateway
   destination:
     server: https://kubernetes.default.svc

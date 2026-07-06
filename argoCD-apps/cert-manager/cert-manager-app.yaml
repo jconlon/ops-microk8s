@@ -15,7 +15,7 @@ spec:
         valueFiles:
           - $values/cert-manager-gitops/helm/cert-manager-values.yaml
     - repoURL: https://github.com/jconlon/ops-microk8s
-      targetRevision: HEAD
+      targetRevision: migrate-to-kgateway
       ref: values
   destination:
     server: https://kubernetes.default.svc
