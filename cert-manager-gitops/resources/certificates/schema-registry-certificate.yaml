@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: schema-registry-tls
+  namespace: kgateway-system
+spec:
+  secretName: schema-registry-tls
+  dnsNames:
+    - schema-registry.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

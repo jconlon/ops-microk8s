@@ -1,0 +1,17 @@
+# Backend confirmed via `kubectl get svc -n hasura`: hasura, port 80.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hasura
+  namespace: hasura
+spec:
+  parentRefs:
+    - name: cluster-gateway
+      namespace: kgateway-system
+      sectionName: https-hasura
+  hostnames:
+    - "hasura.verticon.com"
+  rules:
+    - backendRefs:
+        - name: hasura
+          port: 80

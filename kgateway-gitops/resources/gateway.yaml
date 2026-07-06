@@ -128,3 +128,80 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-argocd
+      protocol: HTTPS
+      port: 443
+      hostname: "argocd.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: argocd-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-freshrss
+      protocol: HTTPS
+      port: 443
+      hostname: "freshrss.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: freshrss-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-hasura
+      protocol: HTTPS
+      port: 443
+      hostname: "hasura.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: hasura-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-wallabag
+      protocol: HTTPS
+      port: 443
+      hostname: "wallabag.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wallabag-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-kafka
+      protocol: HTTPS
+      port: 443
+      hostname: "kafka.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: kafka-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-s3
+      protocol: HTTPS
+      port: 443
+      hostname: "s3.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: s3-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-schema-registry
+      protocol: HTTPS
+      port: 443
+      hostname: "schema-registry.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: schema-registry-tls
+      allowedRoutes:
+        namespaces:
+          from: All

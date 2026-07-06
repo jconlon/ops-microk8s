@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: freshrss-tls
+  namespace: kgateway-system
+spec:
+  secretName: freshrss-tls
+  dnsNames:
+    - freshrss.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

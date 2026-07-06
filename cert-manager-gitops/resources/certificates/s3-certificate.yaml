@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: s3-tls
+  namespace: kgateway-system
+spec:
+  secretName: s3-tls
+  dnsNames:
+    - s3.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

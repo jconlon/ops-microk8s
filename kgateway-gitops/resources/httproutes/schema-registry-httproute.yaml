@@ -1,0 +1,18 @@
+# Backend confirmed via `kubectl get svc -n apicurio-registry`: apicurio-registry-external, port 8080
+# (same Service Caddy already proxies to).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: schema-registry
+  namespace: apicurio-registry
+spec:
+  parentRefs:
+    - name: cluster-gateway
+      namespace: kgateway-system
+      sectionName: https-schema-registry
+  hostnames:
+    - "schema-registry.verticon.com"
+  rules:
+    - backendRefs:
+        - name: apicurio-registry-external
+          port: 8080

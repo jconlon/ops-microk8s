@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wallabag-tls
+  namespace: kgateway-system
+spec:
+  secretName: wallabag-tls
+  dnsNames:
+    - wallabag.verticon.com
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer

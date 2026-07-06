@@ -327,3 +327,235 @@ spec:
               [ "$STATUS" = "200" ] || \
                 { echo "Expected 200, got: $STATUS"; exit 1; }
               echo "Argo Events webhook reachable via Gateway: $STATUS"
+
+    - name: argocd-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: argocd-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: argocd-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: argocd
+                namespace: argocd
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: argocd-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve argocd.verticon.com:443:192.168.0.224 \
+                https://argocd.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "argocd reachable via Gateway: $STATUS"
+    - name: freshrss-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: freshrss-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: freshrss-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: freshrss
+                namespace: freshrss
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: freshrss-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve freshrss.verticon.com:443:192.168.0.224 \
+                https://freshrss.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "freshrss reachable via Gateway: $STATUS"
+    - name: hasura-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: hasura-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: hasura-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: hasura
+                namespace: hasura
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: hasura-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve hasura.verticon.com:443:192.168.0.224 \
+                https://hasura.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "hasura reachable via Gateway: $STATUS"
+    - name: wallabag-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: wallabag-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: wallabag-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: wallabag
+                namespace: wallabag
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: wallabag-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve wallabag.verticon.com:443:192.168.0.224 \
+                https://wallabag.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "wallabag reachable via Gateway: $STATUS"
+    - name: kafka-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: kafka-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: kafka-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: kafka-ui
+                namespace: kafka-system
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: kafka-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve kafka.verticon.com:443:192.168.0.224 \
+                https://kafka.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "kafka reachable via Gateway: $STATUS"
+    - name: s3-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: s3-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: s3-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: s3
+                namespace: rook-ceph
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: s3-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve s3.verticon.com:443:192.168.0.224 \
+                https://s3.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "s3 reachable via Gateway: $STATUS"
+    - name: schema-registry-certificate-ready
+      try:
+        - assert:
+            resource:
+              apiVersion: cert-manager.io/v1
+              kind: Certificate
+              metadata:
+                name: schema-registry-tls
+                namespace: kgateway-system
+              status:
+                (conditions[?type == 'Ready'].status | [0]): "True"
+    - name: schema-registry-httproute-accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: schema-registry
+                namespace: apicurio-registry
+              status:
+                (parents[0].conditions[?type == 'Accepted'].status | [0]): "True"
+    - name: schema-registry-reachable-via-gateway
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
+                --resolve schema-registry.verticon.com:443:192.168.0.224 \
+                https://schema-registry.verticon.com/)
+              [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || \
+                { echo "Expected 200/302, got: $STATUS"; exit 1; }
+              echo "schema-registry reachable via Gateway: $STATUS"
