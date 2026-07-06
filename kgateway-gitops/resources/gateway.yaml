@@ -95,3 +95,14 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-registry
+      protocol: HTTPS
+      port: 443
+      hostname: "registry.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: registry-tls
+      allowedRoutes:
+        namespaces:
+          from: All
