@@ -16,3 +16,6 @@ spec:
     - backendRefs:
         - name: apicurio-registry-external
           port: 8080
+          kind: Service
+          group: ""
+          weight: 1

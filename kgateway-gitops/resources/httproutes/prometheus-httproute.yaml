@@ -16,3 +16,6 @@ spec:
     - backendRefs:
         - name: prometheus-kube-prometheus-prometheus
           port: 80
+          kind: Service
+          group: ""
+          weight: 1

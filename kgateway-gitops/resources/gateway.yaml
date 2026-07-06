@@ -48,6 +48,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: pgadmin-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -59,6 +61,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: prometheus-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -70,6 +74,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: alertmanager-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -81,6 +87,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: grafana-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -92,6 +100,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: loki-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -103,6 +113,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: registry-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -114,6 +126,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: workflows-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -125,6 +139,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: events-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -136,6 +152,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: argocd-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -147,6 +165,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: freshrss-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -158,6 +178,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: hasura-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -169,6 +191,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: wallabag-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -180,6 +204,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: kafka-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -191,6 +217,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: s3-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All
@@ -202,6 +230,8 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: schema-registry-tls
+            kind: Secret
+            group: ""
       allowedRoutes:
         namespaces:
           from: All

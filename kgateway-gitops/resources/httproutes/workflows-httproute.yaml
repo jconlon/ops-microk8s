@@ -15,3 +15,6 @@ spec:
     - backendRefs:
         - name: argo-workflows-server
           port: 2746
+          kind: Service
+          group: ""
+          weight: 1

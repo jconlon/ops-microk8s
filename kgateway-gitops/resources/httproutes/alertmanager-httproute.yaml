@@ -16,3 +16,6 @@ spec:
     - backendRefs:
         - name: alertmanager-kube-promethe-alertmanager
           port: 80
+          kind: Service
+          group: ""
+          weight: 1

@@ -16,3 +16,6 @@ spec:
     - backendRefs:
         - name: loki-gateway
           port: 80
+          kind: Service
+          group: ""
+          weight: 1

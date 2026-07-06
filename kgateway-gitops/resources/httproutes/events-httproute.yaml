@@ -16,3 +16,6 @@ spec:
     - backendRefs:
         - name: git-push-eventsource-lb
           port: 12000
+          kind: Service
+          group: ""
+          weight: 1

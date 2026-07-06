@@ -15,3 +15,6 @@ spec:
     - backendRefs:
         - name: grafana
           port: 80
+          kind: Service
+          group: ""
+          weight: 1
