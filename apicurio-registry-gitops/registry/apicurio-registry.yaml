@@ -4,6 +4,9 @@ metadata:
   name: apicurio-registry
   namespace: apicurio-registry
 spec:
+  deployment:
+    managedResources:
+      disableIngress: true
   configuration:
     persistence: sql
     sql:
