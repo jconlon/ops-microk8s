@@ -8,11 +8,11 @@ metadata:
 spec:
   project: default
   sources:
-    # See kgateway-crds-app.yaml comment: cr.kgateway.dev charts use the
-    # path-based OCI form (full chart path in repoURL + path: .), not the
-    # repoURL+chart split used for shared-namespace registries.
-    - repoURL: oci://cr.kgateway.dev/kgateway-dev/charts/kgateway
-      path: .
+    # See kgateway-crds-app.yaml comment — requires the same registered OCI
+    # repo credential (argocd repo add cr.kgateway.dev/kgateway-dev/charts
+    # --type helm --enable-oci).
+    - repoURL: cr.kgateway.dev/kgateway-dev/charts
+      chart: kgateway
       targetRevision: "v2.3.5"
       helm:
         valueFiles:
