@@ -1,0 +1,8 @@
+# cert-manager — automated TLS certificate issuance.
+# enableGatewayAPI is REQUIRED for the ClusterIssuer's gatewayHTTPRoute solver
+# (Task 3) to work — without it, cert-manager only supports Ingress-based solving.
+installCRDs: true
+config:
+  apiVersion: controller.config.cert-manager.io/v1alpha1
+  kind: ControllerConfiguration
+  enableGatewayAPI: true
