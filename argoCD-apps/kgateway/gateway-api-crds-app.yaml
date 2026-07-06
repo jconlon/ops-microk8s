@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-api-crds
+  namespace: argocd
+  annotations:
+    # Wave 0 — must exist before kgateway-crds (wave 1), the kgateway controller
+    # (wave 2), and our Gateway/HTTPRoute resources (wave 3). kgateway-crds only
+    # installs kgateway's own extension CRDs (gateway.kgateway.dev group) —
+    # confirmed empirically (helm template showed no gateway.networking.k8s.io
+    # kinds). The core Gateway API CRDs (GatewayClass, Gateway, HTTPRoute, etc.)
+    # are a separate upstream project with no Helm chart; vendored here from
+    # https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.0/standard-install.yaml
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jconlon/ops-microk8s
+    targetRevision: migrate-to-kgateway
+    path: kgateway-gitops/crds
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kgateway-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # REQUIRED: the upstream CRD bundle's annotations exceed the 262144-byte
+      # last-applied-configuration limit for client-side apply (upstream docs
+      # themselves specify `kubectl apply --server-side`).
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
