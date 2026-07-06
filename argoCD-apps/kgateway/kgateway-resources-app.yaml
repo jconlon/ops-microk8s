@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: migrate-to-kgateway
+    targetRevision: HEAD
     path: kgateway-gitops/resources
     directory:
       recurse: true

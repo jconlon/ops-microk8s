@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/jconlon/ops-microk8s
-    targetRevision: migrate-to-kgateway
+    targetRevision: HEAD
     path: argoCD-apps/cert-manager
   destination:
     server: https://kubernetes.default.svc

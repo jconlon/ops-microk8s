@@ -18,7 +18,7 @@ spec:
         valueFiles:
           - $values/kgateway-gitops/helm/kgateway-values.yaml
     - repoURL: https://github.com/jconlon/ops-microk8s
-      targetRevision: migrate-to-kgateway
+      targetRevision: HEAD
       ref: values
   destination:
     server: https://kubernetes.default.svc
