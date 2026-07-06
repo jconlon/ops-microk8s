@@ -214,9 +214,13 @@ spec:
         - script:
             timeout: 30s
             content: |
+              # /ready returns 404 even hitting loki-gateway directly in-cluster
+              # (confirmed — not a Gateway/HTTPRoute issue) — loki-gateway (the
+              # nginx proxy in front of Loki) only proxies specific paths.
+              # Root path returns 200; use that instead.
               STATUS=$(curl -sk -o /dev/null -w "%{http_code}" \
                 --resolve loki.verticon.com:443:192.168.0.224 \
-                https://loki.verticon.com/ready)
+                https://loki.verticon.com/)
               [ "$STATUS" = "200" ] || \
                 { echo "Expected 200, got: $STATUS"; exit 1; }
               echo "Loki reachable via Gateway: $STATUS"
