@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    # REQUIRES a registered OCI repo credential (one-time, not GitOps-managed —
+    # same class of manual bootstrap as the kgateway/cr.kgateway.dev repo):
+    #   argocd repo add ghcr.io/kagent-dev/kagent/helm --type helm --enable-oci
+    repoURL: ghcr.io/kagent-dev/kagent/helm
+    chart: kagent-crds
+    targetRevision: "0.9.11"
+    helm:
+      # kmcp CRDs bundled by default as of chart v0.7+; not needed for our
+      # initial scope (see kagent-app.yaml for the matching kmcp.enabled=false).
+      valuesObject:
+        kmcp:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kagent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

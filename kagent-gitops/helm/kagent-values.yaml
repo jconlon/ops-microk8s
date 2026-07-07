@@ -1,0 +1,34 @@
+# KAgent control plane — issue #111
+#
+# v1 scope: internal-only (no kgateway HTTPRoute yet — see issue #111 comments
+# for the deferred external-exposure decision), placeholder LLM provider (real
+# ModelConfig CR pointed at in-cluster vLLM added as a follow-up once the
+# kagent-crds ModelConfig schema can be inspected via `kubectl explain`).
+
+kmcp:
+  enabled: false
+
+database:
+  postgres:
+    # Full postgres:// URL mounted from the kagent-db-credentials secret
+    # (see teller/.teller-kagent.yml) — avoids a plaintext connection string
+    # in git, matching this repo's secrets-handling convention elsewhere.
+    urlFile: /etc/kagent/db/url
+    bundled:
+      enabled: false
+
+controller:
+  volumes:
+    - name: db-credentials
+      secret:
+        secretName: kagent-db-credentials
+  volumeMounts:
+    - name: db-credentials
+      mountPath: /etc/kagent/db
+      readOnly: true
+
+providers:
+  # Inert placeholder so the chart renders; no real key configured.
+  # Real LLM wiring happens via a ModelConfig CR pointed at
+  # http://vllm-router-service.vllm.svc.cluster.local/v1 (see issue #111).
+  default: ollama

@@ -1,0 +1,30 @@
+project: dot
+providers:
+  google_secretmanager:
+    env:
+      KAGENT_ROLE_PASSWORD:
+        path: projects/1000827005146/secrets/kagent-role/versions/latest
+
+# Creates two K8s secrets from the same GSM secret:
+#
+# 1. postgresql-system/kagent-role-password — CloudNativePG managed role
+# 2. kagent/kagent-db-credentials           — KAgent controller DB connection (mounted via urlFile)
+#
+# Prerequisites:
+#   1. Create the GSM secret:
+#        gcloud secrets create kagent-role --replication-policy=automatic
+#        echo -n "<password>" | gcloud secrets versions add kagent-role --data-file=-
+#   2. Ensure the kagent namespace exists (ArgoCD creates it on first sync)
+#
+# Usage (run from ops-microk8s/ directory):
+#   teller run --config teller/.teller-kagent.yml -- bash -c '
+#     kubectl create secret generic kagent-role-password \
+#       -n postgresql-system \
+#       --from-literal=username=kagent \
+#       --from-literal=password="$KAGENT_ROLE_PASSWORD" \
+#       --dry-run=client -o yaml | kubectl apply -f -
+#     kubectl create secret generic kagent-db-credentials \
+#       -n kagent \
+#       --from-literal=url="postgres://kagent:$KAGENT_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/kagent" \
+#       --dry-run=client -o yaml | kubectl apply -f -
+#   '
