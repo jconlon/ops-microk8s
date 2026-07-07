@@ -26,3 +26,10 @@ spec:
           kind: Service
           group: ""
           weight: 1
+      # kagent conversations involve sequential tool calls, LLM generation, and
+      # sub-agent delegation (e.g. observability-agent -> promql-agent) that can
+      # easily exceed kgateway's default route timeout, surfacing in the UI as a
+      # "streaming network failure" mid-response (issue #111).
+      timeouts:
+        request: 300s
+        backendRequest: 300s
