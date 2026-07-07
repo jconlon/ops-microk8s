@@ -43,9 +43,17 @@ providers:
 # (targetPort 3000 internally). secretRef points at a Secret containing
 # GRAFANA_SERVICE_ACCOUNT_TOKEN, created out-of-band (not in git — see
 # scripts/README.md for the bootstrap command).
+#
+# MUST include an explicit scheme (http://) — without "//", Go's url.Parse
+# treats the text before the first ":" as the scheme rather than a hostname
+# (e.g. "grafana.monitoring:80/api" parses as scheme="grafana.monitoring",
+# opaque="80/api", with an EMPTY host). This caused every Grafana API call
+# to fail with "https:///api/...: no Host in request URL" — note the missing
+# host, only a scheme (mcp-grafana silently defaulted to https when parsing
+# failed, which was also wrong: this internal Grafana serves plain HTTP).
 grafana-mcp:
   grafana:
-    url: "grafana.monitoring:80/api"
+    url: "http://grafana.monitoring:80/api"
     secretRef: kagent-grafana-token
   # The server's streamable-http transport rejects requests whose Host header
   # isn't in its allow-list (DNS-rebinding protection) — by default it only
