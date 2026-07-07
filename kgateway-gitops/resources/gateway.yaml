@@ -248,3 +248,16 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-kagent
+      protocol: HTTPS
+      port: 443
+      hostname: "kagent.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: kagent-tls
+            kind: Secret
+            group: ""
+      allowedRoutes:
+        namespaces:
+          from: All
