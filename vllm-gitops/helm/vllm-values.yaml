@@ -34,6 +34,14 @@ servingEngineSpec:
           - "--trust-remote-code"
           - "--quantization"
           - "awq"
+          # Required for kagent's agents to use tool/function calling —
+          # without these, the OpenAI-compatible API rejects tool_choice="auto"
+          # with a 400 (issue #111). Qwen2.5's tokenizer_config.json already
+          # includes Hermes-style tool-call templating, so no custom
+          # --chat-template is needed.
+          - "--enable-auto-tool-choice"
+          - "--tool-call-parser"
+          - "hermes"
 
       nodeSelectorTerms:
         - matchExpressions:
