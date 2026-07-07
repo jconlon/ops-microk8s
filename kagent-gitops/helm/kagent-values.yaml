@@ -58,3 +58,10 @@ grafana-mcp:
   args:
     - "--allowed-hosts"
     - "*"
+
+# Replaced by a custom Agent CR (kagent-gitops/resources/observability-agent.yaml,
+# deployed via kagent-resources) with a curated tool list — the bundled
+# version's 31-tool grafana-mcp toolset alone overflows the vLLM context
+# window (issue #111), and the chart exposes no values override for it.
+observability-agent:
+  enabled: false
