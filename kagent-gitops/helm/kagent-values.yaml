@@ -47,3 +47,14 @@ grafana-mcp:
   grafana:
     url: "grafana.monitoring:80/api"
     secretRef: kagent-grafana-token
+  # The server's streamable-http transport rejects requests whose Host header
+  # isn't in its allow-list (DNS-rebinding protection) — by default it only
+  # allows loopback variants, so in-cluster requests from kagent-controller
+  # (Host: kagent-grafana-mcp.kagent:8000) were rejected with 403 regardless
+  # of the Grafana token being correct. Traffic here is entirely internal
+  # cluster-to-cluster (never exposed externally), so disabling the check is
+  # safe — same "minimum security, lab network" call as kagent's external
+  # exposure (issue #111).
+  args:
+    - "--allowed-hosts"
+    - "*"
