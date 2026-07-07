@@ -1,9 +1,7 @@
 # KAgent control plane — issue #111
 #
 # v1 scope: internal-only (no kgateway HTTPRoute yet — see issue #111 comments
-# for the deferred external-exposure decision), placeholder LLM provider (real
-# ModelConfig CR pointed at in-cluster vLLM added as a follow-up once the
-# kagent-crds ModelConfig schema can be inspected via `kubectl explain`).
+# for the deferred external-exposure decision).
 
 kmcp:
   enabled: false
@@ -28,7 +26,14 @@ controller:
       readOnly: true
 
 providers:
-  # Inert placeholder so the chart renders; no real key configured.
-  # Real LLM wiring happens via a ModelConfig CR pointed at
-  # http://vllm-router-service.vllm.svc.cluster.local/v1 (see issue #111).
-  default: ollama
+  default: openAI
+  openAI:
+    provider: OpenAI
+    model: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+    # vLLM is OpenAI-compatible and requires no real auth (see README) —
+    # apiKeySecretRef/Key below just satisfy the OpenAI client library's
+    # requirement for a non-empty key string.
+    apiKeySecretRef: kagent-vllm-api-key
+    apiKeySecretKey: OPENAI_API_KEY
+    config:
+      baseUrl: http://vllm-router-service.vllm.svc.cluster.local/v1
