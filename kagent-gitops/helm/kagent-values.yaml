@@ -37,3 +37,13 @@ providers:
     apiKeySecretKey: OPENAI_API_KEY
     config:
       baseUrl: http://vllm-router-service.vllm.svc.cluster.local/v1
+
+# Chart default (grafana.kagent:3000/api) assumes Grafana runs in the same
+# namespace — this cluster's Grafana is in monitoring, service port 80
+# (targetPort 3000 internally). secretRef points at a Secret containing
+# GRAFANA_SERVICE_ACCOUNT_TOKEN, created out-of-band (not in git — see
+# scripts/README.md for the bootstrap command).
+grafana-mcp:
+  grafana:
+    url: "grafana.monitoring:80/api"
+    secretRef: kagent-grafana-token
