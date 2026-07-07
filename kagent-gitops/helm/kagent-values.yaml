@@ -44,16 +44,23 @@ providers:
 # GRAFANA_SERVICE_ACCOUNT_TOKEN, created out-of-band (not in git — see
 # scripts/README.md for the bootstrap command).
 #
-# MUST include an explicit scheme (http://) — without "//", Go's url.Parse
-# treats the text before the first ":" as the scheme rather than a hostname
-# (e.g. "grafana.monitoring:80/api" parses as scheme="grafana.monitoring",
-# opaque="80/api", with an EMPTY host). This caused every Grafana API call
-# to fail with "https:///api/...: no Host in request URL" — note the missing
-# host, only a scheme (mcp-grafana silently defaulted to https when parsing
-# failed, which was also wrong: this internal Grafana serves plain HTTP).
+# Two things the chart's own default value gets wrong, found by testing
+# tool calls directly against a port-forwarded grafana-mcp:
+# 1. MUST include an explicit scheme (http://) — without "//", Go's
+#    url.Parse treats the text before the first ":" as the scheme rather
+#    than a hostname (e.g. "grafana.kagent:3000/api" parses as
+#    scheme="grafana.kagent", opaque="3000/api", with an EMPTY host),
+#    producing "https:///api/...: no Host in request URL" errors (note
+#    the missing host, only a scheme — mcp-grafana silently defaults to
+#    https on parse failure, also wrong: this Grafana serves plain HTTP).
+# 2. Do NOT include an "/api" suffix — mcp-grafana's client already bakes
+#    "/api" into its own generated operation paths, so a URL ending in
+#    "/api" produces a doubled "/api/api/..." path and 404s. Confirmed by
+#    testing list_datasources directly: 404 with "/api" suffix, real
+#    datasource list without it.
 grafana-mcp:
   grafana:
-    url: "http://grafana.monitoring:80/api"
+    url: "http://grafana.monitoring:80"
     secretRef: kagent-grafana-token
   # The server's streamable-http transport rejects requests whose Host header
   # isn't in its allow-list (DNS-rebinding protection) — by default it only
