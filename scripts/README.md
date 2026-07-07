@@ -426,6 +426,30 @@ argocd repo add ghcr.io/kagent-dev/kagent/helm --type helm --enable-oci
 kubectl apply -f argoCD-apps/kagent-apps.yaml
 ```
 
+#### kagent-grafana-mcp Grafana service account token
+
+Required for kagent's observability-agent to query Grafana/Prometheus via MCP — without it, `kagent-grafana-mcp` returns 403 Forbidden and the agent's toolset fails to load. Not teller/GSM-managed — generated directly via Grafana's API and stored as a one-off Secret (it's a token scoped only to this integration, not a shared credential):
+
+```bash
+GRAFANA_ADMIN_PW=$(kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d)
+
+SA_ID=$(curl -s -u "admin:$GRAFANA_ADMIN_PW" -X POST http://192.168.0.201/api/serviceaccounts \
+  -H "Content-Type: application/json" -d '{"name":"kagent-mcp","role":"Viewer"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+TOKEN=$(curl -s -u "admin:$GRAFANA_ADMIN_PW" -X POST "http://192.168.0.201/api/serviceaccounts/$SA_ID/tokens" \
+  -H "Content-Type: application/json" -d '{"name":"kagent-mcp-token"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
+
+kubectl create secret generic kagent-grafana-token -n kagent \
+  --from-literal=GRAFANA_SERVICE_ACCOUNT_TOKEN="$TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+unset GRAFANA_ADMIN_PW TOKEN
+```
+
+After creating the secret, restart the pod so it picks up the new toolset: `kubectl delete pod -n kagent -l app.kubernetes.io/name=grafana-mcp`.
+
 ---
 
 ### cert-manager Cloudflare DNS-01 token bootstrap (issue #109)
