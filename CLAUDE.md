@@ -176,7 +176,7 @@ kubectl get pods -n apicurio-registry
 
 ```bash
 # Get Grafana admin password
-kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+kubectl --namespace monitoring get secret grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
 
 ### Development Environment

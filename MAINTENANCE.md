@@ -488,11 +488,11 @@ kubectl run -it --rm psql-test --image=postgres:17 --restart=Never -- \
 kubectl get pods -n monitoring
 
 # Verify Prometheus targets
-kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-prometheus 9090:9090 &
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-prometheus 9090:80 &
 # Open http://localhost:9090/targets in browser
 
 # Check Grafana
-kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80 &
+kubectl port-forward -n monitoring svc/grafana 3000:80 &
 # Open http://localhost:3000 in browser
 ```
 

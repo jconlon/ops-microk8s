@@ -431,7 +431,7 @@ kubectl apply -f argoCD-apps/kagent-apps.yaml
 Required for kagent's observability-agent to query Grafana/Prometheus via MCP — without it, `kagent-grafana-mcp` returns 403 Forbidden and the agent's toolset fails to load. Not teller/GSM-managed — generated directly via Grafana's API and stored as a one-off Secret (it's a token scoped only to this integration, not a shared credential):
 
 ```bash
-GRAFANA_ADMIN_PW=$(kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d)
+GRAFANA_ADMIN_PW=$(kubectl --namespace monitoring get secret grafana -o jsonpath="{.data.admin-password}" | base64 -d)
 
 SA_ID=$(curl -s -u "admin:$GRAFANA_ADMIN_PW" -X POST http://192.168.0.201/api/serviceaccounts \
   -H "Content-Type: application/json" -d '{"name":"kagent-mcp","role":"Viewer"}' \

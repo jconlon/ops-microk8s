@@ -187,7 +187,7 @@ helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-sta
   --timeout 15m
 
 # Get Grafana admin password
-kubectl --namespace monitoring get secrets prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d
+kubectl --namespace monitoring get secret grafana -o jsonpath="{.data.admin-password}" | base64 -d
 ```
 
 ## Kafka
