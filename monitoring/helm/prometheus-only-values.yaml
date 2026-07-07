@@ -81,6 +81,22 @@ prometheusOperator:
 nodeExporter:
   enabled: true
 
+# Node metrics (node_cpu_seconds_total etc.) otherwise only carry an
+# instance label (IP:port, e.g. 192.168.0.101:9100) -- no hostname anywhere.
+# attachMetadata.node exposes the Kubernetes Node object's metadata for
+# relabeling; Node names in this cluster already equal the hostnames
+# (mullet, trout, tuna, whale, gold, squid, puffer, carp), so a single
+# relabeling adds a real "node" label kagent's observability-agent (and
+# anyone else) can query/filter on directly (issue #111).
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      attachMetadata:
+        node: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_node_name]
+          targetLabel: node
+
 kubeStateMetrics:
   enabled: true
 
