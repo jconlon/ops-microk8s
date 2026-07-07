@@ -80,3 +80,29 @@ grafana-mcp:
 # window (issue #111), and the chart exposes no values override for it.
 observability-agent:
   enabled: false
+
+# Bundled agents not applicable to this cluster, disabled to keep the agent
+# list relevant and avoid confusing/unusable tool surfaces:
+istio-agent:
+  # This cluster uses kgateway (Envoy/Gateway API), not Istio.
+  enabled: false
+
+argo-rollouts-agent:
+  # Only Argo Workflows/Events are deployed here; Argo Rollouts is out of scope.
+  enabled: false
+
+helm-agent:
+  # Its tools (helm_upgrade, helm_uninstall, helm_repo_add) let an agent
+  # mutate Helm releases directly, bypassing ArgoCD — this repo's rule is
+  # that ArgoCD owns all Helm operations and `helm` is never run directly.
+  enabled: false
+
+cilium-policy-agent:
+  # Cluster CNI is Calico, not Cilium.
+  enabled: false
+
+cilium-manager-agent:
+  enabled: false
+
+cilium-debug-agent:
+  enabled: false
