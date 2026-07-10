@@ -80,7 +80,7 @@ Always include a `<strong>` label as the first child.
 
 ## Rules
 
-- **No `.md` files** — convert to HTML. Markdown is not rendered in the browser and breaks the visual consistency.
+- **No `.md` files** — convert to HTML. Markdown is not rendered in the browser and breaks the visual consistency. **Exception: `docs/plans/`** — dated design/implementation plan documents are working artifacts for Claude Code and humans reading the repo directly, not browsable pages; they stay as markdown and are exempt from this rule.
 - **No inline styles for colours** — use CSS variables.
 - **No external CDN dependencies** — the docs work offline.
 - **Always include the breadcrumb** — `ops-microk8s › Page Title` linking back to `index.html`.

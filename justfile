@@ -369,6 +369,10 @@ loki-docs:
 cluster-docs:
     xdg-open docs/cluster.html
 
+# Open the node hardware reference in a browser
+nodes-docs:
+    xdg-open docs/nodes.html
+
 # Open the backups reference in a browser
 backup-docs:
     xdg-open docs/backups.html

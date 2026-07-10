@@ -262,7 +262,7 @@
       <td><span class="badge badge-blue">Control plane</span></td>
       <td>Ubuntu 22.04</td>
       <td>Desktop PC · 117 GB root SSD · 3.6 TB <code>/home</code></td>
-      <td>Runs Caddy reverse proxy. Desktop apps bind-mounted to <code>/home/system/</code> (issue #77)</td>
+      <td>Runs Caddy for its own static sites only (mullet.verticon.com/.lab) — no longer fronts cluster services, see kgateway (issue #108). Desktop apps bind-mounted to <code>/home/system/</code> (issue #77)</td>
     </tr>
     <tr>
       <td><code>trout</code></td>
@@ -333,18 +333,18 @@ just test                 # full chainsaw e2e suite</pre>
   New MetalLB IPs must not overlap with DHCP reservations or PiHole's address.
 </div>
 
-<h3>External DNS + TLS — Cloudflare + Caddy</h3>
-<p>All external hostnames follow the same pattern:</p>
+<h3>External DNS + TLS — kgateway + cert-manager (issue #108)</h3>
+<p>All in-scope HTTP(S) cluster hostnames follow the same pattern — see <a href="networking.html">networking.html</a> for the full hostname table:</p>
 <ul>
-  <li>Cloudflare A record: <code>&lt;service&gt;.verticon.com</code> → mullet's public IP</li>
-  <li>Caddy on mullet: terminates TLS (Cloudflare DNS challenge), reverse proxies to MetalLB IP</li>
-  <li>Services use HTTP internally — no per-service TLS needed</li>
+  <li>Cloudflare A record: <code>&lt;service&gt;.verticon.com</code> → shared kgateway MetalLB IP <code>192.168.0.224</code> (DNS only, not proxied)</li>
+  <li>kgateway (Envoy-based Gateway API): one shared <code>Gateway</code> with a per-hostname HTTPS listener, SNI-routed</li>
+  <li>cert-manager issues real Let's Encrypt certs per hostname via DNS-01 through Cloudflare — HTTP-01 can't work since <code>*.verticon.com</code> resolves to private LAN IPs</li>
+  <li>Caddy on mullet no longer fronts any cluster service — it only serves mullet's own static sites (<code>mullet.verticon.com</code>, <code>mullet.verticon.lab</code>)</li>
 </ul>
-<pre># Standard Caddyfile entry pattern:
-&lt;service&gt;.verticon.com {
-    reverse_proxy &lt;MetalLB-IP&gt;:80
-    tls { resolvers 1.1.1.1 1.0.0.1 }
-}</pre>
+<pre># Adding a new hostname requires 3 resources (see README "Adding a New DNS Name for a Service"):
+# 1. Certificate           — cert-manager-gitops/resources/certificates/&lt;service&gt;-certificate.yaml
+# 2. HTTPS listener        — kgateway-gitops/resources/gateway.yaml
+# 3. HTTPRoute             — kgateway-gitops/resources/httproutes/&lt;service&gt;-httproute.yaml</pre>
 
 <!-- ── Storage ────────────────────────────────────────────────────── -->
 <h2 id="storage">Storage</h2>

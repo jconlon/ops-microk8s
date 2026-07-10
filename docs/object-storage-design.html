@@ -305,8 +305,9 @@ spec:
 <table>
   <thead><tr><th>Method</th><th>Endpoint</th></tr></thead>
   <tbody>
-    <tr><td>External HTTPS</td><td><a href="https://s3.verticon.com">s3.verticon.com</a> (192.168.0.204) — path-style</td></tr>
-    <tr><td>Internal cluster</td><td><code>rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:80</code></td></tr>
+    <tr><td>External HTTPS</td><td><a href="https://s3.verticon.com">s3.verticon.com</a> — via kgateway (shared IP <code>192.168.0.224</code>, issue #108), path-style</td></tr>
+    <tr><td>Direct MetalLB (internal/direct clients, e.g. restic)</td><td><code>rook-ceph-rgw-external</code> service · <code>192.168.0.204</code></td></tr>
+    <tr><td>Internal cluster</td><td><code>rook-ceph-rgw-rook-ceph-rgw.rook-ceph.svc:80</code></td></tr>
     <tr><td>mc CLI</td><td><code>mc ls ceph/</code> — <code>MC_HOST_ceph</code> set in devbox shell</td></tr>
   </tbody>
 </table>

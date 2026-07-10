@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node Hardware Reference — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; }
+  ul { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.25rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green);  border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-purple { background: #241f3a; color: var(--accent2);border: 1px solid #352a50; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-orange { background: #2e1e0a; color: var(--orange); border: 1px solid #4a3010; }
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-note { border-color: var(--accent);  background: #141926; }
+  .callout-tip  { border-color: var(--green);   background: #151f1a; }
+  .callout-warn { border-color: var(--yellow);  background: #201d12; }
+  .callout strong { font-weight: 700; }
+  .callout-note strong { color: var(--accent); }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Node Hardware Reference</p>
+<h1>Node Hardware Reference</h1>
+<p class="subtitle">8-node MicroK8s cluster · Last verified 2026-05-31 via <code>dmidecode</code> on each node</p>
+
+<!-- ── Summary ────────────────────────────────────────────────────── -->
+<h2 id="summary">Summary Table</h2>
+<table>
+  <thead>
+    <tr><th>Node</th><th>IP</th><th>Role</th><th>Machine</th><th>CPU</th><th>RAM</th><th>Storage</th><th>GPU</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>mullet</code></td><td>192.168.0.101</td><td>Control plane</td><td>Dell OptiPlex 9010</td><td>Core i7-3770, 4C/8T, 3.4 GHz</td><td>32 GB</td><td>~120 GB SSD</td><td>—</td></tr>
+    <tr><td><code>trout</code></td><td>192.168.0.102</td><td>Control plane</td><td>Dell OptiPlex 9010</td><td>Core i7-3770, 4C/8T, 3.4 GHz</td><td>32 GB</td><td>~120 GB SSD</td><td>—</td></tr>
+    <tr><td><code>whale</code></td><td>192.168.0.107</td><td>Control plane + GPU</td><td>Dell Precision 3680 Tower</td><td>Core i7-14700, 20C/28T, 5.2 GHz boost</td><td>32 GB</td><td>~143 GB SSD</td><td>RTX 2000 Ada 16 GB</td></tr>
+    <tr><td><code>tuna</code></td><td>192.168.0.103</td><td>Worker</td><td>Dell OptiPlex 7020</td><td>Core i5-4590, 4C/4T, 3.3 GHz</td><td>16 GB</td><td>~100 GB SSD</td><td>—</td></tr>
+    <tr><td><code>gold</code></td><td>192.168.0.129</td><td>Ceph storage worker</td><td>Dell PowerEdge R320</td><td>Xeon E5-2407, 4C/4T, 2.2 GHz</td><td>64 GB</td><td>~100 GB SSD + 4 TB HDD</td><td>—</td></tr>
+    <tr><td><code>squid</code></td><td>192.168.0.133</td><td>Ceph storage worker</td><td>Dell PowerEdge R320</td><td>Xeon E5-2407, 4C/4T, 2.2 GHz</td><td>64 GB</td><td>~100 GB SSD + 4 TB HDD</td><td>—</td></tr>
+    <tr><td><code>puffer</code></td><td>192.168.0.135</td><td>Ceph storage worker</td><td>Dell PowerEdge R320</td><td>Xeon E5-2407, 4C/4T, 2.2 GHz</td><td>64 GB</td><td>~100 GB SSD + 4 TB HDD</td><td>—</td></tr>
+    <tr><td><code>carp</code></td><td>192.168.0.137</td><td>Ceph storage worker</td><td>Dell PowerEdge R320</td><td>Xeon E5-2407, 4C/4T, 2.2 GHz</td><td>64 GB</td><td>~100 GB SSD + 4 TB HDD</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Control plane ──────────────────────────────────────────────── -->
+<h2 id="control-plane">Control Plane Nodes</h2>
+
+<h3>mullet</h3>
+<table>
+  <tbody>
+    <tr><td>IP</td><td>192.168.0.101</td></tr>
+    <tr><td>Role</td><td>Control plane (etcd master)</td></tr>
+    <tr><td>Machine</td><td>Dell OptiPlex 9010</td></tr>
+    <tr><td>CPU</td><td>Intel Core i7-3770 (Ivy Bridge, Family 6 Model 58), 4C/8T, 3.4 GHz base</td></tr>
+    <tr><td>RAM</td><td>32 GB</td></tr>
+    <tr><td>Boot storage</td><td>~120 GB SSD</td></tr>
+    <tr><td>OS</td><td>Ubuntu 24.04.4 LTS</td></tr>
+    <tr><td>Kernel</td><td>6.8.0-111-generic</td></tr>
+    <tr><td>MicroK8s</td><td>v1.32.13</td></tr>
+    <tr><td>Notes</td><td>Runs Caddy for its own static sites only (mullet.verticon.com/.lab); kgateway now fronts all cluster services (issue #108)</td></tr>
+  </tbody>
+</table>
+
+<h3>trout</h3>
+<table>
+  <tbody>
+    <tr><td>IP</td><td>192.168.0.102</td></tr>
+    <tr><td>Role</td><td>Control plane (etcd master)</td></tr>
+    <tr><td>Machine</td><td>Dell OptiPlex 9010</td></tr>
+    <tr><td>CPU</td><td>Intel Core i7-3770 (Ivy Bridge, Family 6 Model 58), 4C/8T, 3.4 GHz base</td></tr>
+    <tr><td>RAM</td><td>32 GB</td></tr>
+    <tr><td>Boot storage</td><td>~120 GB SSD</td></tr>
+    <tr><td>OS</td><td>Ubuntu 24.04.3 LTS</td></tr>
+    <tr><td>Kernel</td><td>6.8.0-106-generic</td></tr>
+    <tr><td>MicroK8s</td><td>v1.32.13</td></tr>
+    <tr><td>Notes</td><td>Hosts primary PostgreSQL instance (production-postgresql-3)</td></tr>
+  </tbody>
+</table>
+
+<h3>whale</h3>
+<table>
+  <tbody>
+    <tr><td>IP</td><td>192.168.0.107</td></tr>
+    <tr><td>Role</td><td>Control plane + GPU inference node</td></tr>
+    <tr><td>Machine</td><td>Dell Precision 3680 Tower</td></tr>
+    <tr><td>CPU</td><td>Intel Core i7-14700 (Raptor Lake, Family 6 Model 183), 8P+12E = 20C/28T, 5.247 GHz boost</td></tr>
+    <tr><td>RAM</td><td>32 GB</td></tr>
+    <tr><td>Boot storage</td><td>~143 GB SSD</td></tr>
+    <tr><td>OS</td><td>Ubuntu 22.04.5 LTS</td></tr>
+    <tr><td>Kernel</td><td>6.8.0-111-generic</td></tr>
+    <tr><td>MicroK8s</td><td>v1.32.13</td></tr>
+    <tr><td>GPU</td><td>NVIDIA RTX 2000 Ada Generation</td></tr>
+    <tr><td>GPU VRAM</td><td>16 GB GDDR6</td></tr>
+    <tr><td>GPU architecture</td><td>Ada Lovelace, compute capability 8.9</td></tr>
+    <tr><td>CUDA driver</td><td>580.142</td></tr>
+    <tr><td>CUDA runtime</td><td>13.0</td></tr>
+    <tr><td>PSU wattage</td><td>Unknown — DMI reports no value; requires physical inspection (see issue #71)</td></tr>
+    <tr><td>Notes</td><td>Only GPU node in cluster; runs vLLM for LLM inference</td></tr>
+  </tbody>
+</table>
+
+<p><strong>PCIe slots (from issue #71):</strong></p>
+<table>
+  <thead><tr><th>Slot</th><th>Type</th><th>Length</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>SLOT2</td><td>x16 PCIe</td><td>Full-length</td><td>In use (RTX 2000 Ada)</td></tr>
+    <tr><td>SLOT1</td><td>x4 PCIe</td><td>Half-length</td><td>Available — too small for full-size GPU</td></tr>
+    <tr><td>SLOT4</td><td>x4 PCIe</td><td>Half-length</td><td>Available — too small for full-size GPU</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Workers ────────────────────────────────────────────────────── -->
+<h2 id="workers">Worker Nodes</h2>
+
+<h3>tuna</h3>
+<table>
+  <tbody>
+    <tr><td>IP</td><td>192.168.0.103</td></tr>
+    <tr><td>Role</td><td>Worker</td></tr>
+    <tr><td>Machine</td><td>Dell OptiPlex 7020</td></tr>
+    <tr><td>CPU</td><td>Intel Core i5-4590 (Haswell, Family 6 Model 60), 4C/4T, 3.3 GHz base</td></tr>
+    <tr><td>RAM</td><td>16 GB</td></tr>
+    <tr><td>Boot storage</td><td>~100 GB SSD</td></tr>
+    <tr><td>OS</td><td>Ubuntu 24.04.3 LTS</td></tr>
+    <tr><td>Kernel</td><td>6.8.0-106-generic</td></tr>
+    <tr><td>MicroK8s</td><td>v1.32.13</td></tr>
+    <tr><td>Notes</td><td>Smallest node in cluster; intermittent DNS/RBD issues (issues #39, #95)</td></tr>
+  </tbody>
+</table>
+
+<!-- ── Ceph storage ───────────────────────────────────────────────── -->
+<h2 id="ceph-storage">Ceph Storage Nodes (Dell PowerEdge R320)</h2>
+<p>All four nodes are identical hardware. Each contributes one 4 TB Ceph OSD (16 TB raw total, ~5.3 TB usable at 3× replication).</p>
+
+<table>
+  <tbody>
+    <tr><td>Machine</td><td>Dell PowerEdge R320 (1U rackmount)</td></tr>
+    <tr><td>CPU</td><td>Intel Xeon E5-2407 (Sandy Bridge-EP, Family 6 Model 45), 4C/4T, 2.2 GHz, no HT, no Turbo, AES-NI</td></tr>
+    <tr><td>RAM</td><td>64 GB</td></tr>
+    <tr><td>Boot storage</td><td>~100 GB SSD</td></tr>
+    <tr><td>Ceph OSD</td><td>4 TB HDD</td></tr>
+    <tr><td>OS</td><td>Ubuntu 24.04 LTS</td></tr>
+    <tr><td>MicroK8s</td><td>v1.32.13</td></tr>
+    <tr><td>iDRAC</td><td>Present on each node; sends UDP syslog → Loki via Promtail</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Per-node:</strong></p>
+<table>
+  <thead><tr><th>Node</th><th>IP</th><th>Kernel</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>gold</code></td><td>192.168.0.129</td><td>6.8.0-106-generic</td><td></td></tr>
+    <tr><td><code>squid</code></td><td>192.168.0.133</td><td>6.8.0-117-generic</td><td></td></tr>
+    <tr><td><code>puffer</code></td><td>192.168.0.135</td><td>6.8.0-117-generic</td><td>ACPI power key issue mitigated (issue #59)</td></tr>
+    <tr><td><code>carp</code></td><td>192.168.0.137</td><td>6.8.0-117-generic</td><td></td></tr>
+  </tbody>
+</table>
+
+<!-- ── Open items ─────────────────────────────────────────────────── -->
+<h2 id="open-items">Open Items</h2>
+<div class="callout callout-warn">
+  <strong>whale PSU wattage:</strong> DMI returns Unknown; confirm by physical inspection before GPU upgrade (issue #71).
+</div>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a>
+</p>
+
+</div>
+</body>
+</html>
