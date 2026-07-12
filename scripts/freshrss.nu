@@ -170,6 +170,82 @@ def "main freshrss update-news" [
     print $"Updated ($news_file) with ($link_lines | length) links and by-line: ($new_byline)."
 }
 
+# Build the SELECT query for starred (favorited) entries, deduped by entry
+# (v_freshrss_entries has one row per entry/tag pair) and ordered by category
+# then date so the caller can group consecutive rows by category.
+def freshrss-starred-query [] {
+    "SELECT
+    title,
+    replace(link, '&amp;', '&'),
+    to_char(to_timestamp(date), 'Mon DD YYYY'),
+    feed_name,
+    COALESCE(category_name, ''),
+    COALESCE(author, ''),
+    COALESCE(
+        NULLIF(btrim(replace(replace(NULLIF(entry_attributes, '')::json->'enclosures'->0->>'description', chr(13), ''), chr(10), '|||')), ''),
+        NULLIF(btrim(replace(replace(regexp_replace(COALESCE(content, ''), '<[^>]+>', '', 'g'), chr(13), ''), chr(10), '|||')), ''),
+        ''
+    )
+FROM (
+    SELECT DISTINCT ON (entry_id) *
+    FROM v_freshrss_entries
+    WHERE is_favorite = 1
+      AND link IS NOT NULL AND link != ''
+) e
+ORDER BY category_name NULLS LAST, date DESC;"
+}
+
+# Export starred (favorited) FreshRSS entries grouped by category to a standalone
+# markdown page — unlike update-news/update-technical, this writes a complete new
+# file rather than patching a section of an existing one. is_favorite is left
+# untouched, so the page just reflects current favorites on every run.
+#
+# Usage:
+#   ops freshrss update-starred
+#
+def "main freshrss update-starred" [
+    --host (-H): string = "postgresql.verticon.com"
+    --news-file: string = "/home/jconlon/git/news/docs/starred.md"
+] {
+    let password = (
+        ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
+        | ^base64 -d
+        | str trim
+    )
+
+    let rows = (
+        with-env { PGPASSWORD: $password } {
+            ^psql -h $host -p 5432 -U freshrss -d freshrss -t -A -F (char tab) -c (freshrss-starred-query)
+        }
+        | lines
+        | filter { |l| ($l | str trim) != "" }
+    )
+
+    if ($rows | is-empty) {
+        error make { msg: "No starred entries returned from database — aborting to protect the starred file." }
+    }
+
+    let groups = (
+        $rows
+        | group-by { |l| let cat = ($l | split row "\t" | get 4); if ($cat | str trim) == "" { "Uncategorized" } else { $cat } }
+        | transpose category entries
+        | sort-by category
+    )
+
+    let sections = (
+        $groups
+        | each { |g|
+            [$"## ($g.category)" ""] | append ($g.entries | each { |l| entry-to-markdown $l }) | append ""
+        }
+        | flatten
+    )
+
+    (["# Starred Articles" ""] | append $sections | str join "\n") + "\n"
+    | save --force $news_file
+
+    print $"Wrote ($news_file) with ($rows | length) starred entries across ($groups | length) categories."
+}
+
 # Query FreshRSS entries tagged 'publish' and output a markdown link list.
 #
 # Connects directly to postgresql.verticon.com, runs the publish query via
