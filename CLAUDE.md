@@ -417,3 +417,13 @@ _Cross-project, persistent knowledge and identification for usage in all Claude 
   - "Always rotate credentials every 90 days."
   - "After each release, update CHANGELOG and deployment checklist."
   - "Default user is jconlon; treat jconlon as owner in all sessions."
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub (jconlon/ops-microk8s), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
