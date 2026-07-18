@@ -76,7 +76,7 @@ spec:
             (conditions[?type=='Ready'].status | [0]): "True"
 
   - name: puffer-powerkey-mitigations-applied
-    description: puffer has ACPI power button suppressions in place (issue #59)
+    description: puffer has ACPI power button suppressions configured (issue #59). Only checks static config (logind.conf, udev rule file) — the live sysfs `inhibited` state is intentionally NOT checked while the front panel board is physically disconnected (confirmed root cause, #59), since sysfs inhibit doesn't persist across reboots and there's no signal source to inhibit right now. Re-add a live-state check (plus a boot-persistent systemd one-shot to set it) if/when the panel is reconnected.
     try:
       - script:
           timeout: 60s
@@ -91,7 +91,7 @@ spec:
             kubectl delete pod "$POD" -n "$NS" --ignore-not-found >/dev/null 2>&1
 
             JSON=$(cat <<JSONEOF
-            {"apiVersion":"v1","kind":"Pod","metadata":{"name":"$POD","namespace":"$NS"},"spec":{"restartPolicy":"Never","nodeName":"puffer","containers":[{"name":"check","image":"alpine:latest","command":["sh","-c","FAIL=0; grep -q 'HandlePowerKey=ignore' /host/etc/systemd/logind.conf && echo 'PASS HandlePowerKey=ignore' || { echo 'FAIL HandlePowerKey=ignore missing'; FAIL=1; }; grep -q 'HandlePowerKeyLongPress=ignore' /host/etc/systemd/logind.conf && echo 'PASS HandlePowerKeyLongPress=ignore' || { echo 'FAIL HandlePowerKeyLongPress=ignore missing'; FAIL=1; }; grep -q 'ATTR{inhibited}=\"1\"' /host/etc/udev/rules.d/99-ignore-power-button.udev && echo 'PASS udev rule uses kernel inhibit' || { echo 'FAIL udev rule missing or uses wrong method'; FAIL=1; }; grep -q 'Avocent' /host/etc/udev/rules.d/99-ignore-power-button.udev && echo 'PASS udev rule covers Avocent KVM device' || { echo 'FAIL udev rule missing Avocent KVM device'; FAIL=1; }; [ \"$(cat /host/sys/class/input/input0/inhibited 2>/dev/null)\" = \"1\" ] && echo 'PASS event0 (Power Button) inhibited' || { echo 'FAIL event0 not inhibited'; FAIL=1; }; [ \"$(cat /host/sys/class/input/input1/inhibited 2>/dev/null)\" = \"1\" ] && echo 'PASS event1 (Avocent KVM) inhibited' || { echo 'FAIL event1 not inhibited'; FAIL=1; }; exit \$FAIL"],"volumeMounts":[{"name":"hostroot","mountPath":"/host","readOnly":true}]}],"volumes":[{"name":"hostroot","hostPath":{"path":"/","type":"Directory"}}]}}
+            {"apiVersion":"v1","kind":"Pod","metadata":{"name":"$POD","namespace":"$NS"},"spec":{"restartPolicy":"Never","nodeName":"puffer","containers":[{"name":"check","image":"alpine:latest","command":["sh","-c","FAIL=0; grep -q 'HandlePowerKey=ignore' /host/etc/systemd/logind.conf && echo 'PASS HandlePowerKey=ignore' || { echo 'FAIL HandlePowerKey=ignore missing'; FAIL=1; }; grep -q 'HandlePowerKeyLongPress=ignore' /host/etc/systemd/logind.conf && echo 'PASS HandlePowerKeyLongPress=ignore' || { echo 'FAIL HandlePowerKeyLongPress=ignore missing'; FAIL=1; }; grep -q 'ATTR{inhibited}=\"1\"' /host/etc/udev/rules.d/99-ignore-power-button.udev && echo 'PASS udev rule uses kernel inhibit' || { echo 'FAIL udev rule missing or uses wrong method'; FAIL=1; }; grep -q 'Avocent' /host/etc/udev/rules.d/99-ignore-power-button.udev && echo 'PASS udev rule covers Avocent KVM device' || { echo 'FAIL udev rule missing Avocent KVM device'; FAIL=1; }; exit \$FAIL"],"volumeMounts":[{"name":"hostroot","mountPath":"/host","readOnly":true}]}],"volumes":[{"name":"hostroot","hostPath":{"path":"/","type":"Directory"}}]}}
             JSONEOF
             )
             echo "$JSON" | kubectl apply -f - >/dev/null
