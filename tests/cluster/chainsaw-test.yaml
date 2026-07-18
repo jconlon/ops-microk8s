@@ -111,3 +111,43 @@ spec:
               ' 2>/dev/null)
             echo "$RESULT"
             echo "$RESULT" | grep -q "^FAIL" && exit 1 || exit 0
+
+  - name: control-plane-certs-valid
+    description: Control-plane node certs (front-proxy-client, server) have >30 days remaining validity (issue #115 regression guard — whale's front-proxy-client.crt expired unnoticed for 5 weeks)
+    try:
+      - script:
+          timeout: 150s
+          content: |
+            # NOTE: kubectl debug node ... does not reliably return output through
+            # command substitution in this environment (silently empty, false-passes
+            # the check). Use a plain hostPath-mounted pod instead — fully
+            # deterministic, no output-capture ambiguity, and a single-line JSON
+            # manifest avoids nested-heredoc/YAML-indentation issues.
+            NS=$(kubectl config view --minify -o jsonpath='{..namespace}')
+            FAIL=0
+            for node in mullet trout whale; do
+              POD="certcheck-$node-$$"
+              kubectl delete pod "$POD" -n "$NS" --ignore-not-found >/dev/null 2>&1
+
+              JSON=$(cat <<JSONEOF
+            {"apiVersion":"v1","kind":"Pod","metadata":{"name":"$POD","namespace":"$NS"},"spec":{"restartPolicy":"Never","nodeName":"$node","containers":[{"name":"certcheck","image":"alpine:latest","command":["sh","-c","apk add --no-cache openssl -q 2>/dev/null; CFAIL=0; for cert in front-proxy-client.crt server.crt; do if openssl x509 -in /certs/\$cert -noout -checkend 2592000 2>/dev/null; then echo PASS \$cert; else echo FAIL \$cert; CFAIL=1; fi; done; exit \$CFAIL"],"volumeMounts":[{"name":"certs","mountPath":"/certs","readOnly":true}]}],"volumes":[{"name":"certs","hostPath":{"path":"/var/snap/microk8s/current/certs","type":"Directory"}}]}}
+            JSONEOF
+              )
+              echo "$JSON" | kubectl apply -f - >/dev/null
+
+              PHASE=""
+              for i in $(seq 1 20); do
+                PHASE=$(kubectl get pod "$POD" -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null)
+                { [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ]; } && break
+                sleep 2
+              done
+
+              RESULT=$(kubectl logs "$POD" -n "$NS" 2>/dev/null)
+              kubectl delete pod "$POD" -n "$NS" --ignore-not-found >/dev/null 2>&1
+
+              echo "-- $node --"
+              echo "$RESULT"
+              [ -z "$RESULT" ] && { echo "FAIL $node: no output captured (phase=$PHASE)"; FAIL=1; continue; }
+              echo "$RESULT" | grep -q "^FAIL" && FAIL=1
+            done
+            exit $FAIL
