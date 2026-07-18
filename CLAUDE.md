@@ -333,9 +333,18 @@ kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reco
 # 6. Verify clean quorum (LeaderEpoch should be low, MaxFollowerLag=0)
 kubectl exec -n kafka-system kafka-kafka-0 -- \
   /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server localhost:9092 describe --status
+
+# 7. REQUIRED: restart Kafka Connect worker pods — they stay running through the
+#    broker wipe and are left holding stale group-coordinator state (cached
+#    assignment offset) against the now-rebuilt kafka-connect-cluster-configs
+#    topic. Left unrestarted, workers get stuck in an infinite rebalance loop:
+#    "Current config state offset N does not match group assignment M. Forcing
+#    rebalance." (repeating indefinitely, connectors never go Ready). Confirmed
+#    2026-07-18 — just test-suite kafka-connect fails until this step runs.
+kubectl delete pod kafka-connect-connect-0 kafka-connect-connect-1 -n kafka-system
 ```
 
-After recovery: KafkaTopic CRs are reconciled by Strimzi (topics recreated). KafkaConnector CRs are reconciled (connectors restart from scratch). Connect internal topic `cleanup.policy=compact` is preserved automatically by Strimzi.
+After recovery: KafkaTopic CRs are reconciled by Strimzi (topics recreated). KafkaConnector CRs are reconciled (connectors restart from scratch). Connect internal topic `cleanup.policy=compact` is preserved automatically by Strimzi. Step 7 above is required for the connectors to actually come back healthy — verify with `just test-suite kafka-connect`.
 
 ### Useful Commands
 
