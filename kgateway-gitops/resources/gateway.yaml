@@ -261,3 +261,16 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-jellyfin
+      protocol: HTTPS
+      port: 443
+      hostname: "jellyfin.verticon.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: jellyfin-tls
+            kind: Secret
+            group: ""
+      allowedRoutes:
+        namespaces:
+          from: All

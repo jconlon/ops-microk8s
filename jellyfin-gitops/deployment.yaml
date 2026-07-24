@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jellyfin
+  namespace: jellyfin
+  labels:
+    app.kubernetes.io/name: jellyfin
+    app.kubernetes.io/component: app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jellyfin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jellyfin
+        app.kubernetes.io/component: app
+    spec:
+      # Pinned to whale (issue #116): mullet was at 79% memory/swap-maxed at
+      # grilling time; whale had headroom and is the cluster's only GPU node,
+      # keeping the door open for hardware transcoding later.
+      nodeSelector:
+        kubernetes.io/hostname: whale
+      enableServiceLinks: false
+      containers:
+        - name: jellyfin
+          image: jellyfin/jellyfin:latest
+          ports:
+            - containerPort: 8096
+              name: http
+          # Explicit guardrail (issue #116): whale is also a control-plane
+          # node, so a runaway software transcode shouldn't threaten cluster
+          # stability.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: media
+              mountPath: /media
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: jellyfin-config
+        - name: media
+          persistentVolumeClaim:
+            claimName: jellyfin-media
