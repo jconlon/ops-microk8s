@@ -19,6 +19,10 @@ test-suite suite:
 test-verbose:
     chainsaw test tests/ --verbose
 
+# Run unit tests for the scripts/ Python helpers (e.g. decode_atom_entries.py)
+test-freshrss-scripts:
+    python3 -m pytest scripts/test_decode_atom_entries.py -v
+
 # ── Cluster ───────────────────────────────────────────────────────────────────
 
 # Verify puffer ACPI power key mitigations are in place (issue #59)

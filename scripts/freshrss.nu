@@ -22,9 +22,12 @@ WHERE tag_name = '" + $tag + "'
 ORDER BY date DESC;"
 }
 
-# Convert a raw tab-separated entry row into a formatted markdown list item string.
-def entry-to-markdown [l: string] {
-    let parts = ($l | split row "\t")
+# Build the shared "- [title](link) — date" + optional "    - feed | category | author"
+# lines from a raw tab-separated entry row's parsed parts. Shared by
+# entry-to-markdown and entry-from-avro, which differ only in what
+# additional bullet lines they append (raw content snippet vs. LLM summary
+# bullets).
+def entry-header-lines [parts: list] {
     let title = ($parts | get 0)
         | str replace --all --regex '\|\|.*$' ''
         | str replace --all --regex ' • From .*$' ''
@@ -37,6 +40,16 @@ def entry-to-markdown [l: string] {
     let feed   = ($parts | get 3)
     let cat    = ($parts | get 4)
     let author = ($parts | get 5) | str replace --regex '^;+' ''
+
+    let author_display = if ($author == $feed) { "" } else { $author }
+    let meta = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
+    let base = [$"- [($title)]\(($link)\) — ($date)"]
+    if ($meta | str trim) != "" { $base | append $"    - ($meta)" } else { $base }
+}
+
+# Convert a raw tab-separated entry row into a formatted markdown list item string.
+def entry-to-markdown [l: string] {
+    let parts = ($l | split row "\t")
     let raw_snip = (if ($parts | length) > 6 { $parts | get 6 } else { "" })
 
     let snip_lines = if ($raw_snip | str trim) != "" {
@@ -56,12 +69,8 @@ def entry-to-markdown [l: string] {
             })
     } else { [] }
 
-    let author_display = if ($author == $feed) { "" } else { $author }
-    let meta       = ([$feed, $cat, $author_display] | filter { |p| ($p | str trim) != "" } | str join " | ")
     let snip_items = ($snip_lines | each { |s| $"    - ($s)" })
-    let base       = [$"- [($title)]\(($link)\) — ($date)"]
-    let with_meta  = if ($meta | str trim) != "" { $base | append $"    - ($meta)" } else { $base }
-    ($with_meta | append $snip_items) | str join "\n"
+    (entry-header-lines $parts | append $snip_items) | str join "\n"
 }
 
 def "main freshrss update-technical" [
@@ -244,6 +253,109 @@ def "main freshrss update-starred" [
     | save --force $news_file
 
     print $"Wrote ($news_file) with ($rows | length) starred entries across ($groups | length) categories."
+}
+
+# Build a markdown list item using freshrss-streams' LLM-generated summary
+# bullets (from the Ceph atom-entries bucket) instead of the raw content
+# snippet used by entry-to-markdown — the review pipeline's whole point is
+# surfacing that enrichment.
+def entry-from-avro [avro: record, parts: list] {
+    let bullet_items = ($avro.vi_summary_bullets | each { |b| $"    - ($b)" })
+    (entry-header-lines $parts | append $bullet_items) | str join "\n"
+}
+
+# Export FreshRSS entries tagged 'review' to a standalone markdown page,
+# enriched with freshrss-streams' LLM-generated summary bullets where
+# available (issue #117).
+#
+# The 'review' tag itself only exists in FreshRSS's Postgres tag table — it
+# is NOT reflected in the atom-entries Avro `categories` field (that field
+# only carries feed-provided hashtag categories, confirmed by cross-checking
+# live bucket contents). So entry *selection* still goes through Postgres
+# (same query shape as update-starred), and the Ceph object store is used
+# purely to enrich the selected entries with richer LLM summary bullets in
+# place of the raw content snippet, when a matching, fully-processed record
+# exists. Falls back to the Postgres-only snippet per entry (or for the
+# whole run, if the bucket is unreachable) rather than failing the page.
+#
+# Usage:
+#   ops freshrss update-review
+#
+def "main freshrss update-review" [
+    --host (-H): string = "postgresql.verticon.com"
+    --bucket: string = "atom-entries"
+    --review-file: string = "/home/jconlon/git/news/docs/review.md"
+] {
+    let password = (
+        ^kubectl get secret freshrss-role-password -n postgresql-system -o $"jsonpath={.data.password}"
+        | ^base64 -d
+        | str trim
+    )
+
+    let rows = (
+        with-env { PGPASSWORD: $password } {
+            ^psql -h $host -p 5432 -U freshrss -d freshrss -t -A -F (char tab) -c (freshrss-query "review")
+        }
+        | lines
+        | filter { |l| ($l | str trim) != "" }
+    )
+
+    if ($rows | is-empty) {
+        error make { msg: "No review-tagged entries returned from database — aborting to protect the review file." }
+    }
+
+    # Enrichment is best-effort: read-only reuse of the atom-entries-s3-sink
+    # connector's own S3 credentials (kafka-connect-secret, kafka-system) —
+    # scoped to this bucket via the CephObjectStoreUser Rook created for it
+    # (see docs/object-storage-design.html).
+    let tmp_dir = (mktemp -d)
+    let enriched_by_link = (
+        try {
+            let access_key = (^kubectl get secret kafka-connect-secret -n kafka-system -o $"jsonpath={.data.AWS_ACCESS_KEY_ID}" | ^base64 -d | str trim)
+            let secret_key = (^kubectl get secret kafka-connect-secret -n kafka-system -o $"jsonpath={.data.AWS_SECRET_ACCESS_KEY}" | ^base64 -d | str trim)
+
+            with-env { MC_HOST_atomentries: $"https://($access_key):($secret_key)@s3.verticon.com" } {
+                ^mc mirror --quiet $"atomentries/($bucket)/" $tmp_dir o> /dev/null
+            }
+
+            let links = ($rows | each { |l| $l | split row "\t" | get 1 })
+            let matched = (
+                ($links | str join "\n")
+                | ^python3 scripts/decode_atom_entries.py $tmp_dir
+                | from json
+            )
+
+            ($matched | reduce -f {} { |r, acc| $acc | insert $r.id $r })
+        } catch { |e|
+            print $"WARN  could not read atom-entries bucket \(($e.msg)\) — falling back to Postgres content only."
+            {}
+        }
+    )
+    rm -r $tmp_dir
+
+    let entries = (
+        $rows
+        | each { |l|
+            let parts = ($l | split row "\t")
+            let link  = ($parts | get 1)
+            let avro  = ($enriched_by_link | get $link -i)
+            if ($avro != null) and ($avro.vi_summary_status == "processed") and (($avro.vi_summary_bullets | length) > 0) {
+                entry-from-avro $avro $parts
+            } else {
+                entry-to-markdown $l
+            }
+        }
+    )
+
+    (["# Review" ""] | append $entries | str join "\n") + "\n"
+    | save --force $review_file
+
+    let enriched_count = (
+        $rows
+        | where { |l| ($enriched_by_link | get ($l | split row "\t" | get 1) -i) != null }
+        | length
+    )
+    print $"Wrote ($review_file) with ($rows | length) review entries \(($enriched_count) enriched from atom-entries\)."
 }
 
 # Query FreshRSS entries tagged 'publish' and output a markdown link list.
