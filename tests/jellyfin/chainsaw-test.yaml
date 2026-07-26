@@ -1,0 +1,105 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: jellyfin-healthy
+spec:
+  description: Jellyfin ArgoCD app is Synced/Healthy, pod running on whale, storage bound, health endpoint responds, kgateway routing is wired up
+  concurrent: false
+  timeouts:
+    assert: 5m
+    exec: 30s
+
+  steps:
+
+  - name: argocd-app-synced-and-healthy
+    description: Jellyfin ArgoCD Application is Synced and Healthy
+    try:
+    - assert:
+        resource:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: jellyfin
+            namespace: argocd
+          status:
+            sync:
+              status: Synced
+            health:
+              status: Healthy
+
+  - name: pod-running-on-whale
+    description: Jellyfin pod is Running and scheduled on whale (nodeSelector pin — issue #116)
+    try:
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            namespace: jellyfin
+            labels:
+              app.kubernetes.io/name: jellyfin
+          spec:
+            nodeName: whale
+          status:
+            phase: Running
+
+  - name: storage-bound
+    description: Config and media PVCs are Bound on rook-ceph-block
+    try:
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: jellyfin-config
+            namespace: jellyfin
+          spec:
+            storageClassName: rook-ceph-block
+          status:
+            phase: Bound
+    - assert:
+        resource:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: jellyfin-media
+            namespace: jellyfin
+          spec:
+            storageClassName: rook-ceph-block
+          status:
+            phase: Bound
+
+  - name: health-endpoint
+    description: Jellyfin /health endpoint returns 200 via ClusterIP service
+    try:
+    - script:
+        content: |
+          SVC=$(kubectl get svc jellyfin -n jellyfin -o jsonpath='{.spec.clusterIP}')
+          CODE=$(kubectl run jellyfin-health-check-$RANDOM --image=curlimages/curl --rm -i --restart=Never --quiet -- \
+            curl -s -o /dev/null -w '%{http_code}' http://$SVC:8096/health)
+          [ "$CODE" = "200" ] || { echo "Expected HTTP 200, got: $CODE"; exit 1; }
+          echo "Health check passed"
+
+  - name: kgateway-routing-configured
+    description: HTTPRoute and Certificate for jellyfin.verticon.com exist and the cert is issued
+    try:
+    - assert:
+        resource:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: HTTPRoute
+          metadata:
+            name: jellyfin
+            namespace: jellyfin
+          spec:
+            hostnames:
+            - "jellyfin.verticon.com"
+    - assert:
+        resource:
+          apiVersion: cert-manager.io/v1
+          kind: Certificate
+          metadata:
+            name: jellyfin-tls
+            namespace: kgateway-system
+          status:
+            (conditions[?type == 'Ready']):
+            - status: "True"

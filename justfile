@@ -275,6 +275,16 @@ vllm-status:
 test-vllm:
     chainsaw test tests/vllm
 
+# ── Jellyfin ──────────────────────────────────────────────────────────────────
+
+# Show Jellyfin pod status and node placement
+jellyfin-status:
+    kubectl get pods -n jellyfin -o wide
+
+# Run Jellyfin chainsaw tests
+test-jellyfin:
+    chainsaw test tests/jellyfin
+
 # ── Loki ──────────────────────────────────────────────────────────────────────
 
 # Show Loki + Promtail pod status
