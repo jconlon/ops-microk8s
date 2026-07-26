@@ -3,6 +3,17 @@ routerSpec:
   serviceType: LoadBalancer
   serviceAnnotations:
     metallb.universe.tf/loadBalancerIPs: "192.168.0.218"
+  # Chart default (1000Mi request/limit) crash-looped with a bare SIGKILL
+  # (exit 137) on every cold start after the 2026-07-26 whale reboot — no
+  # OOMKilled reason, no kernel/journal OOM evidence, no kubelet Unhealthy
+  # event, so the exact mechanism is unconfirmed, but raising the ceiling
+  # is the standard low-risk mitigation (issue: vLLM router crash-loop).
+  resources:
+    requests:
+      cpu: "400m"
+      memory: "512Mi"
+    limits:
+      memory: "1536Mi"
 
 servingEngineSpec:
   runtimeClassName: "nvidia"
