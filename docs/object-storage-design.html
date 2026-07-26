@@ -246,6 +246,7 @@ spec:
     <tr><td><code>restic-backups</code></td><td>Retain 30 days</td><td>500 GB</td><td>PostgreSQL WAL + home Restic snapshots</td></tr>
     <tr><td><code>music-library</code></td><td>Indefinite</td><td>2 TB</td><td>Music library mirror</td></tr>
     <tr><td><code>pictures</code></td><td>Indefinite</td><td>2 TB</td><td>Photo library mirror</td></tr>
+    <tr><td><code>atom-entries</code></td><td>Indefinite</td><td>—</td><td>Avro-encoded FreshRSS Atom entries, written by the <code>atom-entries-s3-sink</code> Kafka Connect connector (topic <code>atom.entries</code>, schema via Apicurio ccompat endpoint) — source for the news site's tag-filtered pipelines (e.g. issue #117's Review page)</td></tr>
   </tbody>
 </table>
 
