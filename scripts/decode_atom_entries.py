@@ -3,18 +3,18 @@
 
 Each object in the bucket is a standalone Avro Object Container File (the
 Aiven S3 sink connector's `format.output.type: avro`), keyed by
-`{{topic}}/{{partition}}-{{start_offset}}`. The same FreshRSS entry
-(`vi_entry_id`) can appear in multiple files as freshrss-streams re-emits
-updates, so records must be deduped by `vi_entry_id`, keeping the one with
-the latest `updated` timestamp, before filtering down to the entries a
-caller cares about.
+`{{topic}}/{{partition}}-{{start_offset}}`. freshrss-streams only ever
+emits an entry into this pipeline once it's been tagged `review` in
+FreshRSS — so every record in the bucket is, by construction, a reviewed
+article; there's nothing left to filter by. The same entry (`vi_entry_id`)
+can appear in multiple files as freshrss-streams re-emits updates, so
+records are deduped by `vi_entry_id`, keeping the one with the latest
+`updated` timestamp.
 
 CLI usage (called from scripts/freshrss.nu):
-    decode_atom_entries.py <dir-of-mirrored-objects> < allowed-links.txt
+    decode_atom_entries.py <dir-of-mirrored-objects>
 
-Reads newline-delimited allowed entry links (matched against the `id`
-field) from stdin, and prints a JSON array of matching, deduped, projected
-records to stdout.
+Prints a JSON array of deduped, projected records to stdout, newest first.
 """
 import datetime
 import json
@@ -59,9 +59,9 @@ def dedupe_latest(records):
     return latest
 
 
-def filter_by_ids(deduped_by_entry_id, allowed_ids):
-    """Return the deduped records whose `id` (entry link) is in `allowed_ids`."""
-    return [record for record in deduped_by_entry_id.values() if record["id"] in allowed_ids]
+def sort_by_recency(records):
+    """Sort records newest first, by `published`, falling back to `updated` when null."""
+    return sorted(records, key=lambda r: r["published"] or r["updated"], reverse=True)
 
 
 def to_projection(record):
@@ -77,18 +77,15 @@ def to_projection(record):
 
 def main():
     if len(sys.argv) != 2:
-        print("usage: decode_atom_entries.py <dir-of-mirrored-objects> < allowed-links.txt", file=sys.stderr)
+        print("usage: decode_atom_entries.py <dir-of-mirrored-objects>", file=sys.stderr)
         return 2
 
     bucket_dir = Path(sys.argv[1])
-    allowed_ids = {line.strip() for line in sys.stdin if line.strip()}
-
     paths = [p for p in bucket_dir.rglob("*") if p.is_file()]
     records = iter_records(paths)
-    deduped = dedupe_latest(records)
-    matched = filter_by_ids(deduped, allowed_ids)
+    ordered = sort_by_recency(dedupe_latest(records).values())
 
-    json.dump([to_projection(r) for r in matched], sys.stdout)
+    json.dump([to_projection(r) for r in ordered], sys.stdout)
     return 0
 
 

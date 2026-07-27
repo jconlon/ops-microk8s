@@ -4,14 +4,12 @@ Uses synthetic Avro fixtures (not live bucket data) so these run offline,
 with no cluster/network dependency.
 """
 import datetime
-import io
 import json
 import subprocess
 import sys
 from pathlib import Path
 
 import fastavro
-import pytest
 
 import decode_atom_entries as dae
 
@@ -97,21 +95,27 @@ def test_dedupe_latest_is_order_independent():
     assert dae.dedupe_latest([older, newer])[1]["updated"] == newer["updated"]
 
 
-def test_filter_by_ids_keeps_only_allowed_links():
-    deduped = {
-        1: make_value(id="https://x/1", vi_entry_id=1),
-        2: make_value(id="https://x/2", vi_entry_id=2),
-    }
+def test_sort_by_recency_orders_newest_first_by_published():
+    old = make_value(vi_entry_id=1, published=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc))
+    new = make_value(vi_entry_id=2, published=datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc))
 
-    filtered = dae.filter_by_ids(deduped, {"https://x/2"})
+    ordered = dae.sort_by_recency([old, new])
 
-    assert [r["id"] for r in filtered] == ["https://x/2"]
+    assert [r["vi_entry_id"] for r in ordered] == [2, 1]
 
 
-def test_filter_by_ids_returns_empty_when_no_match():
-    deduped = {1: make_value(id="https://x/1", vi_entry_id=1)}
+def test_sort_by_recency_falls_back_to_updated_when_published_is_null():
+    no_published = make_value(
+        vi_entry_id=1, published=None,
+        updated=datetime.datetime(2026, 7, 1, tzinfo=datetime.timezone.utc),
+    )
+    older_published = make_value(
+        vi_entry_id=2, published=datetime.datetime(2026, 3, 1, tzinfo=datetime.timezone.utc),
+    )
 
-    assert dae.filter_by_ids(deduped, {"https://nowhere"}) == []
+    ordered = dae.sort_by_recency([older_published, no_published])
+
+    assert [r["vi_entry_id"] for r in ordered] == [1, 2]
 
 
 def test_to_projection_serializes_timestamps_and_drops_internal_fields():
@@ -124,32 +128,56 @@ def test_to_projection_serializes_timestamps_and_drops_internal_fields():
     assert "vi_entry_id" not in projected
 
 
-def test_cli_prints_json_array_of_matched_records(tmp_path):
+def test_cli_prints_every_record_deduped_and_sorted_newest_first(tmp_path):
     f1 = tmp_path / "0-1"
     f2 = tmp_path / "0-2"
-    write_avro_file(f1, [make_value(id="https://x/1", vi_entry_id=1, summary="keep-me")])
-    write_avro_file(f2, [make_value(id="https://x/2", vi_entry_id=2, summary="skip-me")])
+    write_avro_file(f1, [make_value(
+        id="https://x/1", vi_entry_id=1,
+        published=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+    )])
+    write_avro_file(f2, [make_value(
+        id="https://x/2", vi_entry_id=2,
+        published=datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc),
+    )])
 
     result = subprocess.run(
         [sys.executable, str(Path(__file__).parent / "decode_atom_entries.py"), str(tmp_path)],
-        input="https://x/1\n",
         capture_output=True,
         text=True,
         check=True,
     )
 
     parsed = json.loads(result.stdout)
-    assert [r["id"] for r in parsed] == ["https://x/1"]
-    assert parsed[0]["summary"] == "keep-me"
+    assert [r["id"] for r in parsed] == ["https://x/2", "https://x/1"]
 
 
-def test_cli_prints_empty_array_when_directory_has_no_matches(tmp_path):
+def test_cli_dedupes_across_files_by_entry_id(tmp_path):
     f1 = tmp_path / "0-1"
-    write_avro_file(f1, [make_value(id="https://x/1", vi_entry_id=1)])
+    f2 = tmp_path / "0-2"
+    write_avro_file(f1, [make_value(
+        id="https://x/1", vi_entry_id=1, summary="stale",
+        updated=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+    )])
+    write_avro_file(f2, [make_value(
+        id="https://x/1", vi_entry_id=1, summary="fresh",
+        updated=datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc),
+    )])
 
     result = subprocess.run(
         [sys.executable, str(Path(__file__).parent / "decode_atom_entries.py"), str(tmp_path)],
-        input="https://nowhere\n",
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    parsed = json.loads(result.stdout)
+    assert len(parsed) == 1
+    assert parsed[0]["summary"] == "fresh"
+
+
+def test_cli_prints_empty_array_for_empty_directory(tmp_path):
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).parent / "decode_atom_entries.py"), str(tmp_path)],
         capture_output=True,
         text=True,
         check=True,

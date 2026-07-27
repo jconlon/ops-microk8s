@@ -144,7 +144,7 @@ PGPASSWORD="$password" psql -h localhost -p 5434 -U freshrss -d freshrss -f scri
 | `ops freshrss publish-links` | Query entries tagged `publish` and print a markdown link list |
 | `ops freshrss update-news` | Query entries tagged `publish` and overwrite the `### Latest` section in `news/docs/index.md` |
 | `ops freshrss update-technical` | Query entries tagged `technical` and overwrite the `### Technical` section in `news/docs/index.md` |
-| `ops freshrss update-review` | Query entries tagged `review`, enrich with LLM summary bullets from the Ceph `atom-entries` bucket where available, and write `news/docs/review.md` |
+| `ops freshrss update-review` | Render every entry in the Ceph `atom-entries` bucket (each is already review-tagged, by pipeline design) to `news/docs/review.md` |
 | `ops freshrss update-feed` | Generate RSS 2.0 feed from `publish`-tagged entries and write to `news/docs/feed.xml` |
 
 #### freshrss psql
@@ -194,15 +194,13 @@ ops freshrss update-technical
 
 #### freshrss update-review
 
-Queries FreshRSS for entries tagged `review` (same as the other tag-based commands) and writes a standalone `/home/jconlon/git/news/docs/review.md` page (like `update-starred`, not a section patch).
-
-Unlike the other generators, this command also tries to enrich each entry with freshrss-streams' LLM-generated summary bullets, read from Avro objects in the Ceph `atom-entries` bucket (see [`docs/object-storage-design.html`](../docs/object-storage-design.html)). The `review` tag itself lives only in FreshRSS's Postgres tag table — it is **not** present in the Avro `categories` field, which carries feed-provided hashtag categories instead — so entry *selection* still goes through Postgres; the bucket is used purely to look up richer bullets for the selected entries by matching on entry link (`id`). Falls back to the raw Postgres content snippet per entry (or for the whole run, printing a `WARN`, if the bucket is unreachable) rather than failing the page.
+Unlike the other generators, this command never touches Postgres. freshrss-streams' pipeline only ever emits an entry into the Ceph `atom-entries` bucket (see [`docs/object-storage-design.html`](../docs/object-storage-design.html)) after it's tagged `review` in FreshRSS — `review` is a workflow trigger, not a persistent category, so every Avro object in the bucket already is a reviewed article and there's nothing left to filter by. `update-review` decodes every object (deduping by entry id, since freshrss-streams re-emits an entry as it's updated), sorts newest first by publish date, and writes a standalone `/home/jconlon/git/news/docs/review.md` page (like `update-starred`, not a section patch). Each entry renders freshrss-streams' LLM-generated summary bullets when fully processed, falling back to its short narrative summary, or just the title/link/date/meta line if neither is available.
 
 ```bash
 ops freshrss update-review
 ```
 
-**Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster (reads `freshrss-role-password` and, for enrichment, `kafka-connect-secret` in `kafka-system`); `mc` on `PATH` (provided by the global devbox environment, same as the Ceph sync scripts below); `scripts/decode_atom_entries.py`'s one-time dependency install, `uv pip install -r scripts/requirements.txt` (run `just test-freshrss-scripts` afterward to verify); `/home/jconlon/git/news/docs/` must exist.
+**Prerequisites:** `kubectl` context must be pointing at the MicroK8s cluster (reads `kafka-connect-secret` in `kafka-system` — the same S3 credentials the `atom-entries-s3-sink` Kafka Connect connector uses); `mc` on `PATH` (provided by the global devbox environment, same as the Ceph sync scripts below); `scripts/decode_atom_entries.py`'s one-time dependency install, `uv pip install -r scripts/requirements.txt` (run `just test-freshrss-scripts` afterward to verify); `/home/jconlon/git/news/docs/` must exist.
 
 #### freshrss update-feed
 
@@ -222,7 +220,7 @@ ops freshrss update-feed
 
 ### decode_atom_entries.py
 
-Helper invoked by `ops freshrss update-review` (never run directly) to decode the Avro Object Container Files mirrored from the Ceph `atom-entries` bucket. Dedupes records by `vi_entry_id` (freshrss-streams re-emits an entry as it's updated, so the same entry can appear in multiple bucket objects) keeping the latest by `updated`, then filters down to the entry links passed on stdin.
+Helper invoked by `ops freshrss update-review` (never run directly) to decode the Avro Object Container Files mirrored from the Ceph `atom-entries` bucket. Dedupes records by `vi_entry_id` (freshrss-streams re-emits an entry as it's updated, so the same entry can appear in multiple bucket objects) keeping the latest by `updated`, and sorts newest first by publish date. Every record qualifies — nothing is filtered — since the pipeline only ever emits `review`-tagged entries in the first place.
 
 ```bash
 # One-time setup
