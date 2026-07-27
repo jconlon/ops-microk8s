@@ -272,28 +272,34 @@ def entry-from-avro-record [r: record] {
     let date  = ((if ($r.published != null) { $r.published } else { $r.updated }) | into datetime | format date "%b %d %Y")
 
     let feed   = ($r.source_feed_name | default "")
+    let author = ($r.author_name | default "")
     # NOTE: freshrss-streams' `categories` array is naively space-split
     # upstream (e.g. "Middle East" arrives as separate "#Middle"/"East"
     # items) — a known data-quality quirk in that pipeline, not something
     # to fix here. Displayed as-is.
-    let cats   = ($r.categories | default [] | str join " ")
-    let author = ($r.author_name | default "")
-    let meta   = ([$feed, $cats, $author] | filter { |p| ($p | str trim) != "" } | str join " | ")
+    let cats = ($r.categories | default [])
 
-    let bullets = (
-        if ($r.vi_summary_status == "processed") and (($r.vi_summary_bullets | default [] | length) > 0) {
-            $r.vi_summary_bullets
-        } else if ($r.summary != null) and (($r.summary | str trim) != "") {
-            [$r.summary]
-        } else {
-            []
-        }
-    )
-    let bullet_items = ($bullets | each { |b| $"    - ($b)" })
+    let feed_line   = if ($feed | str trim) != "" { [$"    - Feed: ($feed)"] } else { [] }
+    let author_line = if ($author | str trim) != "" { [$"    - Author: ($author)"] } else { [] }
+    let cats_line   = if ($cats | length) > 0 { [$"    - Categories: ($cats | str join ', ')"] } else { [] }
 
-    let base      = [$"- [($title)]\(($link)\) — ($date)"]
-    let with_meta = if ($meta | str trim) != "" { $base | append $"    - ($meta)" } else { $base }
-    ($with_meta | append $bullet_items) | str join "\n"
+    let summary_line = if ($r.summary != null) and (($r.summary | str trim) != "") {
+        [$"    - Summary: ($r.summary)"]
+    } else { [] }
+
+    let bullets = ($r.vi_summary_bullets | default [])
+    let highlight_lines = if ($bullets | length) > 0 {
+        ["    - Highlights:"] | append ($bullets | each { |b| $"        - ($b)" })
+    } else { [] }
+
+    (
+        [$"- [($title)]\(($link)\) — ($date)"]
+        | append $feed_line
+        | append $author_line
+        | append $cats_line
+        | append $summary_line
+        | append $highlight_lines
+    ) | str join "\n"
 }
 
 # Export every entry in the Ceph atom-entries bucket to a standalone
