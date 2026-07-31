@@ -25,6 +25,12 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: whale
       enableServiceLinks: false
+      # Issue #122: GIDs for whale's render/video device groups, needed so the
+      # container user can open /dev/dri/renderD129 without running as root.
+      # Verified 2026-07-30 (still render=110, video=44, matching the issue's
+      # 2026-07-26 finding) -- re-check after any OS upgrade on whale.
+      securityContext:
+        supplementalGroups: [110, 44]
       containers:
         - name: jellyfin
           image: jellyfin/jellyfin:latest
@@ -46,6 +52,14 @@ spec:
               mountPath: /config
             - name: media
               mountPath: /media
+            # Issue #122: Intel UHD 770 iGPU render node for QuickSync (QSV)
+            # hardware transcoding. Mounts only this specific device node, not
+            # all of /dev/dri -- whale's other node (renderD128/card1) is the
+            # NVIDIA RTX 2000 Ada, already exclusively managed by the
+            # nvidia.com/gpu device plugin for vLLM; exposing it here via raw
+            # hostPath would bypass that scheduling.
+            - name: intel-qsv
+              mountPath: /dev/dri/renderD129
       volumes:
         - name: config
           persistentVolumeClaim:
@@ -53,3 +67,7 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: jellyfin-media
+        - name: intel-qsv
+          hostPath:
+            path: /dev/dri/renderD129
+            type: CharDevice
