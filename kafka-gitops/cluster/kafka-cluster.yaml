@@ -8,7 +8,7 @@ metadata:
   labels:
     strimzi.io/cluster: kafka
 spec:
-  replicas: 3
+  replicas: 0 # TEMPORARY: scaled to 0 for cluster maintenance shutdown (see MAINTENANCE.md change log) -- restore to 3 on startup
   roles:
     - controller
     - broker
