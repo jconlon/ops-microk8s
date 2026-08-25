@@ -325,6 +325,8 @@ Power on nodes in reverse order of shutdown:
 
 ### Phase 1: Start Control Plane Nodes
 
+> **dqlite HA quorum requirement**: This cluster's control-plane datastore (dqlite) requires 2 of 3 control-plane nodes (mullet, trout, whale) to be powered on and running MicroK8s before `kubectl` will respond **at all** — not even against the node you're sitting on. Power on all three control-plane nodes together; don't wait for `kubectl get nodes` to succeed against mullet alone before powering on trout and whale. (Confirmed 2026-08-24, issue #126.)
+
 #### 1.1 Power On Primary Control Plane Nodes
 
 ```bash
@@ -333,6 +335,15 @@ Power on nodes in reverse order of shutdown:
 # Power on mullet
 
 # Wait 2-3 minutes for nodes to boot
+
+# Check first — don't assume MicroK8s is running locally on mullet just
+# because the node booted:
+microk8s status
+
+# If it reports "not running" / snap.microk8s.daemon-* services inactive,
+# start it manually. Claude Code sessions have no stored sudo password, so
+# this needs an interactive `sudo microk8s start` run by hand:
+sudo microk8s start
 ```
 
 #### 1.2 Verify Control Plane Health
@@ -402,9 +413,15 @@ kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph status
 
 # Check OSD status
 kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd status
+
+# REQUIRED: clear the `noout` flag set during pre-shutdown (to avoid
+# unnecessary rebalancing while nodes were down). Health will stay
+# HEALTH_WARN with "noout flag(s) set" until this runs — startup is not
+# complete without it. (Confirmed 2026-08-24, issue #126.)
+kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph osd unset noout
 ```
 
-**Expected Output**: Ceph cluster `Ready`, health `HEALTH_OK`, all OSDs `up` and `in`.
+**Expected Output**: Ceph cluster `Ready`, health `HEALTH_OK` (after `noout` is unset), all OSDs `up` and `in`.
 
 #### 4.2 Verify Storage Health
 
@@ -466,6 +483,8 @@ kubectl get pods -n kafka-system
 
 **Expected Output**: All 3 kafka-kafka-* pods `1/1 Running`. Downstream services (kafka-entity-operator, kafka-connect, schema-registry, argo-events) self-recover within 2-5 minutes.
 
+> **Reminder**: If `git-push-eventsource`/`git-push-sensor` (or any other Kafka consumer) were scaled to `0` during recovery (see "Noisy consumer clients" below), scale them back to their normal replica count now that Kafka is confirmed fully healthy — e.g. `kubectl scale deploy git-push-eventsource-<hash> git-push-sensor-<hash> -n argo-events --replicas=1`. This is easy to forget once the incident feels over. (Confirmed 2026-08-24, issue #126.)
+
 > **Note**: If Kafka brokers fail to form quorum (CrashLoopBackOff due to KRaft metadata corruption from an unclean shutdown), all topic data must be treated as lost. See the full recovery procedure in the [Kafka KRaft Metadata Corruption](#kafka-kraft-metadata-corruption) troubleshooting section — **PV cleanup is required** in addition to PVC deletion.
 
 #### 5.3 Verify Database Connectivity
@@ -514,8 +533,11 @@ devbox run -- argocd app set <app-name> --sync-policy automated
 
 ### Phase 6: Final Verification
 
+> **Mandatory — do not consider the maintenance window closed until both checks below are run**, even if every individual phase above looked clean. Recovery can look fine phase-by-phase while a downstream consequence (e.g. a downstream consumer left scaled to 0, a stale ArgoCD sync) only shows up in a full pass. (Confirmed 2026-08-24, issue #126.)
+
 ```bash
-# Check all pods are running
+# 1. MANDATORY: check all pods cluster-wide for anything not Running/Completed.
+# Expect empty output — any line here needs investigation before closing out.
 kubectl get pods --all-namespaces | grep -v "Running\|Completed"
 
 # Check PV/PVC status
@@ -524,6 +546,13 @@ kubectl get pv,pvc --all-namespaces
 # Compare with pre-maintenance state
 diff pre-maintenance-pods.txt <(kubectl get pods --all-namespaces)
 diff pre-maintenance-storage.txt <(kubectl get pv,pvc --all-namespaces)
+```
+
+```bash
+# 2. MANDATORY: run the full chainsaw e2e suite — broader coverage than the
+# manual checks above (ArgoCD sync/health, Ceph, Kafka, Connect, kgateway,
+# Loki, PostgreSQL, GPU, Harbor, vLLM, etc.)
+just test
 ```
 
 ---
@@ -717,39 +746,69 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 
 **Root cause**: Kafka brokers received SIGKILL (not SIGTERM) during node shutdown, leaving the KRaft metadata log (`__cluster_metadata-0`) in an inconsistent mid-write state.
 
+> **Do not manually delete/restart Kafka broker pods once Strimzi is actively reconciling** (i.e. any time `pause-reconciliation` is not set — including after step 5 below). Manually touching pods races Strimzi's own `KafkaRoller`, which may independently be trying to roll/recreate the same pods — two actors doing this concurrently produces exactly the chaotic pod-cycling it looks like you're trying to fix. Watch operator logs instead of intervening:
+> ```bash
+> kubectl logs -n kafka-system deploy/strimzi-cluster-operator -f | grep KafkaRoller
+> ```
+> Left alone, brokers typically converge within a few minutes. (Confirmed 2026-08-24, issue #126.)
+
+> **`strimzi.io/pause-reconciliation` does NOT stop pod self-healing.** It only suppresses config-driven rolling updates — `StrimziPodSetController` will still recreate a missing pod within about a minute even with the annotation set. If PVC deletion is still working through its `pvc-protection` finalizer (blocked because a pod is still using it) when that happens, the newly-recreated pod can bind the *same not-yet-deleted* PVC/PV — silently making the wipe a no-op for that broker while troubleshooting continues against still-corrupted data. This is why the steps below delete storage fully, with finalizers stripped, before touching pods, and end with an explicit "is it actually gone" check rather than trusting "pods got recreated" as a signal that the wipe worked. (Confirmed 2026-08-24, issue #126.)
+
 **Recovery** (all Kafka topic data is lost — treat as disposable):
 
 ```bash
-# 1. Pause Strimzi to prevent interference
+# 1. Pause Strimzi (suppresses config-driven rolls; does NOT stop pod
+#    self-healing — see warning above)
 kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true
 kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true
 
-# 2. Force-delete broker pods and all 3 data PVCs
+# 2. Force-delete broker pods first, so the pvc-protection finalizer's
+#    "no pod is using this PVC" condition is satisfied immediately
 kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system --force --grace-period=0
-kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system
 
-# 2a. Remove pvc-protection finalizers if PVCs are stuck Terminating
+# 3. Immediately delete the PVCs and strip finalizers in the same breath —
+#    minimize the window where a self-healed pod could bind stale storage
+kubectl delete pvc data-0-kafka-kafka-0 data-0-kafka-kafka-1 data-0-kafka-kafka-2 -n kafka-system
 for pvc in $(kubectl get pvc -n kafka-system -o name 2>/dev/null); do
   kubectl patch $pvc -n kafka-system -p '{"metadata":{"finalizers":[]}}' --type=merge
 done
 
-# 2b. REQUIRED: delete all Released PVs for Kafka — rook-ceph-block uses reclaimPolicy: Retain,
+# 4. REQUIRED verification — do not proceed until this returns nothing.
+#    If it still shows kafka PVCs, a self-healed pod may have rebound one;
+#    check that pod's PVC/PV name against the pre-wipe PV list, delete it,
+#    and repeat steps 2-4 for that broker.
+kubectl get pvc -n kafka-system
+
+# 5. REQUIRED: delete all Released PVs for Kafka — rook-ceph-block uses reclaimPolicy: Retain,
 # so deleted PVCs leave orphaned Released PVs. New PVCs cannot bind (WaitForFirstConsumer
 # deadlock) until these are removed. Run after every PVC wipe.
 kubectl get pv | grep kafka-system
 kubectl delete pv $(kubectl get pv --no-headers | grep kafka-system | awk '{print $1}')
 
-# 3. Resume Strimzi reconciliation — Strimzi provisions fresh empty PVCs and restarts brokers
+# 6. Resume Strimzi reconciliation — Strimzi provisions fresh empty PVCs and restarts brokers
 kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation-
 kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation-
 
-# 4. Monitor recovery (expect 2 restart cycles before all 3 reach 1/1 Ready, ~3-5 minutes)
+# 7. Monitor recovery (expect 2 restart cycles before all 3 reach 1/1 Ready, ~3-5 minutes).
+#    Watch, don't intervene — see warning above.
 kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka -w
 ```
 
-**Expected recovery time**: 3-5 minutes after step 3.
+**Expected recovery time**: 3-5 minutes after step 6.
 
-> **Warning**: Skipping step 2b causes new PVCs to enter a `WaitForFirstConsumer` deadlock where the CSI provisioner cannot bind new PVCs because stale Released PVs with the same RBD image IDs are still registered. Multiple recovery rounds compound the problem (9 orphaned PVs observed in practice). Always check `kubectl get pv | grep kafka-system` before resuming Strimzi.
+> **Warning**: Skipping step 5 causes new PVCs to enter a `WaitForFirstConsumer` deadlock where the CSI provisioner cannot bind new PVCs because stale Released PVs with the same RBD image IDs are still registered. Multiple recovery rounds compound the problem (9 orphaned PVs observed in practice). Always check `kubectl get pv | grep kafka-system` before resuming Strimzi.
+
+**Noisy consumer clients can block ISR catch-up cluster-wide.** If replication/under-replicated-partition counts keep climbing even after brokers individually look stable, check for crash-looping Kafka consumer clients elsewhere in the cluster before assuming the problem is broker-internal — a client stuck in a restart→rejoin→rebalance loop (e.g. `argo-events`' `git-push-eventsource`/`git-push-sensor`, or any app-level consumer) hammers its consumer group's `__consumer_offsets` coordinator partition, which can prevent that partition (and anything sharing the broker layer, including Kafka Connect's own group) from reaching `min.insync.replicas`. Temporarily scale the noisy client to 0 and recheck:
+
+```bash
+# Find crash-looping consumers
+kubectl get pods -A | grep -v "Running\|Completed"
+
+# Example: pause argo-events' git-push consumers during Kafka recovery
+kubectl scale deploy git-push-eventsource-<hash> git-push-sensor-<hash> -n argo-events --replicas=0
+```
+
+Remember to scale it back once Kafka is confirmed healthy (see the reminder in Section 5.2 above). (Confirmed 2026-08-24, issue #126.)
 
 **Prevention**: Always run Section 1.1 (Gracefully Stop Kafka) before any node shutdown.
 
@@ -878,6 +937,7 @@ kubectl get kafkaconnector -n kafka-system
 
 | Date | Changes | Performed By |
 |------|---------|--------------|
+| 2026-08-25 | **Procedure hardening from issue #126** (2026-08-24 post-shutdown Kafka recovery): (1) documented the dqlite HA quorum requirement (2 of 3 control-plane nodes needed before `kubectl` responds at all) in Startup Phase 1; (2) added a `microk8s status` check-first step before assuming MicroK8s is running on mullet; (3) added the missing `ceph osd unset noout` startup step to Phase 4; (4) added a "don't manually touch Kafka pods once Strimzi is reconciling" warning to the KRaft recovery procedure — manual intervention races Strimzi's own `KafkaRoller` and prolongs incidents; (5) rewrote the PVC/PV wipe steps to delete pods then storage (with finalizers stripped) fully before Strimzi's self-healing can recreate a pod, added a mandatory `kubectl get pvc -n kafka-system` empty-check before proceeding — `pause-reconciliation` was found to not block `StrimziPodSetController`'s pod recreation, only config-driven rolls, which had silently no-op'd part of a previous wipe; (6) added a "check for noisy crash-looping consumer clients" step (e.g. `argo-events`) before assuming Kafka replication problems are broker-internal — a rebalance storm from one bad client can block cluster-wide ISR catch-up; (7) made the Phase 6 final-verification pod check and full `just test` run explicitly mandatory rather than implied; (8) added a reminder to scale any consumers paused during Kafka recovery back to their normal replica count. | jconlon / Claude Code |
 | 2026-06-23 | **Post-recovery follow-up**: `just test` revealed `kafka-connect-healthy` failing — `kafka-connect-connect-0` in CrashLoopBackOff (43 restarts). Root cause: Kafka Connect internal topics (`kafka-connect-cluster-offsets`, `configs`, `status`) were recreated with `cleanup.policy=delete` after the June 23 Kafka PVC/PV wipe. Connect requires `compact` and refuses to start with `delete`. Also: `atom-entries-s3-sink` task 0 failed with "not a recognizable type (source or sink)" due to corrupted task config record from crash-loop cycling on the delete-policy topic. Fix: altered all three topics to `cleanup.policy=compact` via `kafka-configs.sh` on the broker; both Connect pods reached 1/1 Running, both connectors `READY=True`. **Do not delete internal topics to fix** — Connect immediately recreates them with delete policy. | jconlon / Claude Code |
 | 2026-06-23 | Graceful cluster shutdown and restart due to lab A/C failure. Pre-shutdown: Ceph HEALTH_OK, PostgreSQL healthy (primary on mullet, 3/3 instances), continuous archiving active, on-demand backup triggered and completed. Kafka gracefully stopped first (SIGTERM + Strimzi reconciliation paused) — no KRaft corruption. Ceph `noout` set. All nodes drained and shut down via SSH (commands clipboard-copied — no SSH keys in session). PDB-blocked pods (Ceph mgr, PostgreSQL replicas, Prometheus, AlertManager) were force-deleted to unblock drains; all had Ceph storage already offline so no data risk. Mullet kept running (control plane + Claude Code host). **Restart**: All 8 nodes came up Ready. Ceph HEALTH_OK after `noout` cleared (~2 min recovery). PostgreSQL 3/3 healthy. **Kafka recovery required**: KRaft election livelock on fresh PVCs (`voteStates={0=GRANTED,1=REJECTED}`) — root cause: `reclaimPolicy: Retain` left orphaned Released PVs from multiple recovery rounds; new PVCs entered WaitForFirstConsumer deadlock with stale PVs. Fix: deleted all Kafka PVCs, force-removed `pvc-protection` finalizers, deleted all 9 orphaned Kafka PVs, then resumed Strimzi. Brokers formed clean quorum on fresh PVCs in ~1 min. **Lesson**: Add PV cleanup step to Kafka recovery procedure — Retain policy requires manual PV deletion after PVC wipe. | jconlon / Claude Code |
 | 2026-06-16 | Cluster startup after 2026-06-13 shutdown. All 8 nodes came up; Ceph HEALTH_OK after `noout` cleared; PostgreSQL recovered (primary on mullet). **Kafka KRaft recovery required**: Kafka brokers were killed by SIGKILL during the June 13 shutdown (nodes rebooted without draining Kafka first). The KRaft metadata log was left in a corrupt mid-write state causing `OffsetOutOfRangeException` on all 3 brokers. All Kafka topic data was disposable; recovery: deleted all 3 broker PVCs and force-deleted broker pods, then resumed Strimzi reconciliation — brokers provisioned fresh PVCs and formed quorum cleanly. Total Kafka recovery time: ~3 hours of troubleshooting + 10 minutes to execute. **Root cause**: Kafka was not gracefully stopped before node shutdown. Added mandatory Kafka pre-shutdown step (Section 1.1) to prevent recurrence. | jconlon / Claude Code |
