@@ -4,7 +4,7 @@
 # even after a full Kafka PVC/PV wipe during KRaft recovery.
 # Without these CRs, Connect recreates the topics with the broker default
 # cleanup.policy=delete, causing CrashLoopBackOff on startup.
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: kafka-connect-cluster-offsets
@@ -19,7 +19,7 @@ spec:
     min.insync.replicas: "2"
 
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: kafka-connect-cluster-configs
@@ -34,7 +34,7 @@ spec:
     min.insync.replicas: "2"
 
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: kafka-connect-cluster-status

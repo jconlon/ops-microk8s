@@ -1,4 +1,4 @@
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaConnect
 metadata:
   name: kafka-connect
@@ -7,7 +7,7 @@ metadata:
     # Enable KafkaConnector CRs to manage connectors declaratively
     strimzi.io/use-connector-resources: "true"
 spec:
-  version: 3.8.0
+  version: 4.3.1
   replicas: 2
   bootstrapServers: kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092
 
