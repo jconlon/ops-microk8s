@@ -244,6 +244,29 @@ headroom, within the 16 GB card at 85% utilization.</p>
   node replacing <code>tuna</code>) is the preferred path over upgrading whale in place.
 </div>
 
+<h3>Why a 7B model, not something bigger</h3>
+<p><a href="https://www.oreilly.com/radar/when-smaller-models-win/">O'Reilly Radar — "When Smaller Models Win"</a>
+(2026) argues that task-specific small models (NVIDIA's own cutoff: under 10B parameters) consistently
+beat general large models once a problem is well-defined and narrow — "start large" only applies while
+the problem itself is still being figured out. That maps directly onto this deployment:</p>
+<ul>
+  <li><code>Qwen2.5-7B-Instruct-AWQ</code> is already well inside the article's "small model" range.</li>
+  <li>Its actual production use — <a href="#consumers">freshrss-streams</a> summarizing extracted article
+  text into structured fields — is exactly the narrow, stable, already-defined task type the article says
+  small models excel at, not an open-ended problem that would justify a bigger general model.</li>
+  <li>It retroactively explains part of why <a href="#consumers">kagent</a> struggled: open-ended
+  agentic tool-use is a broad, loosely-defined task — the opposite of what a small quantized model is
+  suited for. That's a reason it was disabled, not a reason to size up the base model for a use case
+  that no longer runs.</li>
+</ul>
+<div class="callout callout-tip">
+  <strong>The right lever if summarization quality ever needs improvement: LoRA fine-tuning the current
+  7B model on freshrss's own examples</strong> — the article's own recommended "transition to specialized"
+  step — not swapping to a bigger general-purpose model. It fits the existing 16 GB card, keeps cost and
+  latency down, and is more targeted than raw size. Nothing today indicates this is needed; noting it here
+  as the first thing to reach for, ahead of a model or GPU upgrade, if it ever is.
+</div>
+
 <h2 id="access">API Access</h2>
 <table>
   <thead><tr><th>Access</th><th>Address</th><th>Use</th></tr></thead>
