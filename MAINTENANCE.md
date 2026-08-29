@@ -131,37 +131,9 @@ Follow these steps in order to safely shut down the cluster:
 
 ### Phase 1: Application Shutdown
 
-#### 1.1 Gracefully Stop Kafka (REQUIRED — do NOT skip)
+#### 1.1 Cordon All Nodes
 
-> **Critical**: Kafka uses KRaft (Raft-based metadata consensus). If Kafka brokers are killed abruptly (SIGKILL via node reboot), the KRaft metadata log is left in an inconsistent mid-write state. Recovery requires deleting all broker PVCs and restarting from scratch (all topic data lost).
-
-```bash
-# Gracefully delete Kafka broker pods — sends SIGTERM so brokers flush and checkpoint cleanly
-# Do NOT use --force --grace-period=0 here
-kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system
-
-# Wait for pods to terminate (Strimzi will not recreate them while reconciliation is paused)
-kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true
-kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true
-kubectl wait --for=delete pod/kafka-kafka-0 pod/kafka-kafka-1 pod/kafka-kafka-2 -n kafka-system --timeout=120s
-
-# Verify brokers are stopped
-kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka
-```
-
-**Expected Output**: No kafka-kafka-* pods.
-
-#### 1.2 Scale Down Non-Critical Workloads (Optional)
-
-```bash
-# Pause ArgoCD auto-sync to prevent reconciliation during maintenance
-devbox run -- argocd app set <app-name> --sync-policy none
-
-# Or suspend ArgoCD applications
-kubectl patch application <app-name> -n argocd -p '{"spec":{"syncPolicy":null}}'
-```
-
-#### 1.3 Cordon All Nodes
+> **Do this FIRST, before the Kafka stop in 1.2.** `strimzi.io/pause-reconciliation` only stops the `Kafka` CR's own timer-driven reconciliation — it does **not** stop the separate `StrimziPodSetController` watch loop, which will keep recreating deleted broker pods even with pause confirmed `true` on both the `Kafka` and `StrimziPodSet` resources. Cordoning first means recreated pods have nowhere schedulable to land (`Pending`, no node assigned) — functionally stopped without fighting the controller. Confirmed 2026-07-31, issue #125 — this reordering is what actually makes 1.2 work as written.
 
 Prevent new pods from being scheduled:
 
@@ -181,6 +153,40 @@ kubectl get nodes
 ```
 
 **Expected Output**: All nodes should show `SchedulingDisabled`.
+
+#### 1.2 Gracefully Stop Kafka (REQUIRED — do NOT skip)
+
+> **Critical**: Kafka uses KRaft (Raft-based metadata consensus). If Kafka brokers are killed abruptly (SIGKILL via node reboot), the KRaft metadata log is left in an inconsistent mid-write state. Recovery requires deleting all broker PVCs and restarting from scratch (all topic data lost).
+
+> **Do NOT try `kubectl patch kafkanodepool kafka -p '{"spec":{"replicas":0}}'`** as a way to stop the cluster — Strimzi explicitly rejects this: `InvalidResourceException: KafkaNodePools are enabled, but KafkaNodePools for Kafka cluster kafka either don't exist or have 0 replicas`. Not a supported stop mechanism. Use the cordon-first approach in 1.1 instead. (Confirmed 2026-07-31, issue #125.)
+
+```bash
+# Gracefully delete Kafka broker pods — sends SIGTERM so brokers flush and checkpoint cleanly
+# Do NOT use --force --grace-period=0 here
+kubectl delete pod kafka-kafka-0 kafka-kafka-1 kafka-kafka-2 -n kafka-system
+
+# Wait for pods to terminate (Strimzi will not recreate them while reconciliation is paused)
+kubectl annotate kafka kafka -n kafka-system strimzi.io/pause-reconciliation=true
+kubectl annotate strimzipodset kafka-kafka -n kafka-system strimzi.io/pause-reconciliation=true
+kubectl wait --for=delete pod/kafka-kafka-0 pod/kafka-kafka-1 pod/kafka-kafka-2 -n kafka-system --timeout=120s
+
+# Verify brokers are stopped
+kubectl get pods -n kafka-system -l strimzi.io/name=kafka-kafka
+```
+
+**Expected Output**: No kafka-kafka-* pods (or `Pending` if nodes are already cordoned per 1.1 — this is fine, it means the same thing: no broker process actually running).
+
+#### 1.3 Scale Down Non-Critical Workloads (Optional)
+
+```bash
+# Pause ArgoCD auto-sync to prevent reconciliation during maintenance
+devbox run -- argocd app set <app-name> --sync-policy none
+
+# Or suspend ArgoCD applications
+kubectl patch application <app-name> -n argocd -p '{"spec":{"syncPolicy":null}}'
+```
+
+> **App-of-apps footgun**: if `<app-name>` is a child of an app-of-apps (e.g. `kafka-cluster` under `kafka-apps`), the CLI-level `--sync-policy none` override gets silently reverted back to `Automated` shortly after — the parent app-of-apps re-syncs the child `Application` object itself from git, which still declares automated sync. There is no CLI-only way to durably pause a child app's sync policy; it has to change in git. (Confirmed 2026-07-31, issue #125.)
 
 ### Phase 2: Storage Preparation
 
@@ -257,6 +263,8 @@ sudo shutdown -h now
 exit
 ```
 
+> **Once all 4 Ceph nodes are down, any pod anywhere else in the cluster with a Ceph-backed PVC (RBD or RGW/S3) will hang in `Terminating` indefinitely** when its node is drained next — Ceph itself is unreachable, so the CSI driver can't complete the unmount. Confirmed on `loki-0`, `production-postgresql-2`/`-3`, `prometheus-*-0`, `harbor-redis-0`, `grafana`, `jellyfin`, `alertmanager` in practice. **This is expected and safe** — RBD I/O blocks rather than corrupts when storage is unavailable — not a sign something is wrong. Force-delete to unblock the drain: `kubectl delete pod <pod-name> -n <namespace> --force --grace-period=0`. Separately, PDBs (Ceph mgr's own, CNPG's min-available) will also correctly block eviction during a full planned shutdown — same fix applies: force-delete is the correct override here, not a red flag, since this is a full shutdown rather than an unplanned disruption the PDB is meant to guard against. (Confirmed 2026-07-31, issue #125.)
+
 Then drain remaining worker node:
 
 ```bash
@@ -269,6 +277,8 @@ exit
 ```
 
 #### 3.2 Drain and Shutdown Non-Primary Control Plane Nodes
+
+> **dqlite quorum limitation**: this cluster has exactly 3 control-plane nodes (mullet, trout, whale), and dqlite requires a majority (2 of 3) to serve requests **including `kubectl drain` itself**. There is no way to gracefully drain the *second-to-last* control-plane node without leaving the last one at quorum-loss risk — once 2 of 3 are down, the API server on the survivor goes unresponsive (connection refused), even though that node is still powered on and even though every prior node *was* drained properly first. This is not preventable by draining more carefully; it's structural to a 3-node HA setup. Confirmed 2026-07-31, issue #125 — plan for the last control-plane node's shutdown in 3.3 to skip `kubectl drain` entirely, not as a fallback for when drain happens to fail.
 
 ```bash
 # Identify which control plane node is NOT the current PostgreSQL primary
@@ -291,20 +301,26 @@ exit
 
 #### 3.3 Shutdown Final Control Plane Node (Primary Host)
 
+> **`kubectl drain` will likely be impossible here** — see the quorum note in 3.2. If the API server is already unresponsive by this point, don't wait on it or try to force a drain; go straight to the steps below. `microk8s stop` is a **local** operation (stops the node's own kubelite/containerd services directly) and does not depend on the API server or dqlite quorum being functional, unlike `kubectl drain`/`microk8s status --wait-ready` (which will hang for the same reason). It still gives containerd a chance to send a proper SIGTERM to every running container on this node — including the PostgreSQL primary — closer to what a real drain would have done than a bare `shutdown -h now`. (Confirmed 2026-07-31, issue #125.)
+
 ```bash
 # This should be the node hosting the PostgreSQL primary
-# Drain whale (or whichever node is last)
+# Try to drain whale (or whichever node is last) — may be impossible, see note above
 kubectl drain whale --ignore-daemonsets --delete-emptydir-data --force --grace-period=300
 
 # Give PostgreSQL time to archive WALs (wait for stopDelay: 1800s = 30 minutes default)
 # Monitor PostgreSQL shutdown
 kubectl logs -n postgresql-system production-postgresql-<primary-number> -f
 
-# Once PostgreSQL has shut down gracefully, shutdown the node
+# If kubectl is unresponsive, skip straight here: local stop, no API/quorum needed.
+# Gives containerd one more chance at a clean SIGTERM to every container on this node.
 ssh whale
+sudo microk8s stop
 sudo shutdown -h now
 exit
 ```
+
+> **Considered but not adopted**: `microk8s remove-node <name>` (run from a surviving node before powering the target off) reconfigures dqlite's voter list and could prevent the quorum loss entirely — if trout/whale were formally removed from cluster membership before being powered off, the last node wouldn't be stuck waiting for a majority that includes two permanently-departed members. Tradeoff: a node removed this way needs `microk8s add-node`/`join` to rejoin, not just a power-on — a materially more manual startup path than what this document currently describes for a routine reboot. Worth a deeper evaluation as a separate change, not adopted here. (Issue #125.)
 
 #### 3.4 Shutdown Remaining Nodes
 
@@ -937,6 +953,7 @@ kubectl get kafkaconnector -n kafka-system
 
 | Date | Changes | Performed By |
 |------|---------|--------------|
+| 2026-08-29 | **Procedure hardening from issue #125** (2026-07-31 shutdown where dqlite lost quorum before the last control-plane node could be drained): (1) reordered Phase 1 so all nodes are cordoned (was 1.3, now 1.1) *before* the Kafka graceful-stop step (was 1.1, now 1.2) — cordoning first is what actually makes the pause-reconciliation+delete approach work, since `StrimziPodSetController` keeps recreating deleted broker pods regardless of the pause annotation; (2) added a warning against `KafkaNodePool.replicas: 0` as a stop mechanism — Strimzi explicitly rejects it; (3) documented that ArgoCD app-of-apps children silently revert CLI-level `--sync-policy none` overrides; (4) documented that once all 4 Ceph nodes are down, Ceph-backed pods drained elsewhere will hang in `Terminating` indefinitely (expected, force-delete to unblock) and that PDBs correctly-but-inconveniently block eviction during a full planned shutdown (same fix); (5) documented the structural dqlite quorum limitation — the second-to-last control-plane node cannot be drained without risking quorum loss for the last one, which is not preventable by draining more carefully; (6) added `microk8s stop` (local, no quorum needed) before `shutdown -h now` for the last control-plane node, and noted `microk8s remove-node` as a considered-but-not-adopted alternative that would prevent the quorum loss entirely at the cost of a more manual add-node/join startup path. | jconlon / Claude Code |
 | 2026-08-25 | **Procedure hardening from issue #126** (2026-08-24 post-shutdown Kafka recovery): (1) documented the dqlite HA quorum requirement (2 of 3 control-plane nodes needed before `kubectl` responds at all) in Startup Phase 1; (2) added a `microk8s status` check-first step before assuming MicroK8s is running on mullet; (3) added the missing `ceph osd unset noout` startup step to Phase 4; (4) added a "don't manually touch Kafka pods once Strimzi is reconciling" warning to the KRaft recovery procedure — manual intervention races Strimzi's own `KafkaRoller` and prolongs incidents; (5) rewrote the PVC/PV wipe steps to delete pods then storage (with finalizers stripped) fully before Strimzi's self-healing can recreate a pod, added a mandatory `kubectl get pvc -n kafka-system` empty-check before proceeding — `pause-reconciliation` was found to not block `StrimziPodSetController`'s pod recreation, only config-driven rolls, which had silently no-op'd part of a previous wipe; (6) added a "check for noisy crash-looping consumer clients" step (e.g. `argo-events`) before assuming Kafka replication problems are broker-internal — a rebalance storm from one bad client can block cluster-wide ISR catch-up; (7) made the Phase 6 final-verification pod check and full `just test` run explicitly mandatory rather than implied; (8) added a reminder to scale any consumers paused during Kafka recovery back to their normal replica count. | jconlon / Claude Code |
 | 2026-06-23 | **Post-recovery follow-up**: `just test` revealed `kafka-connect-healthy` failing — `kafka-connect-connect-0` in CrashLoopBackOff (43 restarts). Root cause: Kafka Connect internal topics (`kafka-connect-cluster-offsets`, `configs`, `status`) were recreated with `cleanup.policy=delete` after the June 23 Kafka PVC/PV wipe. Connect requires `compact` and refuses to start with `delete`. Also: `atom-entries-s3-sink` task 0 failed with "not a recognizable type (source or sink)" due to corrupted task config record from crash-loop cycling on the delete-policy topic. Fix: altered all three topics to `cleanup.policy=compact` via `kafka-configs.sh` on the broker; both Connect pods reached 1/1 Running, both connectors `READY=True`. **Do not delete internal topics to fix** — Connect immediately recreates them with delete policy. | jconlon / Claude Code |
 | 2026-06-23 | Graceful cluster shutdown and restart due to lab A/C failure. Pre-shutdown: Ceph HEALTH_OK, PostgreSQL healthy (primary on mullet, 3/3 instances), continuous archiving active, on-demand backup triggered and completed. Kafka gracefully stopped first (SIGTERM + Strimzi reconciliation paused) — no KRaft corruption. Ceph `noout` set. All nodes drained and shut down via SSH (commands clipboard-copied — no SSH keys in session). PDB-blocked pods (Ceph mgr, PostgreSQL replicas, Prometheus, AlertManager) were force-deleted to unblock drains; all had Ceph storage already offline so no data risk. Mullet kept running (control plane + Claude Code host). **Restart**: All 8 nodes came up Ready. Ceph HEALTH_OK after `noout` cleared (~2 min recovery). PostgreSQL 3/3 healthy. **Kafka recovery required**: KRaft election livelock on fresh PVCs (`voteStates={0=GRANTED,1=REJECTED}`) — root cause: `reclaimPolicy: Retain` left orphaned Released PVs from multiple recovery rounds; new PVCs entered WaitForFirstConsumer deadlock with stale PVs. Fix: deleted all Kafka PVCs, force-removed `pvc-protection` finalizers, deleted all 9 orphaned Kafka PVs, then resumed Strimzi. Brokers formed clean quorum on fresh PVCs in ~1 min. **Lesson**: Add PV cleanup step to Kafka recovery procedure — Retain policy requires manual PV deletion after PVC wipe. | jconlon / Claude Code |
