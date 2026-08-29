@@ -1,0 +1,74 @@
+# Scheduled rolling restart of the kured DaemonSet — durable mitigation for
+# a goroutine leak/hang in kured's periodic reboot-check loop (issue #101).
+#
+# Symptom: on all versions tried so far (1.16.1, 1.22.0), every kured pod's
+# periodic "Reboot not required" check silently stops logging, in sync
+# across every pod, after some period of uptime (a few hours on 1.16.1,
+# ~29-53 days on 1.22.0). The pod stays Ready, no errors/events — it just
+# stops doing its job (degrading real reboot-detection, not just the
+# `just node-status` display) and memory then climbs until OOMKilled by
+# the 64Mi safeguard in kured-values.yaml. No kured release since 1.22.0
+# (checked 1.22.1, 1.23.0) has a related fix — both are pure dependency/CI
+# bumps. A scheduled restart resets the goroutines before the hang has a
+# chance to matter, independent of whichever version we're on.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kured-restarter
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kured-restarter
+  namespace: kube-system
+rules:
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kured-restarter
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: kured-restarter
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: kured-restarter
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kured-restart
+  namespace: kube-system
+spec:
+  # Daily at 04:00 UTC — after the 03:00 restic backup window, well clear
+  # of any node reboot kured itself might be mid-drain for (kured checks
+  # hourly; a daily restart is much shorter than the observed hang
+  # interval of days-to-weeks).
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          serviceAccountName: kured-restarter
+          restartPolicy: Never
+          containers:
+            - name: kubectl
+              image: bitnami/kubectl:1.32
+              command:
+                - kubectl
+                - rollout
+                - restart
+                - daemonset/kured
+                - --namespace=kube-system
