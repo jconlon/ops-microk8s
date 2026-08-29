@@ -86,10 +86,14 @@ spec:
     key.converter: org.apache.kafka.connect.storage.StringConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter.schemas.enable: "false"
-    # EnvVarConfigProvider (Strimzi-bundled) — resolves ${env:KEY} from pod env vars.
-    # Env vars are available at validation time unlike file-based providers.
+    # EnvVarConfigProvider — resolves ${env:KEY} from pod env vars. Env vars
+    # are available at validation time unlike file-based providers.
+    # io.strimzi.kafka.EnvVarConfigProvider was removed from the base image
+    # once this was upstreamed into Kafka itself (now auto-registered by
+    # Strimzi under the "strimzienv" alias) — point our "env" alias (used by
+    # ${env:...} references in connector configs) at the new class instead.
     config.providers: env
-    config.providers.env.class: io.strimzi.kafka.EnvVarConfigProvider
+    config.providers.env.class: org.apache.kafka.common.config.provider.EnvVarConfigProvider
 
   # Mounts kafka-connect-secret at /opt/kafka/external-configuration/connect-secret/
   # so FileConfigProvider can read credentials from files.
