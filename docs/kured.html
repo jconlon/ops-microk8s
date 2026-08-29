@@ -161,12 +161,15 @@
 
 <p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Kured Memory Leak</p>
 <h1>Kured Memory Leak</h1>
-<p class="subtitle">Recurring goroutine hang in kured's reboot-check loop — history, mitigations, and the durable fix · Updated 2026-08-29</p>
+<p class="subtitle">Recurring goroutine hang in kured's reboot-check loop, plus stuck-reboot alerting — history, mitigations, and durable fixes · Updated 2026-08-29</p>
 
 <div class="callout callout-warn">
   <strong>Status: mitigated, not fixed.</strong> No kured release has resolved the underlying hang.
-  A 64Mi memory safeguard plus a daily scheduled restart keep it from causing node memory pressure —
-  see <a href="https://github.com/jconlon/ops-microk8s/issues/101">issue #101</a> for full history.
+  A 64Mi memory safeguard plus a daily scheduled restart keep it from causing node memory pressure
+  (<a href="https://github.com/jconlon/ops-microk8s/issues/101">issue #101</a>). A separate Prometheus
+  alert now covers stuck reboots/drains going undetected
+  (<a href="https://github.com/jconlon/ops-microk8s/issues/43">issue #43</a>) — see
+  <a href="#alerting">Prometheus Alert</a> below.
 </div>
 
 <div class="grid-3">
@@ -241,6 +244,57 @@ kubectl get jobs -n kube-system -l job-name=kured-restart</pre>
   goroutine, not the check interval — a shorter <code>--period</code> would just log more before hanging
   at the same point. Only a pod restart clears it.
 </div>
+
+<h2 id="alerting">Prometheus Alert — Stuck Reboots (Issue #43)</h2>
+<p>Separate from the memory leak above: <a href="https://github.com/jconlon/ops-microk8s/issues/43">issue #43</a>
+tracks a related gap from an earlier incident (#42) where a stuck drain on <code>squid</code> went
+undetected for days. <code>kured-gitops/monitoring/kured-alerts.yaml</code> adds a
+<code>PodMonitor</code> (kured has no Service — DaemonSet, metrics-only — so pods are scraped
+directly) and a <code>PrometheusRule</code>:</p>
+
+<pre>alert: KuredRebootStuck
+expr:  kured_reboot_required == 1
+for:   48h</pre>
+
+<p><code>kured_reboot_required</code> is a gauge kured already exposes on <code>:8080/metrics</code>
+(one series per node). Fires if a node has needed a reboot continuously for 48h — two full
+reboot-window cycles (<code>02:00–06:00 America/New_York</code>, checked hourly per
+<code>kured-values.yaml</code>) — which gives real margin above the ~20h a node can legitimately wait
+if it needs a reboot just after the window closes for the night.</p>
+
+<h3>Why this metric and not the reboot-in-progress annotation</h3>
+<p>Kured also sets a <code>weave.works/kured-reboot-in-progress</code> node annotation
+(<code>annotateNodes: true</code>) when a drain starts — a more semantically precise signal in theory
+("actively draining" vs. "just needs a reboot"). Not used, for two reasons found while evaluating it:</p>
+<ul>
+  <li>Prometheus can't read node annotations directly. Exposing one requires adding
+  <code>--metric-annotations-allowlist=nodes=[weave.works/kured-reboot-in-progress]</code> to
+  <strong>kube-state-metrics</strong> — a shared, cluster-wide monitoring component, not something
+  scoped to kured alone.</li>
+  <li>Live evidence the annotation isn't trustworthy: <code>trout</code> carried a stale
+  <code>weave.works/kured-reboot-in-progress: 2026-07-31T06:16:13Z</code> annotation for a full month
+  after that reboot cycle completed successfully (<code>kured_reboot_required</code> on trout was
+  confirmed <code>0</code> the whole time). Kured doesn't reliably clear this annotation on success, so
+  alerting on its presence would need cross-checking against <code>kured_reboot_required</code> anyway —
+  at which point the metric alone is sufficient.</li>
+</ul>
+
+<div class="callout callout-warn">
+  <strong>Not yet tested end-to-end.</strong> The rule is confirmed loaded (<code>health: ok</code>) and
+  all 8 nodes are being scraped successfully, but the alert has not been fired against a real
+  reboot-pending node — doing so would mean creating a genuine <code>/var/run/reboot-required</code>
+  sentinel (or waiting out a real 48h stuck drain). Verify manually the next time a node has a
+  legitimately long-pending reboot.
+</div>
+
+<pre># Confirm the rule is loaded and healthy
+kubectl get prometheusrule kured-alerts -n monitoring
+# Or query Prometheus directly:
+#   http_requests: GET /api/v1/rules  (look for group "kured")
+
+# Confirm all 8 nodes are being scraped
+kubectl get podmonitor kured -n kube-system
+#   http_requests: GET /api/v1/query?query=kured_reboot_required</pre>
 
 <h2 id="history">Incident History</h2>
 
