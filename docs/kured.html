@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kured Memory Leak — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; color: var(--text); }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+  @media (max-width: 700px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+  }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin: 0.1rem 0; }
+  .stat-sub   { font-size: 0.8rem; color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green); border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-red    { background: #2e1a1c; color: var(--red); border: 1px solid #4a282c; }
+
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-tip    { border-color: var(--green);  background: #151f1a; }
+  .callout-warn   { border-color: var(--yellow); background: #1e1a0f; }
+  .callout-note   { border-color: var(--accent); background: #141926; }
+  .callout strong { font-weight: 700; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .callout-note strong { color: var(--accent); }
+
+  .scenario {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.8rem;
+  }
+  .scenario-header {
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+    font-size: 0.92rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .scenario-date { color: var(--muted); font-weight: 400; font-size: 0.82rem; margin-left: auto; }
+  .scenario-body { padding: 0.8rem 1rem; font-size: 0.9rem; }
+  .scenario-body p { margin-bottom: 0.4rem; }
+  .scenario-body pre { margin-top: 0.4rem; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Kured Memory Leak</p>
+<h1>Kured Memory Leak</h1>
+<p class="subtitle">Recurring goroutine hang in kured's reboot-check loop — history, mitigations, and the durable fix · Updated 2026-08-29</p>
+
+<div class="callout callout-warn">
+  <strong>Status: mitigated, not fixed.</strong> No kured release has resolved the underlying hang.
+  A 64Mi memory safeguard plus a daily scheduled restart keep it from causing node memory pressure —
+  see <a href="https://github.com/jconlon/ops-microk8s/issues/101">issue #101</a> for full history.
+</div>
+
+<div class="grid-3">
+  <div class="stat-card">
+    <div class="stat-label">Current version</div>
+    <div class="stat-value">1.22.0</div>
+    <div class="stat-sub">Chart 5.12.0 · latest upstream is 1.23.0, no relevant fix</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Memory safeguard</div>
+    <div class="stat-value">64Mi</div>
+    <div class="stat-sub">limit — OOMKilled + auto-restarted before node impact</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Scheduled restart</div>
+    <div class="stat-value">Daily</div>
+    <div class="stat-sub">04:00 UTC CronJob — resets the hang before it matters</div>
+  </div>
+</div>
+
+<h2 id="symptom">The Symptom</h2>
+<p>Every kured pod runs a periodic reboot-check loop (<code>--period=1h</code> by default) that logs
+<code>Reboot not required</code> (or <code>Reboot required</code>) each cycle. At some point after
+pod start, the goroutine driving that loop dies silently on <strong>every pod simultaneously</strong> —
+same absolute-time window across all 8 nodes, regardless of when each pod started. The pod stays
+<code>Ready</code>, no error/warning logs, no pod events. Two consequences:</p>
+<ul>
+  <li><strong>Reboot detection silently stops working</strong> — not just a display problem. A node needing a reboot after this point won't get one until the pod restarts.</li>
+  <li><strong>Memory climbs unbounded</strong> from whatever the leaked state was, eventually OOMKilling the pod without the 64Mi limit (originally observed up to 14.6 GiB per pod on gold/trout).</li>
+</ul>
+
+<h3>Diagnose whether it's currently hung</h3>
+<pre># Last successful check per pod, compared to "now" — should be within
+# the last ~1-2 hours (period=1h + some slack) if healthy:
+for pod in $(kubectl get pods -n kube-system -l app.kubernetes.io/name=kured -o name); do
+  echo "=== $pod ==="
+  kubectl logs "$pod" -n kube-system --tail=200 | grep -E "Reboot (not )?required" | tail -1
+done
+date -u +"%Y-%m-%dT%H:%M:%SZ"   # compare against the timestamps above
+
+# Memory usage — climbing toward 64Mi is a sign of an active hang
+kubectl top pods -n kube-system -l app.kubernetes.io/name=kured</pre>
+
+<h2 id="mitigations">Current Mitigations</h2>
+
+<h3>1. Memory limit (defense-in-depth)</h3>
+<p><code>kured-gitops/helm/kured-values.yaml</code> sets a <code>64Mi</code> memory limit / <code>16Mi</code>
+request. This bounds the blast radius — the DaemonSet OOMKills and restarts a leaking pod long before
+it can pressure the node — but does <strong>not</strong> address the check loop silently dying, since a
+pod can sit well under 64Mi for a long time after its goroutine has already hung.</p>
+
+<h3>2. Scheduled rolling restart (durable mitigation)</h3>
+<p>A daily <code>CronJob</code> (<code>kured-gitops/cronjob/kured-restart-cronjob.yaml</code>) runs
+<code>kubectl rollout restart daemonset/kured</code> against a dedicated, narrowly-scoped
+<code>kured-restarter</code> ServiceAccount (RBAC limited to <code>get</code>/<code>patch</code> on the
+<code>kured</code> DaemonSet only — nothing else). This resets every pod's goroutines well inside the
+shortest hang interval observed so far (hours on 1.16.1, weeks on 1.22.0), independent of whichever
+kured version is deployed.</p>
+
+<pre># Manually trigger a restart (e.g. to test, or if you suspect an active hang
+# and don't want to wait for the 04:00 UTC schedule):
+kubectl create job --from=cronjob/kured-restart kured-restart-manual -n kube-system
+kubectl logs -n kube-system job/kured-restart-manual
+kubectl delete job kured-restart-manual -n kube-system
+
+# Check the CronJob itself
+kubectl get cronjob kured-restart -n kube-system
+kubectl get jobs -n kube-system -l job-name=kured-restart</pre>
+
+<div class="callout callout-note">
+  <strong>Why a CronJob and not just a shorter reboot-check period?</strong> The hang is in kured's own
+  goroutine, not the check interval — a shorter <code>--period</code> would just log more before hanging
+  at the same point. Only a pod restart clears it.
+</div>
+
+<h2 id="history">Incident History</h2>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-red">Discovered</span>
+    Nodes swapping — pods at up to 14.6 GiB
+    <span class="scenario-date">2026-06-06</span>
+  </div>
+  <div class="scenario-body">
+    <p>Mullet found swapping. <code>kured-wc4ck</code> (gold) and <code>kured-bknv4</code> (trout) each at 14.6 GiB;
+    whale, mullet, tuna also elevated (2.9–5.3 GiB) against a normal baseline of ~10 MB. Version at the time:
+    kured 1.16.1 (chart 5.5.1), no memory limits set. Immediate mitigation: deleted all 8 pods to free memory.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-yellow">Root-caused</span>
+    Goroutine leak traced to upstream #1015, fixed in 1.16.2+
+    <span class="scenario-date">2026-06-07</span>
+  </div>
+  <div class="scenario-body">
+    <p>A 64Mi memory limit was added first as an interim safeguard. Deeper investigation of pod logs across
+    all 8 nodes found every instance's periodic check stopped logging within the <em>same</em> ~40-minute
+    absolute-time window (09:00–09:40 UTC) regardless of pod start time — a synchronized hang, not organic
+    per-node drift. No correlated cluster event found; the trigger is internal to kured. This matched
+    upstream's <code>kured</code> 1.16.2 changelog: "Fix goroutine leak by @evrardjp in #1015". Latest stable
+    at the time was 1.22.0.</p>
+    <p>Upgraded chart 5.5.1 → 5.12.0 (kured 1.22.0). Baseline memory dropped from 38–48 MiB (climbing) to
+    8–11 MiB flat — a strong early signal, pending confirmation the check loop survived longer than 1.16.1's
+    few-hour hang window.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-red">Recurred</span>
+    Same hang signature on 1.22.0, after 53 days
+    <span class="scenario-date">2026-07-30</span>
+  </div>
+  <div class="scenario-body">
+    <p>All 8 pods stopped logging checks simultaneously in a single window, ~10 hours of silence at time of
+    discovery. Memory 14–51 MiB — under the 64Mi limit, not yet OOMKilled, but the check loop was dead.
+    The 1.16.2 upstream fix reduced frequency (hours → 53 days) but did not eliminate the underlying bug.
+    Immediate mitigation: restarted all 8 pods again. Latest upstream at the time: 1.23.0 (2026-06-30),
+    changelog not yet checked.</p>
+  </div>
+</div>
+
+<div class="scenario">
+  <div class="scenario-header">
+    <span class="badge badge-red">Recurred</span>
+    Same hang after 29 days — no upstream fix found, durable mitigation added
+    <span class="scenario-date">2026-08-29</span>
+  </div>
+  <div class="scenario-body">
+    <p>All 8 pods again stopped logging checks in the same narrow window (09:08–09:53 UTC), ~8 hours of
+    silence at discovery — an even shorter interval than the previous cycle (29 vs. 53 days), suggesting
+    this is not a fixed period, just recurring. Checked kured 1.22.1 and 1.23.0 changelogs: both are pure
+    dependency/CI bumps, no goroutine/memory/reboot-loop related changes. No further version to chase.</p>
+    <p>Immediate mitigation: restarted all 8 pods. Durable mitigation: added the daily
+    <code>kured-restart</code> CronJob described above, so this stops requiring manual intervention
+    regardless of kured version going forward.</p>
+  </div>
+</div>
+
+<h2 id="commands">Reference Commands</h2>
+<pre># Current version
+kubectl get ds kured -n kube-system -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Pod status, restarts, memory
+kubectl get pods -n kube-system -l app.kubernetes.io/name=kured -o wide
+kubectl top pods -n kube-system -l app.kubernetes.io/name=kured
+
+# Node reboot-required status (degrades silently during a hang — cross-check
+# the "last successful check" query above if this looks stale)
+just node-status</pre>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jconlon/ops-microk8s/issues/101">Issue #101</a> &nbsp;·&nbsp;
+  <a href="https://github.com/kubereboot/kured/releases">kured releases</a>
+</p>
+
+</div>
+</body>
+</html>

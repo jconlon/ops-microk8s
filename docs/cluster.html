@@ -422,7 +422,7 @@ kubectl exec -n rook-ceph deploy/rook-ceph-tools -- ceph df  # pool usage</pre>
     </tr>
     <tr>
       <td>kured</td><td><code>kured</code></td>
-      <td>Automated rolling node reboots after OS updates</td>
+      <td>Automated rolling node reboots after OS updates. Has a recurring goroutine memory leak — see <a href="kured.html">Kured Memory Leak</a> for mitigations</td>
       <td>kured DaemonSet</td>
     </tr>
     <tr>

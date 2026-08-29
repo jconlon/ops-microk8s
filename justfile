@@ -419,6 +419,10 @@ networking-docs:
 tmux-docs:
     xdg-open docs/tmux-copy-paste-cheatsheet.html
 
+# Open the kured memory leak reference in a browser
+kured-docs:
+    xdg-open docs/kured.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
