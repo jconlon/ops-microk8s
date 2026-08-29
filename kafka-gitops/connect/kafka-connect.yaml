@@ -10,6 +10,12 @@ spec:
   version: 4.3.1
   replicas: 2
   bootstrapServers: kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092
+  # v1 API: group.id / *.storage.topic moved out of spec.config into typed
+  # top-level fields — spec.config now explicitly forbids these prefixes.
+  groupId: kafka-connect-cluster
+  configStorageTopic: kafka-connect-cluster-configs
+  statusStorageTopic: kafka-connect-cluster-status
+  offsetStorageTopic: kafka-connect-cluster-offsets
 
   logging:
     type: inline
@@ -67,10 +73,6 @@ spec:
             url: https://repo1.maven.org/maven2/org/apache/commons/commons-compress/1.26.0/commons-compress-1.26.0.jar
 
   config:
-    group.id: kafka-connect-cluster
-    offset.storage.topic: kafka-connect-cluster-offsets
-    config.storage.topic: kafka-connect-cluster-configs
-    status.storage.topic: kafka-connect-cluster-status
     offset.storage.replication.factor: "3"
     config.storage.replication.factor: "3"
     status.storage.replication.factor: "3"
