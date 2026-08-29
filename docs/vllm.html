@@ -240,7 +240,7 @@ headroom, within the 16 GB card at 85% utilization.</p>
   <tbody>
     <tr><td>External (MetalLB)</td><td><code>http://192.168.0.218/v1</code></td><td>API calls from the LAN</td></tr>
     <tr><td>External (kgateway, HTTPS)</td><td><a href="https://vllm.verticon.com">vllm.verticon.com</a></td><td>Same API, TLS-fronted</td></tr>
-    <tr><td>Internal (cluster)</td><td><code>http://vllm-router-service.vllm.svc.cluster.local/v1</code></td><td>In-cluster clients (e.g. kagent)</td></tr>
+    <tr><td>Internal (cluster)</td><td><code>http://vllm-router-service.vllm.svc.cluster.local/v1</code></td><td>In-cluster clients (e.g. freshrss-streams, see <a href="#consumers">Consumers</a>)</td></tr>
   </tbody>
 </table>
 <p>No API key required on the local network.</p>
@@ -278,9 +278,9 @@ print(response.choices[0].message.content)</pre>
     <div class="stat-sub">Kafka Streams enrichment service — article summarisation, bounded to 2 concurrent calls</div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Evaluated, now disabled</div>
+    <div class="stat-label">Evaluated, now removed</div>
     <div class="stat-value" style="font-size:1rem; margin:0.3rem 0"><a href="https://github.com/kagent-dev/kagent">kagent</a></div>
-    <div class="stat-sub">Deployed &amp; verified end-to-end against vLLM (issue #111), then deliberately disabled (issue #112)</div>
+    <div class="stat-sub">Deployed &amp; verified end-to-end against vLLM (issue #111), evaluated and removed (issue #112)</div>
   </div>
 </div>
 <p><a href="https://github.com/jconlon/freshrss-streams">freshrss-streams</a> (part of the
@@ -307,12 +307,23 @@ sensor, nothing watching anything — it was pure request/response, same shape a
 except slower). The useful domain knowledge from its bundled agents was extracted into this repo's
 Claude Code project skills (<code>.claude/skills/{k8s-troubleshoot,kgateway,promql,observability}/SKILL.md</code>)
 before disabling.</p>
-<p>Controller, UI, tool servers, and agent Deployments were torn down; the CRDs and CloudNativePG
-database were deliberately left in place (zero runtime cost) so it can be cleanly re-enabled via a
-single <code>kubectl apply -f argoCD-apps/kagent-apps.yaml</code> if a concrete event-driven use case
-ever justifies it — see issue #112 for the full disable procedure and re-enable instructions. No kagent
-pods are currently running, and the vLLM tool-calling flags above are simply unused right now rather
-than removed.</p>
+<p>Initially just <em>disabled</em> (controller/UI/tools/agents torn down, CRDs and database kept for a
+possible re-enable) — later taken to full removal: the git manifests (<code>kagent-gitops/</code>,
+<code>argoCD-apps/kagent*.yaml</code>) were removed first, which broke the still-running
+<code>kagent-database</code> ArgoCD app (its source path vanished out from under it, producing a
+<code>ComparisonError</code>). Cleaning that up surfaced the rest of the half-finished disable, so the
+remaining pieces were removed too: the <code>kagent-crds</code>/<code>kagent-database</code> ArgoCD apps,
+the kagent CRDs (deleted manually — a Helm chart <code>crds/</code> directory, not covered by cascade
+delete), the retained CNPG database and role (~9.3MB, just kagent's own session/tool-config state — set
+<code>ensure: absent</code> declaratively for the role, though it had to be dropped manually via
+<code>psql</code> too, since CNPG never tracked it as reconciled in the first place — same class of bug
+noted in #111's original deployment history), the <code>kagent</code> namespace, the
+<code>kagent-httproute.yaml</code>/<code>kagent-certificate.yaml</code> manifests and the Gateway's
+<code>https-kagent</code> listener (<code>kagent.verticon.com</code> was never publicly usable without
+these anyway), the <code>kagent-mcp</code> Grafana service account, and <code>teller/.teller-kagent.yml</code>.
+The vLLM tool-calling flags above (<code>--enable-auto-tool-choice</code>, Hermes parser) were left as-is
+— harmless with no consumer, and cheap to re-add support for later if needed. The 4 extracted Claude
+Code skills remain, with no dependency on any of this.</p>
 
 <h2 id="ops">Operational Commands</h2>
 <pre># Pod placement and status

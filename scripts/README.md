@@ -310,7 +310,6 @@ Run all teller commands from the `ops-microk8s` root directory within a devbox s
 | `teller/.teller-argo-workflows.yml` | Argo Workflows Harbor robot account credentials |
 | `teller/.teller-hasura.yml` | Hasura K8s secrets (`hasura-role-password`, `hasura-credentials`) |
 | `teller/.teller-cert-manager.yml` | Cloudflare API token for cert-manager's DNS-01 `ClusterIssuer` (`cloudflare-api-token-secret`) |
-| `teller/.teller-kagent.yml` | KAgent K8s secrets (`kagent-role-password`, `kagent-db-credentials`) |
 
 > **Note:** Machine-local teller configs (restic, gitlab) remain in `~/dotfiles`. Only cluster K8s secret configs belong here.
 
@@ -443,62 +442,6 @@ teller run --config teller/.teller-hasura.yml -- bash -c 'kubectl create secret 
   --from-literal=HASURA_GRAPHQL_ADMIN_SECRET="$HASURA_GRAPHQL_ADMIN_SECRET" \
   --dry-run=client -o yaml | kubectl apply -f -'
 ```
-
----
-
-### Example: Create kagent secrets (issue #111)
-
-> **Prerequisites:** Add `kagent-role` to Google Secret Manager before running:
-> ```bash
-> gcloud secrets create kagent-role --replication-policy=automatic
-> echo -n "<password>" | gcloud secrets versions add kagent-role --data-file=-
-> ```
-
-```bash
-# Role password (postgresql-system namespace — used by CloudNativePG managed role)
-teller run --config teller/.teller-kagent.yml -- bash -c 'kubectl create secret generic kagent-role-password \
-  --namespace postgresql-system \
-  --from-literal=username=kagent \
-  --from-literal=password="$KAGENT_ROLE_PASSWORD" \
-  --dry-run=client -o yaml | kubectl apply -f -'
-
-# DB connection secret (kagent namespace — full URL, mounted via urlFile in kagent-values.yaml)
-teller run --config teller/.teller-kagent.yml -- bash -c 'kubectl create secret generic kagent-db-credentials \
-  --namespace kagent \
-  --from-literal=url="postgres://kagent:$KAGENT_ROLE_PASSWORD@production-postgresql-rw.postgresql-system.svc.cluster.local:5432/kagent" \
-  --dry-run=client -o yaml | kubectl apply -f -'
-```
-
-One-time ArgoCD OCI repo registration and initial app bootstrap (not GitOps-managed, same class as the kgateway/cr.kgateway.dev registration):
-
-```bash
-argocd repo add ghcr.io/kagent-dev/kagent/helm --type helm --enable-oci
-kubectl apply -f argoCD-apps/kagent-apps.yaml
-```
-
-#### kagent-grafana-mcp Grafana service account token
-
-Required for kagent's observability-agent to query Grafana/Prometheus via MCP — without it, `kagent-grafana-mcp` returns 403 Forbidden and the agent's toolset fails to load. Not teller/GSM-managed — generated directly via Grafana's API and stored as a one-off Secret (it's a token scoped only to this integration, not a shared credential):
-
-```bash
-GRAFANA_ADMIN_PW=$(kubectl --namespace monitoring get secret grafana -o jsonpath="{.data.admin-password}" | base64 -d)
-
-SA_ID=$(curl -s -u "admin:$GRAFANA_ADMIN_PW" -X POST http://192.168.0.201/api/serviceaccounts \
-  -H "Content-Type: application/json" -d '{"name":"kagent-mcp","role":"Viewer"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
-
-TOKEN=$(curl -s -u "admin:$GRAFANA_ADMIN_PW" -X POST "http://192.168.0.201/api/serviceaccounts/$SA_ID/tokens" \
-  -H "Content-Type: application/json" -d '{"name":"kagent-mcp-token"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
-
-kubectl create secret generic kagent-grafana-token -n kagent \
-  --from-literal=GRAFANA_SERVICE_ACCOUNT_TOKEN="$TOKEN" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-unset GRAFANA_ADMIN_PW TOKEN
-```
-
-After creating the secret, restart the pod so it picks up the new toolset: `kubectl delete pod -n kagent -l app.kubernetes.io/name=grafana-mcp`.
 
 ---
 
