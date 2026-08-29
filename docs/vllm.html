@@ -278,9 +278,9 @@ print(response.choices[0].message.content)</pre>
     <div class="stat-sub">Kafka Streams enrichment service — article summarisation, bounded to 2 concurrent calls</div>
   </div>
   <div class="stat-card">
-    <div class="stat-label">Planned</div>
+    <div class="stat-label">Evaluated, now disabled</div>
     <div class="stat-value" style="font-size:1rem; margin:0.3rem 0"><a href="https://github.com/kagent-dev/kagent">kagent</a></div>
-    <div class="stat-sub">AI agent framework — tool-calling config already added to vLLM for this (issue #111)</div>
+    <div class="stat-sub">Deployed &amp; verified end-to-end against vLLM (issue #111), then deliberately disabled (issue #112)</div>
   </div>
 </div>
 <p><a href="https://github.com/jconlon/freshrss-streams">freshrss-streams</a> (part of the
@@ -293,18 +293,26 @@ in-flight requests via a bounded <code>ExecutorService</code>, with a 120s per-c
 recorded as <code>vi_summary_status=failed</code>, never fed back as stream errors). Full detail,
 including the consumer's config table and failure/observability semantics: freshrss's
 <a href="https://github.com/jconlon/freshrss/blob/master/docs/architecture.html#vllm-integration">architecture.html#vllm-integration</a>.</p>
-<p><a href="https://github.com/kagent-dev/kagent">kagent</a> is a Kubernetes-native AI agent framework
-intended to use this vLLM deployment as its inference backend — this is why <code>--enable-auto-tool-choice</code>
-and the Hermes tool-call parser are configured (Qwen2.5's tokenizer already includes Hermes-style
-tool-call templating, so no custom chat template was needed). Its deployment is in progress, not fully
-live: <code>kagent-crds</code> ArgoCD app is <span class="badge badge-green">Synced/Healthy</span>, but
-<code>kagent-database</code> has a stale <code>ComparisonError</code> (references
-<code>kagent-gitops/database</code>, which doesn't exist in the repo yet) and no pods are currently
-running in the <code>kagent</code> namespace. See <code>scripts/README.md</code>'s kagent secrets
-section for the bootstrap steps once that's picked back up. Also relevant: kagent's
-<code>kagent-grafana-mcp</code> component needs a Grafana service-account token to query
-Prometheus/Grafana via MCP for its observability-agent role (also documented in
-<code>scripts/README.md</code>).</p>
+<p><a href="https://github.com/kagent-dev/kagent">kagent</a>, a Kubernetes-native AI agent framework, was
+deployed (issue #111) with a real <code>ModelConfig</code> pointed at this vLLM instance's internal
+endpoint — <code>--enable-auto-tool-choice</code> and the Hermes tool-call parser are configured on vLLM
+specifically for this (Qwen2.5's tokenizer already includes Hermes-style tool-call templating, so no
+custom chat template was needed). It worked: verified end-to-end, including a real agent session
+completing a full agent → ModelConfig → secret resolution chain with no errors.</p>
+<p>It was then <strong>deliberately disabled</strong> after a follow-up evaluation (issue #112) found
+it added nothing over using Claude Code directly — every request round-tripped through the quantized
+8192-token vLLM model (slower than a full-size model), the web UI was clumsy next to a Claude Code
+session, and kagent had no event-driven behavior of its own (no AlertManager receiver, no Argo Events
+sensor, nothing watching anything — it was pure request/response, same shape as talking to Claude Code
+except slower). The useful domain knowledge from its bundled agents was extracted into this repo's
+Claude Code project skills (<code>.claude/skills/{k8s-troubleshoot,kgateway,promql,observability}/SKILL.md</code>)
+before disabling.</p>
+<p>Controller, UI, tool servers, and agent Deployments were torn down; the CRDs and CloudNativePG
+database were deliberately left in place (zero runtime cost) so it can be cleanly re-enabled via a
+single <code>kubectl apply -f argoCD-apps/kagent-apps.yaml</code> if a concrete event-driven use case
+ever justifies it — see issue #112 for the full disable procedure and re-enable instructions. No kagent
+pods are currently running, and the vLLM tool-calling flags above are simply unused right now rather
+than removed.</p>
 
 <h2 id="ops">Operational Commands</h2>
 <pre># Pod placement and status
