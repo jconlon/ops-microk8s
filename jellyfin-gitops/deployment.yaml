@@ -25,12 +25,6 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: whale
       enableServiceLinks: false
-      # Issue #122: GIDs for whale's render/video device groups, needed so the
-      # container user can open /dev/dri/renderD129 without running as root.
-      # Verified 2026-07-30 (still render=110, video=44, matching the issue's
-      # 2026-07-26 finding) -- re-check after any OS upgrade on whale.
-      securityContext:
-        supplementalGroups: [110, 44]
       containers:
         - name: jellyfin
           image: jellyfin/jellyfin:latest
@@ -40,26 +34,28 @@ spec:
           # Explicit guardrail (issue #116): whale is also a control-plane
           # node, so a runaway software transcode shouldn't threaten cluster
           # stability.
+          #
+          # Issue #122: gpu.intel.com/i915 replaces the earlier raw hostPath
+          # mount of /dev/dri/renderD129. hostPath bind-mounts a device node
+          # but does not add it to the container's cgroup device allow-list,
+          # so QSV never actually worked (open() failed with EPERM despite
+          # correct file permissions). The intel-gpu-plugin DaemonSet
+          # (intel-gpu-plugin-gitops/) advertises this resource only on
+          # whale and wires the cgroup rule correctly on allocation.
           resources:
             requests:
               cpu: 500m
               memory: 512Mi
+              gpu.intel.com/i915: 1
             limits:
               cpu: "4"
               memory: 4Gi
+              gpu.intel.com/i915: 1
           volumeMounts:
             - name: config
               mountPath: /config
             - name: media
               mountPath: /media
-            # Issue #122: Intel UHD 770 iGPU render node for QuickSync (QSV)
-            # hardware transcoding. Mounts only this specific device node, not
-            # all of /dev/dri -- whale's other node (renderD128/card1) is the
-            # NVIDIA RTX 2000 Ada, already exclusively managed by the
-            # nvidia.com/gpu device plugin for vLLM; exposing it here via raw
-            # hostPath would bypass that scheduling.
-            - name: intel-qsv
-              mountPath: /dev/dri/renderD129
       volumes:
         - name: config
           persistentVolumeClaim:
@@ -67,7 +63,3 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: jellyfin-media
-        - name: intel-qsv
-          hostPath:
-            path: /dev/dri/renderD129
-            type: CharDevice
