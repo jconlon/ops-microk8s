@@ -92,10 +92,7 @@ spec:
         passwordSecret:
           name: apicurio-role-password
       - name: kagent
-        ensure: present
-        login: true
-        passwordSecret:
-          name: kagent-role-password
+        ensure: absent
 
   # Tolerations for dedicated nodes (if needed)
   # tolerations:
