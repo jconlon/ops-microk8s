@@ -65,7 +65,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: kubectl
-              image: bitnami/kubectl:1.32
+              image: rancher/kubectl:v1.33.13
               command:
                 - kubectl
                 - rollout
