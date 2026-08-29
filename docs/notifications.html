@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alerting &amp; Notifications — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; color: var(--text); }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+  @media (max-width: 700px) { .grid-3 { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+  }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin: 0.1rem 0; }
+  .stat-sub   { font-size: 0.8rem; color: var(--muted); }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.5rem 0 1rem;
+  }
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .flow-arrow { color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green); border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-red    { background: #2e1a1c; color: var(--red); border: 1px solid #4a282c; }
+
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-tip    { border-color: var(--green);  background: #151f1a; }
+  .callout-warn   { border-color: var(--yellow); background: #1e1a0f; }
+  .callout-note   { border-color: var(--accent); background: #141926; }
+  .callout strong { font-weight: 700; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .callout-note strong { color: var(--accent); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › Alerting &amp; Notifications</p>
+<h1>Alerting &amp; Notifications</h1>
+<p class="subtitle">How a firing Prometheus alert actually reaches someone — desktop notifications on mullet · Updated 2026-08-29</p>
+
+<div class="callout callout-warn">
+  <strong>Before 2026-08-29, no alert notified anyone.</strong> Alertmanager routed everything to a
+  <code>"null"</code> receiver — alerts only existed if someone opened
+  <a href="https://alertmanager.verticon.com">alertmanager.verticon.com</a> and looked. Issues
+  <a href="https://github.com/jconlon/ops-microk8s/issues/79">#79</a> and
+  <a href="https://github.com/jconlon/ops-microk8s/issues/43">#43</a> both trace back to real incidents
+  that went unnoticed for hours-to-days as a direct result.
+</div>
+
+<div class="grid-3">
+  <div class="stat-card">
+    <div class="stat-label">Delivery</div>
+    <div class="stat-value">notify-send</div>
+    <div class="stat-sub">Desktop popup on mullet, jconlon's login session</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Poll interval</div>
+    <div class="stat-value">5 min</div>
+    <div class="stat-sub">systemd --user timer</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Dedup</div>
+    <div class="stat-value">Fingerprint</div>
+    <div class="stat-sub">Notifies once per alert, once more on resolve</div>
+  </div>
+</div>
+
+<h2 id="pipeline">Pipeline</h2>
+<div class="flow">
+  <span class="flow-node">Prometheus</span>
+  <span class="flow-arrow">— rule evaluates true, <code>for:</code> duration elapses —▶</span>
+  <span class="flow-node">Alertmanager</span>
+  <span class="flow-arrow">— polled every 5m —▶</span>
+  <span class="flow-node">ops alertmanager notify</span>
+  <span class="flow-arrow">— new/resolved only —▶</span>
+  <span class="flow-node">notify-send</span>
+</div>
+<p><code>scripts/alertmanager.nu</code> (<code>ops alertmanager notify</code>) queries
+<code>GET https://alertmanager.verticon.com/api/v2/alerts?active=true&amp;silenced=false&amp;inhibited=false</code>,
+drops the always-firing <code>Watchdog</code> heartbeat alert, and diffs the result against
+<code>~/.cache/ops-microk8s/alertmanager-notified.json</code> — a list of previously-seen fingerprints —
+so a still-firing alert only pops once, not every 5 minutes. A separate low-urgency notification fires
+when a previously-tracked alert drops out of the active list (resolved).</p>
+
+<p>Run via a <strong><code>systemd --user</code></strong> timer, not a system unit — installation and
+management commands are in <code>scripts/systemd/README.md</code>'s Alertmanager Desktop Notifications
+section. The key reason for <code>--user</code>: <code>notify-send</code> needs the logged-in desktop
+session's D-Bus bus, which a system-level unit doesn't have without extra plumbing.</p>
+
+<pre># Manually check right now
+ops alertmanager notify
+
+# Force re-notification of everything currently active
+rm ~/.cache/ops-microk8s/alertmanager-notified.json
+ops alertmanager notify
+
+# Timer status
+systemctl --user status alertmanager-notify.timer
+journalctl --user -u alertmanager-notify.service -f</pre>
+
+<h2 id="why-not-pagerduty">Why notify-send, not PagerDuty</h2>
+<p><a href="https://github.com/jconlon/ops-microk8s/issues/79">Issue #79</a> originally proposed full
+PagerDuty integration — a dedicated on-call paging service with phone/SMS escalation, severity-tiered
+routing, and an integration key managed via Teller/Google Secret Manager. None of that was built.
+notify-send was chosen instead because:</p>
+<ul>
+  <li>This is a single-admin home lab, not a team with on-call rotations — PagerDuty's escalation
+  policies and paging infrastructure solve a coordination problem this cluster doesn't have.</li>
+  <li>Zero new external accounts, secrets, or paid services — just a script and a systemd timer,
+  both already fully within this repo's existing tooling (nushell, devbox, systemd).</li>
+  <li>notify-send is <em>good enough</em> for the actual failure mode both #79 and #43 describe: an
+  alert firing silently with nobody looking. It directly closes that gap.</li>
+</ul>
+
+<div class="callout callout-note">
+  <strong>The real limitation this doesn't solve:</strong> notify-send only reaches you while logged
+  into mullet's desktop session. If you're away — traveling, or mullet's screen is locked/logged out —
+  you'll miss it entirely, exactly the scenario PagerDuty's phone paging exists for. If that ever
+  becomes a real problem, email (Alertmanager's built-in <code>email_configs</code> receiver) or a
+  chat webhook (Slack/Discord) would reach you anywhere with much less setup than PagerDuty — see the
+  options discussion in <a href="https://github.com/jconlon/ops-microk8s/issues/79">#79</a>.
+</div>
+
+<h2 id="alerts">Current Alert Catalog</h2>
+<table>
+  <thead><tr><th>Alert</th><th>Condition</th><th>Severity</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>KuredRebootStuck</code></td>
+      <td>A node has needed a reboot for &gt;48h (two full <code>02:00–06:00</code> reboot-window cycles)</td>
+      <td><span class="badge badge-yellow">warning</span></td>
+      <td><code>kured-gitops/monitoring/kured-alerts.yaml</code> — <a href="https://github.com/jconlon/ops-microk8s/issues/43">#43</a>, see also <a href="kured.html">kured.html</a></td>
+    </tr>
+    <tr>
+      <td><code>MulletRootDiskHigh</code></td>
+      <td>mullet root filesystem &gt;75% full</td>
+      <td><span class="badge badge-yellow">warning</span></td>
+      <td><code>monitoring/rules/mullet-disk-alerts.yaml</code> — issue #77</td>
+    </tr>
+    <tr>
+      <td><code>MulletRootDiskCritical</code></td>
+      <td>mullet root filesystem &gt;88% full — DiskPressure imminent</td>
+      <td><span class="badge badge-red">critical</span></td>
+      <td><code>monitoring/rules/mullet-disk-alerts.yaml</code> — issue #77</td>
+    </tr>
+  </tbody>
+</table>
+<p style="font-size:0.85rem; color:var(--muted);">Both are picked up automatically — the notify script
+doesn't need per-alert configuration, it reacts to anything Alertmanager reports as active (minus
+<code>Watchdog</code>).</p>
+
+<h2 id="limitations">Known Limitations</h2>
+<ul>
+  <li><strong>Desktop-session only.</strong> No reach while away from mullet or logged out — see the callout above.</li>
+  <li><strong>Not end-to-end fire-tested.</strong> <code>KuredRebootStuck</code> is confirmed loaded and healthy in Prometheus, and the notify pipeline is confirmed working (tested with a synthetic tracked-alert resolve), but no <em>real</em> alert has fired through the whole chain yet. Worth confirming next time any cluster alert genuinely fires.</li>
+  <li><strong>5-minute polling</strong> means up to a 5-minute delay between an alert going active/resolving and the notification appearing — acceptable for the current alert set, which all use <code>for:</code> windows measured in hours.</li>
+</ul>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jconlon/ops-microk8s/issues/79">Issue #79</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jconlon/ops-microk8s/issues/43">Issue #43</a> &nbsp;·&nbsp;
+  <a href="kured.html">Kured Memory Leak &amp; Alerting</a>
+</p>
+
+</div>
+</body>
+</html>

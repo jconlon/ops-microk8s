@@ -423,6 +423,10 @@ tmux-docs:
 kured-docs:
     xdg-open docs/kured.html
 
+# Open the alerting & notifications reference in a browser
+notifications-docs:
+    xdg-open docs/notifications.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
