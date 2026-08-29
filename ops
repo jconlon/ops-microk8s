@@ -1,5 +1,6 @@
 #!/usr/bin/env nu
 
+source scripts/alertmanager.nu
 source scripts/argocd.nu
 source scripts/cluster.nu
 source scripts/freshrss.nu

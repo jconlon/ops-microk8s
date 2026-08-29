@@ -282,3 +282,64 @@ sudo journalctl -u music-sync.service -u pictures-sync.service --since today
 # Test pictures sync
 /home/jconlon/git/ops-microk8s/scripts/sync-pictures-to-ceph.sh
 ```
+
+---
+
+## Alertmanager Desktop Notifications
+
+Polls Alertmanager every 5 minutes and sends a `notify-send` desktop notification for
+newly-firing and newly-resolved alerts (deduped by fingerprint — a still-firing alert
+doesn't re-notify every poll). See `docs/kured.html`'s Prometheus Alert section for the
+`KuredRebootStuck` alert this was originally built for; it applies to any alert in the
+cluster, not just kured.
+
+> **Different from the sync services above: this is a `systemd --user` unit, not a
+> system unit.** `notify-send` needs the logged-in desktop session's D-Bus bus, which a
+> system-level unit (`User=jconlon`) doesn't have without extra plumbing — `--user`
+> units inherit it automatically. Install *without* sudo, as your normal user.
+
+### Quick Install
+
+```bash
+/home/jconlon/git/ops-microk8s/scripts/systemd/install-alertmanager-notify.sh
+```
+
+### Manual Installation
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp /home/jconlon/git/ops-microk8s/scripts/systemd/alertmanager-notify.service ~/.config/systemd/user/
+cp /home/jconlon/git/ops-microk8s/scripts/systemd/alertmanager-notify.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now alertmanager-notify.timer
+```
+
+### Management Commands
+
+```bash
+# Timer status / next run
+systemctl --user status alertmanager-notify.timer
+systemctl --user list-timers alertmanager-notify.timer
+
+# Trigger a check immediately
+systemctl --user start alertmanager-notify.service
+
+# Logs
+journalctl --user -u alertmanager-notify.service -f
+
+# Test the underlying script directly (bypasses systemd)
+devbox run --config /home/jconlon/git/ops-microk8s -- alertmanager-notify
+
+# Disable
+systemctl --user disable --now alertmanager-notify.timer
+```
+
+### Files
+
+- **Service/Timer**: `~/.config/systemd/user/alertmanager-notify.{service,timer}`
+- **Script**: `scripts/alertmanager.nu` (`ops alertmanager notify`) — queries
+  `https://alertmanager.verticon.com/api/v2/alerts`, filters out the `Watchdog`
+  heartbeat, dedupes against `~/.cache/ops-microk8s/alertmanager-notified.json`
+- **State**: `~/.cache/ops-microk8s/alertmanager-notified.json` — list of currently-tracked
+  (already-notified) alert fingerprints; delete it to force re-notification of everything
+  currently active

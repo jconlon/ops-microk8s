@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Alertmanager for active alerts and send desktop notifications
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/git/ops-microk8s
+# nu (and the rest of the devbox env) isn't on the system PATH outside a
+# devbox shell — go through `devbox run`, same as documented in
+# scripts/README.md for running a script from outside the repo directory.
+ExecStart=/usr/local/bin/devbox run --config %h/git/ops-microk8s -- alertmanager-notify

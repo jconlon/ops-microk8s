@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll Alertmanager every 5 minutes for active alerts
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -6,6 +6,7 @@ Operational scripts for the MicroK8s cluster. NuShell scripts are invoked via th
 
 ```
 scripts/
+├── alertmanager.nu              # Alertmanager polling + notify-send desktop alerts (nushell)
 ├── argocd.nu                    # ArgoCD management commands (nushell)
 ├── cluster.nu                   # Cluster health/status commands (nushell)
 ├── freshrss.nu                  # FreshRSS database access (nushell)
@@ -14,14 +15,17 @@ scripts/
 ├── requirements.txt             # Python deps for decode_atom_entries.py (fastavro, pytest)
 ├── sync-music-to-ceph.sh        # Sync ~/Music to Ceph RGW
 ├── sync-pictures-to-ceph.sh     # Sync ~/Pictures to Ceph RGW
-├── systemd/                     # Systemd service/timer units for sync jobs
+├── systemd/                     # Systemd service/timer units for sync jobs + desktop alerts
 │   ├── README.md
 │   ├── install.sh               # Install music sync service
 │   ├── install-pictures-sync.sh # Install pictures sync service
+│   ├── install-alertmanager-notify.sh  # Install alertmanager-notify (systemd --user)
 │   ├── music-sync.service
 │   ├── music-sync.timer         # Daily at 2:00 AM
 │   ├── pictures-sync.service
-│   └── pictures-sync.timer      # Daily at 3:00 AM
+│   ├── pictures-sync.timer      # Daily at 3:00 AM
+│   ├── alertmanager-notify.service
+│   └── alertmanager-notify.timer       # Every 5 minutes (systemd --user)
 └── restic/                      # Restic backup scripts and systemd units
     ├── restic-prune.sh          # Enforce retention policy
     ├── restic-verify.sh         # Verify repository integrity
@@ -50,6 +54,22 @@ scripts/
 > ```
 
 Sourced by the `ops` wrapper script. Run from the `ops-microk8s` directory.
+
+### alertmanager.nu
+
+Polls Alertmanager for active alerts and sends desktop notifications via `notify-send` — see `scripts/systemd/README.md`'s Alertmanager Desktop Notifications section for the `systemd --user` timer that runs this every 5 minutes on mullet's desktop. Dedupes by fingerprint against `~/.cache/ops-microk8s/alertmanager-notified.json` so a still-firing alert only notifies once (plus once more on resolution).
+
+| Command | Description |
+|---|---|
+| `ops alertmanager notify` | Check for new/resolved alerts and notify (`--url` defaults to `https://alertmanager.verticon.com`) |
+
+```bash
+ops alertmanager notify
+
+# Force re-notification of everything currently active
+rm ~/.cache/ops-microk8s/alertmanager-notified.json
+ops alertmanager notify
+```
 
 ### loki.nu
 

@@ -32,6 +32,7 @@
       "agent-plan":      ["claude --name ops-microk8s --model opus --permission-mode plan"],
       "agent-small":     ["claude --name ops-microk8s --model haiku"],
       "agent-big":       ["claude --name ops-microk8s --model opus"],
+      "alertmanager-notify": ["./ops alertmanager notify"],
       "argocd-login": ["./ops argocd login"],
       "freshrss-psql": ["./ops freshrss psql"],
       "freshrss-publish-links": ["./ops freshrss publish-links"],
