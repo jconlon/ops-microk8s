@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM — ops-microk8s</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --text: #e2e4f0;
+    --muted: #8b90a8;
+    --accent: #7c9ef5;
+    --accent2: #9d7cf5;
+    --green: #4caf82;
+    --yellow: #e8c55a;
+    --red: #e06c75;
+    --orange: #e09a5c;
+    --code-bg: #12151f;
+    --radius: 6px;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    padding: 2rem 1rem;
+  }
+  .page { max-width: 860px; margin: 0 auto; }
+
+  h1 { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 0.25rem; }
+  h2 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin: 2.5rem 0 0.75rem;
+       padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1.5rem 0 0.5rem; }
+  p  { margin-bottom: 0.75rem; color: var(--text); }
+  ul, ol { padding-left: 1.4rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .breadcrumb { font-size: 0.85rem; color: var(--muted); margin-bottom: 2rem; }
+  .breadcrumb a { color: var(--muted); }
+  .breadcrumb a:hover { color: var(--accent); }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.4em;
+    color: #c9d1d9;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1rem;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+  @media (max-width: 700px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+  }
+  .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.3rem; font-weight: 700; color: var(--accent); margin: 0.1rem 0; }
+  .stat-sub   { font-size: 0.8rem; color: var(--muted); }
+
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0.5rem 0 1rem;
+  }
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .flow-arrow { color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-green  { background: #1a3328; color: var(--green); border: 1px solid #2a4a3a; }
+  .badge-blue   { background: #1a2240; color: var(--accent); border: 1px solid #263060; }
+  .badge-yellow { background: #2e2610; color: var(--yellow); border: 1px solid #4a3e18; }
+  .badge-red    { background: #2e1a1c; color: var(--red); border: 1px solid #4a282c; }
+
+  .callout {
+    border-left: 3px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout-tip    { border-color: var(--green);  background: #151f1a; }
+  .callout-warn   { border-color: var(--yellow); background: #1e1a0f; }
+  .callout-note   { border-color: var(--accent); background: #141926; }
+  .callout strong { font-weight: 700; }
+  .callout-tip  strong { color: var(--green); }
+  .callout-warn strong { color: var(--yellow); }
+  .callout-note strong { color: var(--accent); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<p class="breadcrumb"><a href="index.html">ops-microk8s</a> › vLLM</p>
+<h1>vLLM — Self-Hosted LLM Inference</h1>
+<p class="subtitle">OpenAI-compatible chat API running on whale's GPU · What it is, how to use it, and what consumes it · Updated 2026-08-29</p>
+
+<div class="grid-3">
+  <div class="stat-card">
+    <div class="stat-label">Model</div>
+    <div class="stat-value">Qwen2.5-7B</div>
+    <div class="stat-sub">AWQ INT4 quantized · <code>vllm/vllm-openai:v0.20.2</code></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">GPU</div>
+    <div class="stat-value">RTX 2000 Ada</div>
+    <div class="stat-sub">16 GB VRAM · node <code>whale</code> only</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">API</div>
+    <div class="stat-value">OpenAI-compatible</div>
+    <div class="stat-sub"><code>192.168.0.218</code> / <code>vllm.verticon.com</code></div>
+  </div>
+</div>
+
+<h2 id="what">What It Is</h2>
+<p>vLLM is a self-hosted, OpenAI-API-compatible LLM inference server. It runs one model
+(<code>Qwen/Qwen2.5-7B-Instruct-AWQ</code>) on the cluster's only GPU — an RTX 2000 Ada in <code>whale</code>
+— so anything on the LAN that speaks the OpenAI chat-completions API can get local LLM inference without
+calling out to an external provider. It was a net-new addition (issue tracking: see the vLLM app in
+ArgoCD) — never had a Caddy entry or prior hostname, unlike most other services in this cluster which
+migrated from Caddy to kgateway.</p>
+
+<h3>Why self-hosted</h3>
+<ul>
+  <li>No per-token cost or external API dependency for cluster-internal tooling</li>
+  <li>Data stays on the LAN — relevant for anything processing local/private content</li>
+  <li>A real (if modest) GPU workload to justify and exercise the GPU Operator / NVIDIA device plugin setup</li>
+</ul>
+
+<h2 id="architecture">Architecture</h2>
+<div class="flow">
+  <span class="flow-node">Client</span>
+  <span class="flow-arrow">— OpenAI API request —▶</span>
+  <span class="flow-node">vllm-router (mullet)</span>
+  <span class="flow-arrow">— routes to engine —▶</span>
+  <span class="flow-node">vllm-qwen25-7b engine (whale, GPU)</span>
+</div>
+<p>Deployed via the <a href="https://github.com/vllm-project/production-stack">vllm-project/production-stack</a>
+Helm chart (<code>vllm-gitops/helm/vllm-values.yaml</code>), managed by ArgoCD like everything else in this
+cluster. Two components:</p>
+<ul>
+  <li><strong>Router</strong> (<code>vllm-deployment-router</code>, runs on mullet) — the stable entry point;
+  handles routing to model-serving engines. Chart default resources (1000Mi request/limit) crash-looped
+  with a bare SIGKILL on every cold start after a 2026-07-26 whale reboot — no OOMKilled reason or kernel
+  OOM evidence found, so the exact mechanism is unconfirmed, but raising the memory limit to 1536Mi
+  (request 512Mi) was the standard low-risk mitigation and resolved it.</li>
+  <li><strong>Serving engine</strong> (<code>vllm-qwen25-7b-deployment-vllm</code>, runs on whale) — the
+  actual model process, GPU-bound via <code>nodeSelectorTerms: gpu-class=rtx2000-ada</code> and
+  <code>runtimeClassName: nvidia</code>. Pinned to whale because it's the only node with a GPU.</li>
+</ul>
+
+<h2 id="config">Model Configuration</h2>
+<table>
+  <thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>modelURL</code></td><td><code>Qwen/Qwen2.5-7B-Instruct-AWQ</code></td><td>Pre-quantized AWQ build — fits the 16GB card</td></tr>
+    <tr><td><code>--quantization awq</code></td><td>AWQ INT4</td><td>~4 GiB model weights vs. ~14 GiB unquantized</td></tr>
+    <tr><td><code>--gpu-memory-utilization</code></td><td>0.85</td><td>Leaves headroom on the 16GB card for KV cache + overhead</td></tr>
+    <tr><td><code>maxModelLen</code></td><td>8192 tokens</td><td>Context window ceiling</td></tr>
+    <tr><td><code>dtype</code></td><td>float16</td><td>Standard for this card generation</td></tr>
+    <tr><td><code>enableChunkedPrefill</code> / <code>enablePrefixCaching</code></td><td>both <code>false</code></td><td>Disabled — not needed at this scale</td></tr>
+    <tr><td><code>--enable-auto-tool-choice</code> / <code>--tool-call-parser hermes</code></td><td>enabled</td><td>Required for OpenAI-style function/tool calling (issue #111) — see <a href="#consumers">Consumers</a></td></tr>
+    <tr><td>Storage</td><td>50Gi <code>rook-ceph-block</code> PVC</td><td>Model weights cache</td></tr>
+  </tbody>
+</table>
+<p style="font-size:0.85rem; color:var(--muted);">VRAM budget: ~4 GiB model weights + ~9 GiB KV cache
+headroom, within the 16 GB card at 85% utilization.</p>
+
+<h2 id="access">API Access</h2>
+<table>
+  <thead><tr><th>Access</th><th>Address</th><th>Use</th></tr></thead>
+  <tbody>
+    <tr><td>External (MetalLB)</td><td><code>http://192.168.0.218/v1</code></td><td>API calls from the LAN</td></tr>
+    <tr><td>External (kgateway, HTTPS)</td><td><a href="https://vllm.verticon.com">vllm.verticon.com</a></td><td>Same API, TLS-fronted</td></tr>
+    <tr><td>Internal (cluster)</td><td><code>http://vllm-router-service.vllm.svc.cluster.local/v1</code></td><td>In-cluster clients (e.g. kagent)</td></tr>
+  </tbody>
+</table>
+<p>No API key required on the local network.</p>
+
+<pre># List available models
+curl http://192.168.0.218/v1/models | jq .
+
+# Health check
+curl http://192.168.0.218/health
+
+# Chat completion
+curl http://192.168.0.218/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}],
+    "max_tokens": 100,
+    "temperature": 0.7
+  }' | jq .choices[0].message.content</pre>
+
+<pre># Python (OpenAI SDK) — base_url is the only thing that changes
+from openai import OpenAI
+client = OpenAI(base_url="http://192.168.0.218/v1", api_key="none")
+response = client.chat.completions.create(
+    model="Qwen/Qwen2.5-7B-Instruct-AWQ",
+    messages=[{"role": "user", "content": "What is the capital of France?"}],
+)
+print(response.choices[0].message.content)</pre>
+
+<h2 id="consumers">Consumers</h2>
+<div class="grid-2">
+  <div class="stat-card">
+    <div class="stat-label">Currently</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0">Manual / ad hoc</div>
+    <div class="stat-sub">Direct API calls per the examples above — no automated pipeline consumes it in production yet</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Planned</div>
+    <div class="stat-value" style="font-size:1rem; margin:0.3rem 0"><a href="https://github.com/kagent-dev/kagent">kagent</a></div>
+    <div class="stat-sub">AI agent framework — tool-calling config already added to vLLM for this (issue #111)</div>
+  </div>
+</div>
+<p><a href="https://github.com/kagent-dev/kagent">kagent</a> is a Kubernetes-native AI agent framework
+intended to use this vLLM deployment as its inference backend — this is why <code>--enable-auto-tool-choice</code>
+and the Hermes tool-call parser are configured (Qwen2.5's tokenizer already includes Hermes-style
+tool-call templating, so no custom chat template was needed). Its deployment is in progress, not fully
+live: <code>kagent-crds</code> ArgoCD app is <span class="badge badge-green">Synced/Healthy</span>, but
+<code>kagent-database</code> has a stale <code>ComparisonError</code> (references
+<code>kagent-gitops/database</code>, which doesn't exist in the repo yet) and no pods are currently
+running in the <code>kagent</code> namespace. See <code>scripts/README.md</code>'s kagent secrets
+section for the bootstrap steps once that's picked back up. Also relevant: kagent's
+<code>kagent-grafana-mcp</code> component needs a Grafana service-account token to query
+Prometheus/Grafana via MCP for its observability-agent role (also documented in
+<code>scripts/README.md</code>).</p>
+
+<h2 id="ops">Operational Commands</h2>
+<pre># Pod placement and status
+just vllm-status
+kubectl get pods -n vllm -o wide
+
+# Run vLLM chainsaw tests (ArgoCD health, pod, /health, /v1/models, chat completion)
+just test-vllm
+
+# GPU allocation on whale
+just gpu-status</pre>
+
+<hr>
+<p style="font-size:0.82rem; color:var(--muted);">
+  <a href="index.html">← ops-microk8s docs</a> &nbsp;·&nbsp;
+  <a href="https://vllm.verticon.com">vllm.verticon.com</a> &nbsp;·&nbsp;
+  <a href="https://github.com/vllm-project/production-stack">production-stack chart</a>
+</p>
+
+</div>
+</body>
+</html>

@@ -427,6 +427,10 @@ kured-docs:
 notifications-docs:
     xdg-open docs/notifications.html
 
+# Open the vLLM reference in a browser
+vllm-docs:
+    xdg-open docs/vllm.html
+
 # ── Backups ───────────────────────────────────────────────────────────────────
 
 # Show restic backup timer status and latest snapshots
