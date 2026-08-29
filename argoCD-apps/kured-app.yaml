@@ -19,6 +19,10 @@ spec:
       ref: values
       path: kured-gitops/cronjob
 
+    - repoURL: https://github.com/jconlon/ops-microk8s
+      targetRevision: HEAD
+      path: kured-gitops/monitoring
+
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system

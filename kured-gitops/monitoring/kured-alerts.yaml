@@ -1,0 +1,59 @@
+# Prometheus alerting for stuck kured reboots (issue #43).
+#
+# kured has no dedicated Service (DaemonSet, metrics-only) — a PodMonitor
+# scrapes the pods directly rather than needing to create one.
+#
+# Alert threshold rationale: the reboot window (kured-values.yaml) is
+# 02:00-06:00 America/New_York, checked hourly. A node that needs a reboot
+# just after the window closes won't get one until the next night's
+# window — worst case ~20h of legitimate waiting, plus up to 1h of
+# check-period slop. `for: 48h` (two full reboot-window cycles) gives
+# real margin above that normal-case ceiling before firing.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kured
+  namespace: kube-system
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kured
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 1m
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kured-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+spec:
+  groups:
+    - name: kured
+      rules:
+        - alert: KuredRebootStuck
+          expr: kured_reboot_required == 1
+          for: 48h
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.node }} has needed a reboot for over 48h"
+            description: >-
+              kured has not completed a reboot on {{ $labels.node }} within two full
+              reboot-window cycles (02:00-06:00 America/New_York). This usually means
+              a drain is stuck (PDB blocking eviction, a pod won't terminate) or kured
+              itself is wedged — see issue #42 for the original incident and
+              docs/kured.html for known kured issues (including a separate recurring
+              memory leak, issue #101).
+            runbook: >-
+              kubectl describe node {{ $labels.node }} | grep -A5 Taints;
+              kubectl get pods -A --field-selector spec.nodeName={{ $labels.node }} | grep -v Running;
+              kubectl logs -n kube-system -l app.kubernetes.io/name=kured --field-selector spec.nodeName={{ $labels.node }} --tail=100
