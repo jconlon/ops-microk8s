@@ -60,13 +60,18 @@ spec:
           echo "$OUTPUT"
 
           LEADER=$(echo "$OUTPUT" | awk '/^LeaderId:/ {print $2}')
-          VOTERS=$(echo "$OUTPUT" | awk '/^CurrentVoters:/ {print $2}')
+          # CurrentVoters format varies by Kafka version: a simple list like
+          # "[0,1,2]" pre-4.x, or a JSON-ish list of objects like
+          # '[{"id": 0, "endpoints": [...]}, ...]' on Kafka 4.x — capture the
+          # whole line (not just awk $2) and match either shape below.
+          VOTERS=$(echo "$OUTPUT" | sed -n 's/^CurrentVoters:[[:space:]]*//p')
 
           [ -n "$LEADER" ] && [ "$LEADER" != "-1" ] || {
             echo "No KRaft leader elected (LeaderId=$LEADER)"; exit 1; }
-          echo "$VOTERS" | grep -q "0" || { echo "Voter 0 missing from quorum: $VOTERS"; exit 1; }
-          echo "$VOTERS" | grep -q "1" || { echo "Voter 1 missing from quorum: $VOTERS"; exit 1; }
-          echo "$VOTERS" | grep -q "2" || { echo "Voter 2 missing from quorum: $VOTERS"; exit 1; }
+          for id in 0 1 2; do
+            echo "$VOTERS" | grep -qE "\"id\":[[:space:]]*$id\b|[^0-9]$id[],]" || {
+              echo "Voter $id missing from quorum: $VOTERS"; exit 1; }
+          done
           echo "KRaft quorum: leader=$LEADER voters=$VOTERS"
 
   - name: produce-consume-round-trip
