@@ -1,5 +1,12 @@
 # Strimzi Kafka Operator Helm Values
 
+# UseConnectBuildWithBuildah became the default KafkaConnect build engine in
+# Strimzi 1.0.0. Buildah's rootless overlay mount fails under this cluster's
+# pod security policy ("remount /: permission denied"). Disable it to keep
+# the Kaniko-based build path (kafka-gitops/connect/kafka-connect.yaml's
+# spec.build already assumes Kaniko). See issue #127.
+featureGates: "-UseConnectBuildWithBuildah"
+
 # Resource limits for the operator
 resources:
   requests:
