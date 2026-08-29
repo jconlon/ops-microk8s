@@ -121,12 +121,14 @@ spec:
   # Bumped from 512Mi/1Gi during the Strimzi 1.2.0/Kafka 4.3.1 upgrade
   # (issue #127) — the previous 1Gi limit was insufficient once on 4.3.1
   # with this plugin set (JDBC source, S3 sink, bundled Confluent/Avro
-  # serialization jars): kafka-connect-connect-0 was repeatedly OOMKilled,
-  # and the surviving pod was observed sitting at ~1013Mi RSS, right at the
-  # old ceiling.
+  # serialization jars): kafka-connect-connect-0 was repeatedly OOMKilled.
+  # First bump to 768Mi/1536Mi still left only ~60Mi headroom at idle
+  # (observed 1473Mi RSS on a fresh, traffic-free cluster — JVM heap scales
+  # with the container limit, so raising it raises usage too) — went
+  # straight to 1Gi/2Gi for real margin under actual message traffic.
   resources:
     requests:
       cpu: 250m
-      memory: 768Mi
+      memory: 1Gi
     limits:
-      memory: 1536Mi
+      memory: 2Gi
