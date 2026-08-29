@@ -17,13 +17,18 @@ spec:
   statusStorageTopic: kafka-connect-cluster-status
   offsetStorageTopic: kafka-connect-cluster-offsets
 
+  # Kafka 4.x moved from Log4j 1.x to Log4j2 — properties use the
+  # logger.<id>.name / logger.<id>.level pair syntax, not log4j.logger.<class>.
   logging:
     type: inline
     loggers:
-      log4j.rootLogger: "INFO"
-      log4j.logger.io.aiven.connect.jdbc: "INFO"
-      log4j.logger.io.aiven.kafka.connect.s3: "INFO"
-      log4j.logger.org.apache.kafka.connect.runtime.WorkerTask: "INFO"
+      rootLogger.level: "INFO"
+      logger.jdbc.name: "io.aiven.connect.jdbc"
+      logger.jdbc.level: "INFO"
+      logger.s3.name: "io.aiven.kafka.connect.s3"
+      logger.s3.level: "INFO"
+      logger.workertask.name: "org.apache.kafka.connect.runtime.WorkerTask"
+      logger.workertask.level: "INFO"
 
   # Strimzi builds a custom image with the listed plugins and pushes to Harbor.
   # The build runs as a Pod in kafka-system using kaniko; re-triggers when
