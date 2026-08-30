@@ -27,8 +27,6 @@ spec:
             enabled: false
           service:
             type: LoadBalancer
-          extraArgs:
-            - --grpc-web
 
         notifications:
           enabled: false
