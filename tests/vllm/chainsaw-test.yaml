@@ -64,7 +64,7 @@ spec:
           echo "Models endpoint OK"
 
   - name: vllm-openai-chat-completion
-    description: OpenAI-compatible chat completion returns a valid response
+    description: OpenAI-compatible chat completion returns correct, complete, non-degenerate output
     try:
     - script:
         content: |
@@ -78,5 +78,19 @@ spec:
               "temperature": 0
             }')
           echo "$RESPONSE"
-          echo "$RESPONSE" | grep -q '"choices"' || { echo "No choices in response"; exit 1; }
-          echo "Chat completion OK"
+          echo "$RESPONSE" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          choice = data['choices'][0]
+          content = choice['message']['content']
+          finish_reason = choice['finish_reason']
+          prompt_tokens = data['usage']['prompt_tokens']
+          completion_tokens = data['usage']['completion_tokens']
+
+          assert content.strip(), 'content is empty'
+          assert 'ok' in content.strip().lower(), f'unexpected content: {content!r}'
+          assert finish_reason == 'stop', f'unexpected finish_reason: {finish_reason!r}'
+          assert prompt_tokens > 0, f'prompt_tokens not > 0: {prompt_tokens}'
+          assert completion_tokens > 0, f'completion_tokens not > 0: {completion_tokens}'
+          print(f'Chat completion OK: content={content!r} finish_reason={finish_reason} prompt_tokens={prompt_tokens} completion_tokens={completion_tokens}')
+          "
