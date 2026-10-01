@@ -74,9 +74,13 @@ spec:
     try:
     - script:
         content: |
+          # Curl the ClusterIP directly (as tests/vllm does) rather than via a
+          # throwaway `kubectl run --rm -i` pod — that pattern flaked on attach
+          # races ("couldn't attach to pod ... falling back to streaming logs")
+          # and on $RANDOM pod-name collisions with still-terminating pods.
           SVC=$(kubectl get svc jellyfin -n jellyfin -o jsonpath='{.spec.clusterIP}')
-          CODE=$(kubectl run jellyfin-health-check-$RANDOM --image=curlimages/curl --rm -i --restart=Never --quiet -- \
-            curl -s -o /dev/null -w '%{http_code}' http://$SVC:8096/health)
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+            --retry 3 --retry-delay 2 --retry-all-errors http://$SVC:8096/health)
           [ "$CODE" = "200" ] || { echo "Expected HTTP 200, got: $CODE"; exit 1; }
           echo "Health check passed"
 
