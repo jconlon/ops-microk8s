@@ -7,8 +7,22 @@ configuration:
   endTime: "06:00"
   timeZone: "America/New_York"
 
-  # Standard Ubuntu reboot sentinel file (written by unattended-upgrades)
+  # Standard Ubuntu reboot sentinel file (written by unattended-upgrades).
+  # Ignored by kured while rebootSentinelCommand is set; kept for reference.
   rebootSentinel: /var/run/reboot-required
+
+  # Reboot when the sentinel file exists OR the running kernel is older than
+  # the newest installed kernel (issue #133). On Livepatch nodes (mullet,
+  # trout, whale, tuna, gold) update-notifier never writes the sentinel file
+  # for kernel packages, so the file alone misses every kernel update there.
+  # kured runs this via nsenter in the host mount namespace, shlex-split (no
+  # shell, hence sh -c). Exit 0 = reboot, exit 1 = no reboot. If linux-version
+  # yields nothing it exits 1 (fail safe, no reboot loop).
+  # The chart only renders --reboot-sentinel-command when
+  # useRebootSentinelHostPath is false, and inserts the value unquoted into
+  # YAML, so the command must not contain ": " or " #".
+  useRebootSentinelHostPath: false
+  rebootSentinelCommand: sh -c 'test -e /var/run/reboot-required && exit 0; k=$(linux-version list 2>/dev/null | linux-version sort | tail -n1); test -n "$k" && test "$k" != "$(uname -r)" && exit 0; exit 1'
 
   # Grace period per pod in seconds (5 min is generous for Ceph OSD shutdown).
   # drainTimeout must be >> drainGracePeriod * number of pods to evict.

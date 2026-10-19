@@ -1,6 +1,11 @@
 # Kured — Kubernetes Reboot Daemon
 
-Automated rolling node reboots for the MicroK8s cluster. Kured watches for `/var/run/reboot-required` (written by unattended-upgrades) and safely drains and reboots one node at a time.
+Automated rolling node reboots for the MicroK8s cluster. Kured safely drains and reboots one node at a time when a node needs a reboot, meaning either:
+
+- `/var/run/reboot-required` exists (written by update-notifier during unattended-upgrades), **or**
+- the running kernel (`uname -r`) is older than the newest installed kernel (`linux-version list | linux-version sort`).
+
+The kernel check is required because on Livepatch nodes update-notifier deliberately **never** writes `/var/run/reboot-required` for kernel packages. It defers to Livepatch, and Livepatch's own apt hook only ever removes the flag. Without the check, Livepatch nodes stay on old kernels forever (issue #133). Both checks run as a single `rebootSentinelCommand` in `helm/kured-values.yaml`.
 
 ## Architecture
 
@@ -24,7 +29,8 @@ kubectl apply -f argoCD-apps/kured-app.yaml
 See `helm/kured-values.yaml`:
 - **Reboot window**: 02:00–06:00 Eastern
 - **Check period**: every 1 hour
-- **Drain timeout**: 30 minutes (generous for Ceph workloads)
+- **Reboot trigger**: `rebootSentinelCommand` (sentinel file **or** newer installed kernel). This requires `useRebootSentinelHostPath: false`, otherwise the chart silently drops the command.
+- **Drain timeout**: 2 hours (generous for Ceph workloads)
 - **Tolerations**: runs on control plane nodes
 
 ## Node Setup (one-time, run on each node)
@@ -54,6 +60,8 @@ ssh <node> sudo bash setup-livepatch.sh <your-pro-token>
 - `whale` — Control Plane
 - `tuna` — Worker
 - `gold` — Ceph Storage
+
+Livepatch nodes still reboot via kured when a new kernel is installed, through the kernel-version check above. Livepatch covers the gap between the kernel install and the next reboot window.
 
 **kured-only nodes** (no Livepatch — Ceph tolerates rolling reboots):
 - `squid` — Ceph Storage
