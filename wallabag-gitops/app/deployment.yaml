@@ -22,7 +22,7 @@ spec:
       enableServiceLinks: false
       containers:
         - name: wallabag
-          image: wallabag/wallabag:latest
+          image: wallabag/wallabag:2.6.14
           ports:
             - containerPort: 80
               name: http
@@ -58,6 +58,10 @@ spec:
               mountPath: /var/www/wallabag/web/assets/images
             - name: graby-youtube-config
               mountPath: /var/www/wallabag/vendor/j0k3r/graby-site-config/youtube.com.txt
+              subPath: youtube.com.txt
+              readOnly: true
+            - name: graby-youtube-config
+              mountPath: /var/www/wallabag/vendor/j0k3r/graby-site-config/youtu.be.txt
               subPath: youtube.com.txt
               readOnly: true
       volumes:

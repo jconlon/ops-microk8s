@@ -15,12 +15,41 @@ data:
     # This causes graby to follow YouTube's oEmbed XML endpoint, resulting in the oEmbed URL
     # being stored as the entry URL instead of the real watch URL.
     # This override removes that directive.
+    #
+    # Also mounted over youtu.be.txt (see deployment.yaml): YouTube serves the watch page
+    # directly at youtu.be short links, so they need the same rules.
+    #
+    # graby rejects an attribute node as body ("Body can not be an attribute"), and the
+    # description only exists in <meta content> attributes and the player JSON. So the
+    # find_string/replace_string pairs below rewrite the raw HTML before parsing (issue #135):
+    #   - og:video:url meta  -> <iframe id="wb-yt-player"> embed
+    #   - "shortDescription" -> <div id="wb-yt-desc"> (full description, not the truncated meta)
+    # The pairs are applied in order; keep the JSON unescaping after the description markers.
     http_header(User-Agent): Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
 
     title: //meta[@property='og:title']/@content
-    body: //meta[@property='og:description']/@content
+
+    find_string: <meta property="og:video:url" content="
+    replace_string: <iframe id="wb-yt-player" width="480" height="360" frameborder="0" allowfullscreen="allowfullscreen" src="
+    find_string: "><meta property="og:video:secure_url"
+    replace_string: "></iframe><meta property="og:video:secure_url"
+
+    find_string: "shortDescription":"
+    replace_string: "x":""}</script><div id="wb-yt-desc"><p>
+    find_string: ","isCrawlable":
+    replace_string: </p></div><script>{"y":
+    find_string: \n
+    replace_string: <br>
+    find_string: \"
+    replace_string: "
+    find_string: \u0026
+    replace_string: &amp;
+
+    body: //iframe[@id='wb-yt-player'] | //div[@id='wb-yt-desc']
 
     prune: no
     tidy: no
+    # Never fall back to readability autodetection: on a YouTube page it grabs page script.
+    autodetect_on_failure: no
 
     test_url: https://www.youtube.com/watch?v=GjENnyQupow
