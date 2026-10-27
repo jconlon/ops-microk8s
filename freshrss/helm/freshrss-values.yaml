@@ -1,8 +1,16 @@
 image:
   repository: freshrss/freshrss
-  tag: "1.29.1"
+  tag: "1.30.4"
   type: alpine
   pullPolicy: IfNotPresent
+
+# FreshRSS 1.30+ blocks feed fetches to private/local networks by default (issue #137).
+# Allow only the in-cluster/LAN hosts our feeds and extensions use:
+#   - rss-bridge: Associated Press feed + xExtension-RssBridge
+#   - wallabag (192.168.0.224 via kgateway): wallabag Atom feeds + xExtension-wallabag-button
+extraEnv:
+  - name: INTERNAL_HOST_ALLOWLIST
+    value: "rssbridge.rssbridge.svc.cluster.local:80 wallabag.verticon.com:443"
 
 deploymentStrategy:
   type: Recreate
