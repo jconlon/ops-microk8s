@@ -1,6 +1,7 @@
 #!/usr/bin/env nu
 
-const SCHEMA_REGISTRY_URL = "http://192.168.0.214:8081"
+# Apicurio Registry, Confluent-compatible API (replaced Confluent Schema Registry)
+const SCHEMA_REGISTRY_URL = "https://schema-registry.verticon.com/apis/ccompat/v6"
 
 # List all registered schema subjects
 #
@@ -11,12 +12,11 @@ const SCHEMA_REGISTRY_URL = "http://192.168.0.214:8081"
 #   ╭───┬──────────────────────────────────╮
 #   │ # │             subject              │
 #   ├───┼──────────────────────────────────┤
-#   │ 0 │ freshrss.articles.raw-value      │
+#   │ 0 │ atom.entries-value      │
 #   ╰───┴──────────────────────────────────╯
 #
 def "main kafka schema-list" [] {
     http get $"($SCHEMA_REGISTRY_URL)/subjects"
-    | from json
     | each { |s| { subject: $s } }
 }
 
@@ -26,12 +26,12 @@ def "main kafka schema-list" [] {
 #   ops kafka schema-get <subject>
 #
 # Parameters:
-#   subject: string  — Schema subject name (e.g. "freshrss.articles.raw-value")
+#   subject: string  — Schema subject name (e.g. "atom.entries-value")
 #
 def "main kafka schema-get" [
     subject: string  # Schema subject name
 ] {
-    let result = (http get $"($SCHEMA_REGISTRY_URL)/subjects/($subject)/versions/latest" | from json)
+    let result = (http get $"($SCHEMA_REGISTRY_URL)/subjects/($subject)/versions/latest")
     {
         subject:    $result.subject
         version:    $result.version
@@ -49,7 +49,6 @@ def "main kafka schema-versions" [
     subject: string  # Schema subject name
 ] {
     http get $"($SCHEMA_REGISTRY_URL)/subjects/($subject)/versions"
-    | from json
     | each { |v| { version: $v } }
 }
 
@@ -59,5 +58,5 @@ def "main kafka schema-versions" [
 #   ops kafka schema-config
 #
 def "main kafka schema-config" [] {
-    http get $"($SCHEMA_REGISTRY_URL)/config" | from json
+    http get $"($SCHEMA_REGISTRY_URL)/config"
 }
