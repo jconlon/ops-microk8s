@@ -80,16 +80,16 @@ Loki log analysis commands via logcli. All commands query `http://192.168.0.220`
 | Command | Description |
 |---|---|
 | `ops loki node-events <node>` | Query syslog for a node (`--since 24h`, `--limit 100`, `--filter ""`) |
-| `ops loki shutdown-events <node>` | Power/shutdown/reboot events + boot markers (`--since 7d`) |
+| `ops loki shutdown-events <node>` | Timeline of `kured` (drain/trigger/uncordon), `shutdown` (logind/systemd reboot, power-off, power key) and `boot` (kernel banner, startup finished) events (`--since 7d`). A `boot` with no `shutdown` before it means power loss, a crash or a hard reset |
 | `ops loki idrac <node>` | iDRAC hardware events from a Dell R320 node (`--since 7d`) |
-| `ops loki reboot-history` | Boot times + shutdown event count for all nodes (`--since 7d`) |
+| `ops loki reboot-history` | Boot times + `boots` / `clean_shutdowns` / `unclean` counts for all nodes (`--since 7d`). `unclean` > 0 means a boot with no orderly shutdown before it |
 | `ops loki tail <node>` | Live tail syslog for a node (`--filter ""`) |
 
 ```bash
 # Investigate puffer shutdowns over the last 7 days
 ops loki shutdown-events puffer --since 7d
 
-# Show all node boot times and how many times each shut down
+# Show all node boot times, boot counts, and any unclean (non-orderly) boots
 ops loki reboot-history --since 30d
 
 # Check iDRAC events for all Dell nodes
