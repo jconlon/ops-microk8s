@@ -64,7 +64,7 @@ Projects may open issues here when they need cluster-level support (secrets, sto
 
 ### Cluster Configuration
 
-- **Platform**: MicroK8s v1.32.9 on Ubuntu
+- **Platform**: MicroK8s v1.32.13 on Ubuntu
 - **Nodes**: 8-node HA cluster (3 control plane nodes: mullet, trout, whale)
   - Original nodes: mullet (Ubuntu 24.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
   - Dell R320 nodes (Ceph storage): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
@@ -80,14 +80,14 @@ Projects may open issues here when they need cluster-level support (secrets, sto
 - **Kafka**: Strimzi operator, 3-broker KRaft cluster (no ZooKeeper), `kafka-system` namespace
   - External (MetalLB): `192.168.0.213:9094` — use IP, not DNS (broker reconnect requires it)
   - Internal: `kafka-kafka-bootstrap.kafka-system.svc.cluster.local:9092`
-  - Confluent Schema Registry (legacy, to be deprecated): `192.168.0.214:8081`, running in `kafka-system`
-- **Apicurio Registry**: v2.6.4.Final replacing Confluent Schema Registry; `apicurio-registry` namespace
+- **Apicurio Registry**: v2.6.4.Final — the cluster's only schema registry (Confluent Schema Registry at `192.168.0.214:8081` has been decommissioned); `apicurio-registry` namespace
+  - Query from the CLI with `ops kafka schema-list` / `schema-get` / `schema-versions` / `schema-config` (via the ccompat API)
   - REST API: `http://192.168.0.223:8080/apis/registry/v2`
-  - Confluent-compatible endpoint (for pipeline cutover): `http://192.168.0.223:8080/apis/ccompat/v6`
+  - Confluent-compatible endpoint (used by the freshrss pipelines and `ops kafka`): `http://192.168.0.223:8080/apis/ccompat/v6`
   - UI: `http://192.168.0.223:8080/ui`
   - Backed by `production-postgresql/apicurio` database; credentials via `teller/.teller-apicurio.yml`
   - Operator: `quay.io/apicurio/apicurio-registry-operator:1.1.3` (v2, UBI8 — v3 requires x86-64-v3 CPU, incompatible with cluster nodes)
-  - Phase 2 pipeline cutover tracked in: freshrss#59, freshrss-streams#12
+  - Phase 2 pipeline cutover completed June 2026 (freshrss#59, freshrss-streams#12 closed)
 - **Loki**: Grafana Loki log aggregation (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80; external access via https://loki.verticon.com (see kgateway entry below)
 - **Argo Workflows**: CI/CD engine at https://workflows.verticon.com; `argo-workflows` namespace
   - `image-build-push` ClusterWorkflowTemplate — builds images via Kaniko and pushes to Harbor; callable from any namespace

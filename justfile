@@ -11,7 +11,7 @@ default:
 test:
     chainsaw test tests/
 
-# Run a specific test suite (cluster, storage, gpu, postgresql, argocd)
+# Run a specific test suite (one per directory under tests/, e.g. cluster, kafka, kgateway)
 test-suite suite:
     chainsaw test tests/{{suite}}
 

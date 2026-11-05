@@ -10,6 +10,8 @@ scripts/
 ├── argocd.nu                    # ArgoCD management commands (nushell)
 ├── cluster.nu                   # Cluster health/status commands (nushell)
 ├── freshrss.nu                  # FreshRSS database access (nushell)
+├── kafka.nu                     # Schema registry queries via Apicurio ccompat API (nushell)
+├── loki.nu                      # Loki syslog/journal queries (nushell)
 ├── decode_atom_entries.py       # Avro decoder for the Ceph atom-entries bucket, used by freshrss.nu update-review
 ├── test_decode_atom_entries.py  # pytest unit tests for decode_atom_entries.py
 ├── requirements.txt             # Python deps for decode_atom_entries.py (fastavro, pytest)
@@ -125,6 +127,25 @@ Cluster health and status commands. Queries Prometheus — no SSH required.
 ```bash
 ops cluster node-uptime
 ops cluster node-status
+```
+
+---
+
+### kafka.nu
+
+Schema registry queries against Apicurio Registry's Confluent-compatible API (`https://schema-registry.verticon.com/apis/ccompat/v6`). The old Confluent Schema Registry (`192.168.0.214:8081`) has been decommissioned.
+
+| Command | Description |
+|---|---|
+| `ops kafka schema-list` | List all registered schema subjects |
+| `ops kafka schema-get <subject>` | Show the latest schema for a subject (schema parsed into a record) |
+| `ops kafka schema-versions <subject>` | List all versions of a subject |
+| `ops kafka schema-config` | Show global compatibility level |
+
+```bash
+ops kafka schema-list
+ops kafka schema-get atom.entries-value
+ops kafka schema-versions atom.entries-value
 ```
 
 ---

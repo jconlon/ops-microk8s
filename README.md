@@ -21,45 +21,54 @@ Projects may open issues here when they need cluster-level support (secrets, sto
 
 ## Cluster Overview
 
-```bash
-☸ microk8s (monitoring) in ops-microk8s [✘!?] took 8m0s
-✗ k get no
-NAME     STATUS   ROLES    AGE     VERSION
-mullet   Ready    <none>   30d     v1.32.3
-shamu    Ready    <none>   22d     v1.32.3
-trout    Ready    <none>   22d     v1.32.3
-tuna     Ready    <none>   4d20h   v1.32.3
-whale    Ready    <none>   22d     v1.32.3
+Snapshot taken 2026-11-04. For live state, run `just node-status`, `just test-suite cluster`, or the commands below.
 
-➜ microk8s status
+```bash
+➜ kubectl get nodes -o wide   # (columns trimmed)
+NAME     STATUS   AGE    VERSION    INTERNAL-IP     OS-IMAGE             KERNEL-VERSION
+carp     Ready    338d   v1.32.13   192.168.0.137   Ubuntu 24.04.4 LTS   6.8.0-147-generic
+gold     Ready    344d   v1.32.13   192.168.0.129   Ubuntu 24.04.5 LTS   6.8.0-147-generic
+mullet   Ready    509d   v1.32.13   192.168.0.101   Ubuntu 24.04.5 LTS   6.8.0-147-generic
+puffer   Ready    339d   v1.32.13   192.168.0.135   Ubuntu 24.04.4 LTS   6.8.0-147-generic
+squid    Ready    343d   v1.32.13   192.168.0.133   Ubuntu 24.04.4 LTS   6.8.0-147-generic
+trout    Ready    501d   v1.32.13   192.168.0.102   Ubuntu 24.04.5 LTS   6.8.0-147-generic
+tuna     Ready    483d   v1.32.13   192.168.0.103   Ubuntu 24.04.5 LTS   6.8.0-147-generic
+whale    Ready    501d   v1.32.13   192.168.0.107   Ubuntu 22.04.5 LTS   6.8.0-138-generic
+
+➜ microk8s status   # (disabled addons omitted)
 microk8s is running
 high-availability: yes
   datastore master nodes: 192.168.0.101:19001 192.168.0.107:19001 192.168.0.102:19001
   datastore standby nodes: none
 addons:
   enabled:
+    cert-manager         # (core) Cloud native certificate management
     dns                  # (core) CoreDNS
+    gpu                  # (core) Alias to nvidia add-on
     ha-cluster           # (core) Configure high availability on the current node
     helm                 # (core) Helm - the package manager for Kubernetes
     helm3                # (core) Helm 3 - the package manager for Kubernetes
     metallb              # (core) Loadbalancer for your Kubernetes cluster
+    metrics-server       # (core) K8s Metrics Server for API access to service metrics
+    nvidia               # (core) NVIDIA hardware (GPU and network) support
+    rook-ceph            # (core) Distributed Ceph storage using Rook
 
 ➜ kubectl get nodes -l node.kubernetes.io/microk8s-controlplane=microk8s-controlplane
-NAME     STATUS   ROLES    AGE   VERSION
-mullet   Ready    <none>   30d   v1.32.3
-trout    Ready    <none>   22d   v1.32.3
-whale    Ready    <none>   22d   v1.32.3
+NAME     STATUS   ROLES    AGE    VERSION
+mullet   Ready    <none>   509d   v1.32.13
+trout    Ready    <none>   501d   v1.32.13
+whale    Ready    <none>   501d   v1.32.13
 ```
 
 ## Architecture
 
 ### Cluster Configuration
 
-- **Platform**: MicroK8s v1.32.9 on Ubuntu
+- **Platform**: MicroK8s v1.32.13 on Ubuntu
 - **Nodes**: 8-node HA cluster (3 control plane nodes: mullet, trout, whale)
   - Original nodes: mullet (Ubuntu 24.04), trout (Ubuntu 24.04), tuna (Ubuntu 24.04), whale (Ubuntu 22.04)
   - Dell R320 nodes (Ceph storage): gold (Ubuntu 24.04), squid (Ubuntu 24.04), puffer (Ubuntu 24.04), carp (Ubuntu 24.04)
-- **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.220
+- **LoadBalancer**: MetalLB with IP range 192.168.0.200-192.168.0.230
 - **Storage**: Rook/Ceph distributed storage with 3-way replication across Dell R320 nodes (16TB total capacity)
 
 ### Key Components
@@ -105,8 +114,8 @@ No special prerequisites required for Rook/Ceph storage nodes. The Dell R320 nod
 microk8s enable dns
 
 # Pihole is reserving range 192.168.0.100-192.168.0.150
-# Use 192.168.0.200-192.168.0.220 for load balancer
-microk8s enable metallb:192.168.0.200-192.168.0.220
+# Use 192.168.0.200-192.168.0.230 for load balancer
+microk8s enable metallb:192.168.0.200-192.168.0.230
 ```
 
 ## ArgoCD GitOps Setup

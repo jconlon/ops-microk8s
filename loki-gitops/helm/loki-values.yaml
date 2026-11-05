@@ -1,7 +1,8 @@
 # Loki — monolithic single-binary mode
 # Ceph RGW S3 backend for log chunks and TSDB index
 # MetalLB LoadBalancer at 192.168.0.220
-# Accessible at http://192.168.0.220 (Caddy terminates TLS externally as loki.verticon.com)
+# Plain HTTP at http://192.168.0.220 — kept for external Promtail pushes and logcli/ops loki
+# HTTPS at https://loki.verticon.com via kgateway (cluster-gateway HTTPRoute, TLS terminated there)
 # S3 credentials injected via loki-s3-credentials secret (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
 # Create secret before applying: see scripts/README.md "Loki S3 credentials bootstrap"
 
@@ -68,7 +69,7 @@ singleBinary:
     - secretRef:
         name: loki-s3-credentials
 
-# Expose Loki via MetalLB LoadBalancer — HTTP only (Caddy terminates TLS)
+# Expose Loki via MetalLB LoadBalancer — HTTP only (kgateway terminates TLS for loki.verticon.com)
 gateway:
   enabled: true
   service:
