@@ -42,8 +42,9 @@ def "main cluster node-uptime" [
 
 # Show node uptime and kured reboot-required status for all cluster nodes
 #
-# Combines Prometheus uptime data with kured pod log inspection to show
-# which nodes are pending a reboot. No SSH required.
+# Queries Prometheus for uptime and kured's kured_reboot_required metric to
+# show which nodes are pending a reboot. "Unknown" means no kured metric was
+# scraped for that node (kured pod down or not scraped). No SSH required.
 #
 # Usage:
 #   ops cluster node-status
@@ -78,24 +79,17 @@ def "main cluster node-status" [
         | sort-by node
     )
 
-    let kured_pods = (
-        ^kubectl get pods -n kube-system -l app.kubernetes.io/name=kured -o json
-        | from json
-        | get items
-        | each { |p| { pod: $p.metadata.name, node: $p.spec.nodeName } }
-    )
-
+    # kured exports kured_reboot_required{node} = 1 when its sentinel command
+    # (reboot-required flag OR newer kernel installed) fires, 0 otherwise.
+    let reboot_query = 'kured_reboot_required'
     let reboot_data = (
-        $kured_pods | each { |p|
-            let log = (do { ^kubectl logs -n kube-system $p.pod --tail=5 } | complete | get stdout | lines | str join " ")
-            let required = if ($log | str contains "Reboot required") and not ($log | str contains "not required") {
-                "Yes"
-            } else if ($log | str contains "Reboot not required") {
-                "No"
-            } else {
-                "Unknown"
+        http get $"($url)/api/v1/query?query=($reboot_query | url encode)"
+        | get data.result
+        | each { |r|
+            {
+                node: $r.metric.node
+                reboot_required: (if ($r.value.1 == "1") { "Yes" } else { "No" })
             }
-            { node: $p.node, reboot_required: $required }
         }
     )
 
