@@ -184,6 +184,24 @@ spec:
               done
               echo "No new git-push workflow detected within 60s"
               exit 1
+      # Delete the Workflows this test's synthetic webhooks triggered (issue #138).
+      # Both payloads (health-check from argo-events-webhook-reachable, git-push-test
+      # from this step) produce git-push-build Workflows that can never clone, so
+      # left alone they sit as Init:Error pods for the 3-day failure TTL.
+      # Runs whether the try block passed or failed. Matching on the sensor label
+      # plus the payload "service" name prefixes leaves real git-push builds alone.
+      finally:
+        - script:
+            timeout: 60s
+            content: |
+              WFS=$(kubectl get workflow -n argo-workflows \
+                -l events.argoproj.io/sensor=git-push -o name 2>/dev/null \
+                | grep -E '/(health-check|git-push-test)' || true)
+              if [ -z "$WFS" ]; then
+                echo "No test-triggered workflows to clean up"
+                exit 0
+              fi
+              echo "$WFS" | xargs kubectl delete -n argo-workflows --wait=false
 
     - name: argo-events-clusterworkflowtemplate-exists
       description: image-build-push ClusterWorkflowTemplate exists (cluster-scoped)
