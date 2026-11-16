@@ -524,7 +524,7 @@ Automated incremental backups of `/home/jconlon` to Ceph RGW object storage usin
 
 ### Overview
 
-- **Repository**: `s3:http://192.168.0.204/restic-backups` (Ceph RGW)
+- **Repository**: `s3:http://192.168.0.204/restic-backups` (Ceph RGW). This is the `rook-ceph-rgw-external` MetalLB IP, used directly rather than `https://s3.verticon.com`; the restic config is owned by the dotfiles repo, so change it there if it ever moves
 - **Source**: `/home/jconlon` (excludes Music, Downloads, caches, build artifacts)
 - **Secrets**: Injected at runtime via teller from Google Secret Manager — no credentials on disk
 - **Teller config**: `~/dotfiles/restic/restic/.teller-restic-ceph.yml`

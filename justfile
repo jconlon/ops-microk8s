@@ -27,20 +27,7 @@ test-freshrss-scripts:
 
 # Verify puffer ACPI power key mitigations are in place (issue #59)
 puffer-powerkey-status:
-    #!/usr/bin/env bash
-    echo "Checking puffer power key mitigations..."
-    kubectl debug node/puffer --image=alpine:latest --quiet --rm \
-      -- sh -c '
-        grep -q "HandlePowerKey=ignore" /host/etc/systemd/logind.conf \
-          && echo "PASS  HandlePowerKey=ignore" \
-          || echo "FAIL  HandlePowerKey=ignore missing"
-        grep -q "HandlePowerKeyLongPress=ignore" /host/etc/systemd/logind.conf \
-          && echo "PASS  HandlePowerKeyLongPress=ignore" \
-          || echo "FAIL  HandlePowerKeyLongPress=ignore missing"
-        test -f /host/etc/udev/rules.d/99-ignore-power-button.udev \
-          && echo "PASS  udev power button suppression rule" \
-          || echo "FAIL  udev rule missing"
-      ' 2>/dev/null
+    ops cluster puffer-powerkey
 
 # Show node uptime and reboot-required status
 node-status:
@@ -56,7 +43,7 @@ ceph-status:
 
 # Show all non-running pods across the cluster
 pods-unhealthy:
-    kubectl get pods -A --no-headers | grep -v Running | grep -v Completed
+    ops cluster pods-unhealthy
 
 # ── ArgoCD ────────────────────────────────────────────────────────────────────
 
@@ -98,148 +85,10 @@ argo-status:
 test-argo-workflows:
     chainsaw test tests/argo-workflows
 
-# End-to-end CI pipeline validation. Builds a minimal Alpine image using the
-# image-build-push WorkflowTemplate, verifies the result in Harbor, then cleans up.
-# Run manually after changes to the CI pipeline — not part of the routine chainsaw suite
-# because Kaniko must pull its executor image, clone the repo, build, and push (3–10 min).
-#
-# Prerequisites:
-#   - harbor-credentials secret in argo-workflows namespace (issue #62)
-#   - image-build-push WorkflowTemplate deployed and ArgoCD synced (issue #63)
-#   - 'library' project in Harbor (default, always present)
-#   - 'cache' project in Harbor with robot$argo-workflows push/pull access (issue #63)
-#   - robot$argo-workflows has Artifact:Delete permission on 'library' project (issue #62)
-#
-# Steps:
-#   1. Submit  — creates a Workflow from the image-build-push WorkflowTemplate via
-#                `argo submit --from`. Kaniko clones ops-microk8s (git init container),
-#                builds tests/e2e-build/Dockerfile (FROM alpine:latest), and pushes
-#                to registry.verticon.com/library/kaniko-e2e-test:<epoch-tag>.
-#   2. Wait    — polls workflow phase every 15s up to 10 minutes. On failure, dumps
-#                Kaniko logs before exiting non-zero.
-#   3. Verify image — hits Harbor API to confirm the artifact was actually pushed and
-#                returns its digest. Auth is extracted from the harbor-credentials secret
-#                already in the cluster (no passwords in the command).
-#   4. Verify cache — queries Harbor API for repositories in the 'cache' project. A PASS
-#                means Kaniko wrote layer cache entries to registry.verticon.com/cache.
-#                WARN (not failure) on first build with a bare FROM — Kaniko only caches
-#                RUN layers, so FROM alpine:latest alone produces no cache entries.
-#   5. Delete artifact — removes the test artifact from Harbor via API (DELETE on the tag
-#                reference). Warns but does not fail if the robot account lacks Artifact:Delete.
-#   6. Cleanup — trap on EXIT deletes the Workflow object from the cluster regardless of
-#                success or failure, keeping the argo-workflows namespace tidy.
+# End-to-end CI pipeline validation: Kaniko build -> Harbor checks -> PR check -> cleanup
+# (3–10 min; run after CI pipeline changes). Steps and prerequisites: `ops ci build-e2e --help`
 test-build-e2e:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    NS=argo-workflows
-    PROJECT=library
-    REPO=kaniko-e2e-test
-    TAG=e2e-$(date +%s)
-    IMAGE="registry.verticon.com/$PROJECT/$REPO:$TAG"
-    SPEC_BRANCH="image-update/${TAG}"
-    PR_NUMBER=""
-
-    # Step 6+: runs on EXIT (success or failure) to delete the Workflow object,
-    # close the test PR, and delete the spec branch.
-    cleanup() {
-        if [ -n "${WF_NAME:-}" ]; then
-            echo ">>> Cleaning up workflow $WF_NAME..."
-            kubectl delete workflow "$WF_NAME" -n $NS --ignore-not-found >/dev/null 2>&1 || true
-        fi
-        if [ -n "${PR_NUMBER:-}" ]; then
-            echo ">>> Closing PR #$PR_NUMBER..."
-            gh pr close "$PR_NUMBER" --repo jconlon/ops-microk8s 2>/dev/null || true
-        fi
-        echo ">>> Deleting spec branch $SPEC_BRANCH..."
-        gh api -X DELETE "repos/jconlon/ops-microk8s/git/refs/heads/$SPEC_BRANCH" 2>/dev/null || true
-    }
-    trap cleanup EXIT
-
-    # Step 1: submit build + PR workflow against this repo as the spec repo.
-    # spec-manifest points to tests/e2e-build/test-manifest.yaml which contains
-    # a placeholder image reference that the create-pr step will update.
-    echo ">>> Submitting kaniko build: $IMAGE"
-    WF_NAME=$(argo submit -n $NS \
-        --from clusterworkflowtemplate/image-build-push \
-        -p repo-url=https://github.com/jconlon/ops-microk8s \
-        -p image="$IMAGE" \
-        -p context=tests/e2e-build \
-        -p spec-repo-url=https://github.com/jconlon/ops-microk8s \
-        -p spec-manifest=tests/e2e-build/test-manifest.yaml \
-        -o name)
-    echo "    workflow: $WF_NAME"
-
-    # Step 2: poll workflow phase every 15s with a 15-minute hard deadline.
-    # Two steps run sequentially: build-and-push (Kaniko) then create-pr.
-    # argo wait --timeout is not supported in this CLI version.
-    echo ">>> Waiting for completion (timeout: 10m)..."
-    DEADLINE=$(($(date +%s) + 900))
-    while true; do
-        PHASE=$(kubectl get workflow "$WF_NAME" -n $NS \
-            -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        [ "$PHASE" = "Succeeded" ] && break
-        if [[ "$PHASE" =~ ^(Failed|Error)$ ]]; then
-            echo "FAIL  workflow phase: $PHASE"
-            argo logs -n $NS "$WF_NAME" 2>/dev/null || true
-            exit 1
-        fi
-        if [ "$(date +%s)" -gt "$DEADLINE" ]; then
-            echo "FAIL  timed out after 10m (phase: ${PHASE:-Unknown})"
-            exit 1
-        fi
-        sleep 15
-    done
-    echo "PASS  workflow succeeded"
-
-    # Step 3: extract Basic auth from the harbor-credentials dockerconfigjson secret
-    # and call the Harbor API to confirm the artifact exists and return its digest.
-    echo ">>> Verifying image in Harbor..."
-    AUTH=$(kubectl get secret harbor-credentials -n $NS \
-        -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(d['auths']['registry.verticon.com']['auth'])")
-    DIGEST=$(curl -sf \
-        -H "Authorization: Basic $AUTH" \
-        "https://registry.verticon.com/api/v2.0/projects/$PROJECT/repositories/$REPO/artifacts/$TAG" | \
-        python3 -c "import sys,json; print(json.load(sys.stdin)['digest'][:19])")
-    echo "PASS  image present in Harbor: $DIGEST"
-
-    # Step 4: check the cache project for repositories written by Kaniko --cache-repo.
-    # WARN (not FAIL) because FROM-only Dockerfiles produce no RUN layers to cache.
-    echo ">>> Verifying Kaniko layer cache populated in Harbor..."
-    CACHE_COUNT=$(curl -sf \
-        -H "Authorization: Basic $AUTH" \
-        "https://registry.verticon.com/api/v2.0/projects/cache/repositories?page_size=100" | \
-        python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-    if [ "${CACHE_COUNT:-0}" -gt 0 ] 2>/dev/null; then
-        echo "PASS  Kaniko cache populated: $CACHE_COUNT repositor$([ "$CACHE_COUNT" = "1" ] && echo y || echo ies) in registry.verticon.com/cache"
-    else
-        echo "WARN  no cache repositories found — cache project may be empty on first build or --cache-repo not reachable"
-    fi
-
-    # Step 5: delete the test artifact by tag reference via Harbor API.
-    # Requires Artifact:Delete permission on the library project for robot$argo-workflows.
-    echo ">>> Removing artifact from Harbor..."
-    HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-        -H "Authorization: Basic $AUTH" \
-        "https://registry.verticon.com/api/v2.0/projects/$PROJECT/repositories/$REPO/artifacts/$TAG")
-    if [ "$HTTP" = "200" ] || [ "$HTTP" = "202" ]; then
-        echo "PASS  artifact deleted"
-    else
-        echo "WARN  artifact deletion returned HTTP $HTTP — robot account may lack delete permission; clean up manually in Harbor"
-    fi
-
-    # Step 7: verify the create-pr step opened a PR against this repo.
-    echo ">>> Verifying PR created for branch $SPEC_BRANCH..."
-    PR_NUMBER=$(gh pr list --repo jconlon/ops-microk8s \
-        --head "$SPEC_BRANCH" --json number -q '.[0].number' 2>/dev/null || echo "")
-    if [ -n "$PR_NUMBER" ]; then
-        echo "PASS  PR #$PR_NUMBER created: $SPEC_BRANCH"
-    else
-        echo "FAIL  no PR found for branch $SPEC_BRANCH"
-        exit 1
-    fi
-
-    echo ">>> Done."
+    ops ci build-e2e
 
 # ── Argo Events ───────────────────────────────────────────────────────────────
 
@@ -327,21 +176,7 @@ loki-tail node="puffer":
 #   just loki-journal-check gold "OOM" 48h
 #   just loki-journal-check whale "entered failed state" 7d
 loki-journal-check node="puffer" filter="Power key" since="24h":
-    #!/usr/bin/env bash
-    echo "=== journal stream: node={{node}} filter='{{filter}}' since={{since}} ==="
-    logcli --addr=http://192.168.0.220 \
-      query "{job=\"journal\", node=\"{{node}}\"} |= \"{{filter}}\"" \
-      --since={{since}} --limit=100 --timezone=Local
-    echo ""
-    echo "=== journal stream flowing? (last 5 min) ==="
-    COUNT=$(logcli --addr=http://192.168.0.220 \
-      query "{job=\"journal\", node=\"{{node}}\"}" \
-      --since=5m --limit=1 --quiet 2>/dev/null | wc -l)
-    if [ "$COUNT" -gt 0 ]; then
-      echo "PASS  journal stream active for {{node}}"
-    else
-      echo "WARN  no journal entries in last 5 min — stream may be delayed or node down"
-    fi
+    ops loki journal-check {{node}} '{{filter}}' --since {{since}}
 
 # Query syslog for a specific node using the node label (available since 2026-05-12
 # pipeline_stages fix — streams before that date lack the label).
@@ -351,23 +186,7 @@ loki-journal-check node="puffer" filter="Power key" since="24h":
 #   just loki-syslog-node mullet 6h "disk"
 #   just loki-syslog-node tuna 24h "error"
 loki-syslog-node node="mullet" since="1h" filter="":
-    #!/usr/bin/env bash
-    QUERY="{job=\"syslog\", node=\"{{node}}\"}"
-    [ -n "{{filter}}" ] && QUERY="$QUERY |= \"{{filter}}\""
-    echo "=== syslog: node={{node}} since={{since}}$([ -n "{{filter}}" ] && echo " filter='{{filter}}'") ==="
-    logcli --addr=http://192.168.0.220 \
-      query "$QUERY" \
-      --since={{since}} --limit=200 --timezone=Local
-    echo ""
-    echo "=== stream active? (last 5 min) ==="
-    COUNT=$(logcli --addr=http://192.168.0.220 \
-      query "{job=\"syslog\", node=\"{{node}}\"}" \
-      --since=5m --limit=1 --quiet 2>/dev/null | wc -l)
-    if [ "$COUNT" -gt 0 ]; then
-      echo "PASS  syslog stream active for {{node}}"
-    else
-      echo "WARN  no syslog in last 5 min — node may be quiet or stream stale (pre-2026-05-12 data lacks node label)"
-    fi
+    ops loki syslog-node {{node}} --since {{since}} --filter '{{filter}}'
 
 # ── Docs ──────────────────────────────────────────────────────────────────────
 
@@ -469,24 +288,4 @@ issue issue:
 
 # Check syslog is flowing from all 8 nodes into Loki (last 15 minutes)
 loki-node-logs:
-    #!/usr/bin/env bash
-    LOKI="http://192.168.0.220"
-    START=$(date -u -d '15 minutes ago' +%s)000000000
-    END=$(date -u +%s)000000000
-    FAILED=0
-    for node in mullet trout tuna whale gold squid puffer carp; do
-      COUNT=$(curl -sfG \
-        --data-urlencode "query={filename=\"/var/log/syslog\"} |= \" ${node} \"" \
-        --data-urlencode "start=$START" \
-        --data-urlencode "end=$END" \
-        --data-urlencode "limit=1" \
-        "$LOKI/loki/api/v1/query_range" | \
-        python3 -c "import sys,json; d=json.load(sys.stdin); print(sum(len(s.get('values',[])) for s in d.get('data',{}).get('result',[])))")
-      if [ "$COUNT" -gt 0 ]; then
-        echo "PASS  $node"
-      else
-        echo "FAIL  $node — no syslog in last 15 min"
-        FAILED=1
-      fi
-    done
-    exit $FAILED
+    ops loki node-logs

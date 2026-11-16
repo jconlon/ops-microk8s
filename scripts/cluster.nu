@@ -99,3 +99,107 @@ def "main cluster node-status" [
         { node: $u.node, uptime: $u.uptime, reboot_required: $rb }
     }
 }
+
+# Run a shell script on a node's host via a kubectl debug pod and return its output
+#
+# `kubectl debug node/<n>` does not attach by default: it creates a pod and
+# returns at once. So this creates the pod, waits for it to finish, reads its
+# logs and deletes it. The host filesystem is at /host inside the pod. Mind
+# the /var/run symlink trap: /host/var/run points at the container's /run,
+# so use /host/run instead.
+def node-debug-run [node: string, script: string, --timeout: string = "120s"] {
+    let created = (^kubectl debug $"node/($node)" --image=alpine:latest --profile=legacy -- sh -c $script | complete)
+    if $created.exit_code != 0 {
+        error make { msg: $"kubectl debug failed on ($node): ($created.stderr | str trim)" }
+    }
+    let pod = ($created.stdout ++ $created.stderr | parse -r 'pod (?<name>\S+) with' | get -i name.0)
+    if ($pod | is-empty) {
+        error make { msg: $"could not find the debug pod name in: ($created.stdout ++ $created.stderr)" }
+    }
+    let waited = (^kubectl wait $"pod/($pod)" --for=jsonpath={.status.phase}=Succeeded $"--timeout=($timeout)" | complete)
+    let out = (^kubectl logs $pod | complete)
+    ^kubectl delete pod $pod --wait=false | complete | ignore
+    if $waited.exit_code != 0 {
+        error make { msg: $"debug pod ($pod) did not finish: ($waited.stderr | str trim)\n($out.stdout)" }
+    }
+    $out.stdout
+}
+
+# Verify the ACPI power key mitigations on puffer (issue #59)
+#
+# Checks logind.conf ignores the power key (short and long press) and the udev
+# rule that suppresses the power button is present. Exits 1 if any check fails.
+#
+# Usage:
+#   ops cluster puffer-powerkey
+#
+def "main cluster puffer-powerkey" [
+    --node: string = "puffer"   # node to check (the mitigations were only applied to puffer)
+] {
+    let script = '
+        grep -q "^HandlePowerKey=ignore" /host/etc/systemd/logind.conf \
+          && echo "PASS  HandlePowerKey=ignore" \
+          || echo "FAIL  HandlePowerKey=ignore missing"
+        grep -q "^HandlePowerKeyLongPress=ignore" /host/etc/systemd/logind.conf \
+          && echo "PASS  HandlePowerKeyLongPress=ignore" \
+          || echo "FAIL  HandlePowerKeyLongPress=ignore missing"
+        test -f /host/etc/udev/rules.d/99-ignore-power-button.udev \
+          && echo "PASS  udev power button suppression rule" \
+          || echo "FAIL  udev rule missing"
+    '
+    print $"Checking ($node) power key mitigations..."
+    let out = (node-debug-run $node $script)
+    print ($out | str trim)
+    if ($out =~ 'FAIL') { exit 1 }
+}
+
+# Show pods that are not healthy, across all namespaces
+#
+# Lists pods that aren't Running or Succeeded, pods with a container stuck
+# waiting (CrashLoopBackOff, ImagePullBackOff, ...) and Running pods whose
+# containers aren't all ready. Prints a message when there are none.
+#
+# Usage:
+#   ops cluster pods-unhealthy
+#
+def "main cluster pods-unhealthy" [] {
+    let pods = (
+        ^kubectl get pods -A -o json | from json | get items
+        | each { |p|
+            let cs   = ($p.status | get -i containerStatuses | default [])
+            let ics  = ($p.status | get -i initContainerStatuses | default [])
+            let main_reasons = ($cs | each { |c| $c.state | get -i waiting.reason } | compact)
+            let init_reasons = ($ics | each { |c|
+                let w = ($c.state | get -i waiting.reason)
+                let t = ($c.state | get -i terminated)
+                if ($w | is-not-empty) and $w != "PodInitializing" { $"Init:($w)" } else if ($t | is-not-empty) and $t.exitCode != 0 { $"Init:($t.reason? | default 'Error')" }
+            } | compact)
+            let ready = ($cs | where ready == true | length)
+            let status = if ($p.metadata | get -i deletionTimestamp | is-not-empty) {
+                "Terminating"
+            } else if ($init_reasons | is-not-empty) {
+                $init_reasons.0
+            } else if ($main_reasons | is-not-empty) {
+                $main_reasons.0
+            } else {
+                $p.status.phase
+            }
+            {
+                namespace: $p.metadata.namespace
+                name:      $p.metadata.name
+                ready:     $"($ready)/($cs | length)"
+                status:    $status
+                restarts:  ($cs | each { |c| $c.restartCount } | append 0 | math sum)
+                node:      ($p.spec | get -i nodeName | default "")
+                all_ready: ($ready == ($cs | length))
+            }
+        }
+        | where { |r| ($r.status not-in [Running Succeeded]) or ($r.status == "Running" and not $r.all_ready) }
+        | reject all_ready
+    )
+    if ($pods | is-empty) {
+        print "No unhealthy pods"
+    } else {
+        $pods
+    }
+}

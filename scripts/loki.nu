@@ -349,3 +349,94 @@ def "main loki tail" [
     print $"(ansi green)Tailing ($node) syslog — Ctrl+C to stop(ansi reset)"
     ^logcli query $query --addr $LOKI --tail --output raw --quiet
 }
+
+# Count lines in a stream for a node over the last 5 minutes (0 on error)
+def recent-count [job: string, node: string] {
+    let r = (^logcli query $"{job=\"($job)\", node=\"($node)\"}" --addr $LOKI --since 5m --limit 1 --output jsonl --quiet | complete)
+    if $r.exit_code != 0 { 0 } else { $r.stdout | lines | where { |l| $l | str trim | is-not-empty } | length }
+}
+
+# Print PASS/WARN for whether a node's stream has logged in the last 5 minutes
+def report-stream-active [job: string, node: string, hint: string] {
+    if (recent-count $job $node) > 0 {
+        print $"PASS  ($job) stream active for ($node)"
+    } else {
+        print $"WARN  no ($job) entries in last 5 min — ($hint)"
+    }
+}
+
+# Search a node's systemd journal stream for a term
+#
+# A first-line check before reaching for `kubectl debug` (issue #64). The
+# journal stream has logind, kernel errors and unit failures that rsyslog
+# misses. Also reports whether the node's journal stream is still flowing.
+#
+# Usage:
+#   ops loki journal-check puffer "Power key" --since 24h
+#   ops loki journal-check gold "OOM" --since 48h
+#   ops loki journal-check whale "entered failed state" --since 7d
+#
+def "main loki journal-check" [
+    node: string = "puffer"          # cluster node name
+    filter: string = "Power key"     # text to search for
+    --since (-s): string = "24h"     # how far back
+    --limit (-n): int = 100          # max lines returned
+] {
+    print $"=== journal stream: node=($node) filter='($filter)' since=($since) ==="
+    let rows = (loki-query $"{job=\"journal\", node=\"($node)\"} |= `($filter)`" $since $limit | select time message)
+    if ($rows | is-empty) { print "(no matching lines)" } else { print ($rows | table) }
+    print ""
+    report-stream-active "journal" $node "stream may be delayed or node down"
+}
+
+# Show a node's syslog using the node label
+#
+# Faster and more accurate than node-events, which matches the hostname in the
+# line text. The node label only exists from 2026-05-12 on, so older data
+# returns nothing. Also reports whether the node's syslog is still flowing.
+#
+# Usage:
+#   ops loki syslog-node whale
+#   ops loki syslog-node mullet --since 6h --filter disk
+#   ops loki syslog-node tuna --since 24h --filter error
+#
+def "main loki syslog-node" [
+    node: string = "mullet"          # cluster node name
+    --since (-s): string = "1h"      # how far back
+    --filter (-f): string = ""       # optional text filter (server-side)
+    --limit (-n): int = 200          # max lines returned
+] {
+    # Pin filename: the syslog job also has a kern.log stream that repeats every kernel line.
+    let base = $"{job=\"syslog\", filename=\"/var/log/syslog\", node=\"($node)\"}"
+    let query = if ($filter | is-empty) { $base } else { $"($base) |= `($filter)`" }
+    let label = if ($filter | is-empty) { "" } else { $" filter='($filter)'" }
+    print $"=== syslog: node=($node) since=($since)($label) ==="
+    let rows = (loki-query $query $since $limit | select time message | update message { clean-syslog-line $node })
+    if ($rows | is-empty) { print "(no matching lines)" } else { print ($rows | table) }
+    print ""
+    report-stream-active "syslog" $node "node may be quiet or stream stale (pre-2026-05-12 data lacks node label)"
+}
+
+# Check syslog is reaching Loki from all 8 cluster nodes
+#
+# Looks for at least one syslog line mentioning each node in the window.
+# Prints PASS/FAIL per node and exits 1 if any node has none.
+#
+# Usage:
+#   ops loki node-logs
+#   ops loki node-logs --since 1h
+#
+def "main loki node-logs" [
+    --since (-s): string = "15m"     # how far back
+] {
+    let nodes = [mullet trout tuna whale gold squid puffer carp]
+    let results = ($nodes | par-each --keep-order { |node|
+        let r = (^logcli query $"{filename=\"/var/log/syslog\"} |= \" ($node) \"" --addr $LOKI --since $since --limit 1 --output jsonl --quiet | complete)
+        let n = if $r.exit_code != 0 { 0 } else { $r.stdout | lines | where { |l| $l | str trim | is-not-empty } | length }
+        { node: $node, ok: ($n > 0) }
+    })
+    for r in $results {
+        if $r.ok { print $"PASS  ($r.node)" } else { print $"FAIL  ($r.node) — no syslog in last ($since)" }
+    }
+    if ($results | any { |r| not $r.ok }) { exit 1 }
+}

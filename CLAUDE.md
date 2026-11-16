@@ -88,7 +88,7 @@ Projects may open issues here when they need cluster-level support (secrets, sto
   - Backed by `production-postgresql/apicurio` database; credentials via `teller/.teller-apicurio.yml`
   - Operator: `quay.io/apicurio/apicurio-registry-operator:1.1.3` (v2, UBI8 — v3 requires x86-64-v3 CPU, incompatible with cluster nodes)
   - Phase 2 pipeline cutover completed June 2026 (freshrss#59, freshrss-streams#12 closed)
-- **Loki**: Grafana Loki log aggregation (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80; external access via https://loki.verticon.com (see kgateway entry below)
+- **Loki**: Grafana Loki log aggregation (`loki` namespace) — all pod logs + OS syslog; Grafana datasource at http://loki-gateway.loki.svc:80; external access via https://loki.verticon.com (see kgateway entry below). The plain-HTTP MetalLB IP `http://192.168.0.220` is kept on purpose for external Promtail pushes, `logcli` (`LOKI_ADDR` in devbox.json) and `ops loki` — see `loki-gitops/helm/loki-values.yaml`
 - **Argo Workflows**: CI/CD engine at https://workflows.verticon.com; `argo-workflows` namespace
   - `image-build-push` ClusterWorkflowTemplate — builds images via Kaniko and pushes to Harbor; callable from any namespace
   - `ci-tools` image at `registry.verticon.com/library/ci-tools:latest` — contains `git`, `gh`, `yq`; source at `images/ci-tools/Dockerfile`; rebuild with `argo submit --from clusterworkflowtemplate/image-build-push -p repo-url=https://github.com/jconlon/ops-microk8s -p image=registry.verticon.com/library/ci-tools:latest -p context=images/ci-tools`
@@ -390,7 +390,7 @@ _Project-specific instructions and facts—use only within this repository:_
 - All argocd commands use the `ops argocd` wrapper: e.g. `ops argocd list-app`
 - **For checking cluster state, prefer `just` recipes and chainsaw tests over raw kubectl:**
   - `just test` — run all e2e health checks (nodes, ceph, gpu, postgresql, argocd, kafka, apicurio, etc.)
-  - `just test-suite <suite>` — run a single suite: `cluster`, `storage`, `gpu`, `postgresql`, `argocd`, `kafka`, `kafka-connect`, `apicurio`, `loki`, `harbor`, `freshrss`, `vllm`
+  - `just test-suite <suite>` — run a single suite (one per directory under `tests/`): `apicurio`, `argo-events`, `argo-workflows`, `argocd`, `cert-manager`, `cluster`, `freshrss`, `gpu`, `harbor`, `jellyfin`, `kafka`, `kafka-connect`, `kgateway`, `loki`, `postgresql`, `storage`, `vllm`
   - `just node-status` — node uptime + reboot-required
   - `just ceph-status` — Ceph cluster health
   - `just pg-status` — CloudNativePG cluster status

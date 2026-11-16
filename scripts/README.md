@@ -1,6 +1,6 @@
 # Scripts
 
-Operational scripts for the MicroK8s cluster. NuShell scripts are invoked via the `ops` wrapper using `devbox run`. Bash scripts are called directly or by systemd services.
+Operational scripts for the MicroK8s cluster. NuShell scripts are invoked via the `ops` wrapper at the repo root (on `PATH` inside the devbox shell; run `ops` alone to list every command). Bash scripts are called directly or by systemd services.
 
 ## Structure
 
@@ -8,6 +8,7 @@ Operational scripts for the MicroK8s cluster. NuShell scripts are invoked via th
 scripts/
 ├── alertmanager.nu              # Alertmanager polling + notify-send desktop alerts (nushell)
 ├── argocd.nu                    # ArgoCD management commands (nushell)
+├── ci.nu                        # CI pipeline end-to-end check (nushell)
 ├── cluster.nu                   # Cluster health/status commands (nushell)
 ├── freshrss.nu                  # FreshRSS database access (nushell)
 ├── kafka.nu                     # Schema registry queries via Apicurio ccompat API (nushell)
@@ -84,6 +85,9 @@ Loki log analysis commands via logcli. All commands query `http://192.168.0.220`
 | `ops loki idrac <node>` | iDRAC hardware events from a Dell R320 node (`--since 7d`) |
 | `ops loki reboot-history` | Boot times + `boots` / `clean_shutdowns` / `unclean` counts for all nodes (`--since 7d`). `unclean` > 0 means a boot with no orderly shutdown before it |
 | `ops loki tail <node>` | Live tail syslog for a node (`--filter ""`) |
+| `ops loki journal-check <node> <text>` | Search a node's systemd journal stream for text, and report whether the stream is still flowing (`--since 24h`). First check before `kubectl debug` (issue #64) |
+| `ops loki syslog-node <node>` | A node's syslog by node label, plus a stream-flowing check (`--since 1h`, `--filter ""`). Only data from 2026-05-12 on has the label |
+| `ops loki node-logs` | PASS/FAIL per node for whether syslog reached Loki recently (`--since 15m`); exits 1 on any FAIL |
 
 ```bash
 # Investigate puffer shutdowns over the last 7 days
@@ -111,6 +115,9 @@ just loki-reboot-history 30d
 just loki-idrac puffer 7d
 just loki-node-events puffer 24h
 just loki-tail puffer
+just loki-journal-check gold "OOM" 48h
+just loki-syslog-node mullet 6h disk
+just loki-node-logs
 ```
 
 ---
@@ -123,11 +130,29 @@ Cluster health and status commands. Queries Prometheus — no SSH required.
 |---|---|
 | `ops cluster node-uptime` | Show uptime for all 8 nodes via Prometheus |
 | `ops cluster node-status` | Show uptime + kured reboot-required status for all nodes |
+| `ops cluster pods-unhealthy` | Pods that aren't Running/Succeeded, have a container stuck waiting (CrashLoopBackOff etc.), or are Running but not ready. Prints "No unhealthy pods" otherwise |
+| `ops cluster puffer-powerkey` | Check puffer's power key mitigations (issue #59) through a `kubectl debug` pod; exits 1 on any FAIL |
 
 ```bash
 ops cluster node-uptime
 ops cluster node-status
+ops cluster pods-unhealthy     # just pods-unhealthy
+ops cluster puffer-powerkey    # just puffer-powerkey-status
 ```
+
+---
+
+### ci.nu
+
+| Command | Description |
+|---|---|
+| `ops ci build-e2e` | End-to-end CI check: Kaniko build via `image-build-push`, Harbor image + cache checks, PR check, then cleanup (`--timeout 15min`). Takes 3–10 min; run after CI pipeline changes. `ops ci build-e2e --help` lists the steps and prerequisites |
+
+```bash
+ops ci build-e2e   # just test-build-e2e
+```
+
+Cleanup (delete the Workflow, close the test PR, delete the `image-update/<tag>` branch) runs whether the check passes or fails, but not on Ctrl+C — clean up by hand if you interrupt it.
 
 ---
 
